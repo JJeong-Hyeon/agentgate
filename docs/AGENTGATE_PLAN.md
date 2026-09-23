@@ -390,6 +390,18 @@ AgentGate는 AI Agent와 기업 시스템 사이에서
 
 ---
 
+# 12. 배포 (prod 프로파일)
+
+`spring.profiles.active=prod`로 기동 시 admin 비밀번호가 dev 기본값이면 즉시 기동 실패(`SecurityHardeningCheck`). 필수 환경변수:
+
+- `AGENTGATE_ADMIN_USERNAME`, `AGENTGATE_ADMIN_PASSWORD`
+- `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`
+- `SPRING_DATA_REDIS_HOST`, `SPRING_DATA_REDIS_PORT`
+
+`spring-boot-docker-compose`는 developmentOnly라 prod 빌드에는 포함되지 않음 — 위 값들을 직접 넣어야 함.
+
+---
+
 # Project Status
 
 - [x] Spring Boot 프로젝트 생성
