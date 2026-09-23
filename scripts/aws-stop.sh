@@ -7,9 +7,10 @@ set -euo pipefail
 cd "$(dirname "$0")/../infra"
 EC2_ID=$(terraform output -raw ec2_instance_id)
 RDS_ID=$(terraform output -raw rds_instance_id)
+MONITORING_ID=$(terraform output -raw monitoring_instance_id)
 
-echo "Stopping EC2 ($EC2_ID)..."
-aws ec2 stop-instances --instance-ids "$EC2_ID"
+echo "Stopping EC2 ($EC2_ID, $MONITORING_ID)..."
+aws ec2 stop-instances --instance-ids "$EC2_ID" "$MONITORING_ID"
 
 echo "Stopping RDS ($RDS_ID)..."
 aws rds stop-db-instance --db-instance-identifier "$RDS_ID" || true
