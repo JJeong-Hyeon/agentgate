@@ -13,6 +13,7 @@ import com.agentgate.common.security.ApiKeyGenerator;
 import com.agentgate.risk.ActionStatus;
 import com.agentgate.risk.RiskEvaluationResult;
 import com.agentgate.risk.RiskEvaluationService;
+import com.agentgate.risk.RiskLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -33,7 +34,7 @@ public class AgentActionService {
             throw new InvalidApiKeyException();
         }
 
-        RiskEvaluationResult result = riskEvaluationService.evaluate(request.action(), request.labels());
+        RiskEvaluationResult result = applyAgentCap(agent, riskEvaluationService.evaluate(request.action(), request.labels()));
 
         Long approvalId = null;
         if (result.status() == ActionStatus.APPROVAL_REQUIRED) {
@@ -46,5 +47,13 @@ public class AgentActionService {
                 result.riskLevel(), result.status(), approvalId);
 
         return new ActionResponse(result.status(), result.riskLevel(), approvalId);
+    }
+
+    private RiskEvaluationResult applyAgentCap(Agent agent, RiskEvaluationResult result) {
+        RiskLevel cap = agent.getMaxRiskLevel();
+        if (cap != null && result.riskLevel().ordinal() > cap.ordinal()) {
+            return new RiskEvaluationResult(RiskLevel.BLOCKED, ActionStatus.BLOCKED);
+        }
+        return result;
     }
 }

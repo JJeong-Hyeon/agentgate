@@ -1,7 +1,10 @@
 package com.agentgate.agent.domain;
 
+import com.agentgate.risk.RiskLevel;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -31,6 +34,9 @@ public class Agent {
     @Column(nullable = false)
     private String apiKeyHash;
 
+    @Enumerated(EnumType.STRING)
+    private RiskLevel maxRiskLevel;
+
     private Instant createdAt;
 
     public Agent(String agentId, String name, String apiKeyHash) {
@@ -42,5 +48,9 @@ public class Agent {
     @PrePersist
     void onCreate() {
         this.createdAt = Instant.now();
+    }
+
+    public void restrictTo(RiskLevel maxRiskLevel) {
+        this.maxRiskLevel = maxRiskLevel;
     }
 }

@@ -113,6 +113,40 @@ class AgentActionServiceTest {
         assertThat(response.approvalId()).isEqualTo(42L);
     }
 
+    @Test
+    void overridesToBlockedWhenExceedingAgentRiskCap() {
+        Agent agent = new Agent("mail-agent", "Mail Agent", ApiKeyGenerator.hash(API_KEY));
+        agent.restrictTo(RiskLevel.LOW);
+        when(agentRepository.findByAgentId("mail-agent")).thenReturn(Optional.of(agent));
+        when(riskEvaluationService.evaluate("SEND_EMAIL", List.of("PII")))
+                .thenReturn(new RiskEvaluationResult(RiskLevel.HIGH, ActionStatus.APPROVAL_REQUIRED));
+
+        ActionRequest request = new ActionRequest("mail-agent", "SEND_EMAIL", null, List.of("PII"));
+
+        ActionResponse response = service.evaluate(request, API_KEY);
+
+        assertThat(response.status()).isEqualTo(ActionStatus.BLOCKED);
+        assertThat(response.riskLevel()).isEqualTo(RiskLevel.BLOCKED);
+        assertThat(response.approvalId()).isNull();
+        verify(approvalService, never()).createRequest(anyString(), anyString(), any(), any(), any());
+    }
+
+    @Test
+    void allowsWhenWithinAgentRiskCap() {
+        Agent agent = new Agent("mail-agent", "Mail Agent", ApiKeyGenerator.hash(API_KEY));
+        agent.restrictTo(RiskLevel.HIGH);
+        when(agentRepository.findByAgentId("mail-agent")).thenReturn(Optional.of(agent));
+        when(riskEvaluationService.evaluate("VIEW_DATA", List.of()))
+                .thenReturn(new RiskEvaluationResult(RiskLevel.LOW, ActionStatus.ALLOWED));
+
+        ActionRequest request = new ActionRequest("mail-agent", "VIEW_DATA", null, List.of());
+
+        ActionResponse response = service.evaluate(request, API_KEY);
+
+        assertThat(response.status()).isEqualTo(ActionStatus.ALLOWED);
+        assertThat(response.riskLevel()).isEqualTo(RiskLevel.LOW);
+    }
+
     private static void setId(ApprovalRequest approvalRequest, Long id) {
         try {
             Field field = ApprovalRequest.class.getDeclaredField("id");
