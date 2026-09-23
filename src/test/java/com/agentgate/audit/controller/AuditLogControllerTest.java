@@ -8,12 +8,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.agentgate.audit.dto.AuditLogResponse;
+import com.agentgate.audit.dto.AuditStatsResponse;
 import com.agentgate.audit.service.AuditLogService;
 import com.agentgate.common.exception.AuditLogNotFoundException;
 import com.agentgate.risk.ActionStatus;
 import com.agentgate.risk.RiskLevel;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -60,5 +62,17 @@ class AuditLogControllerTest {
         mockMvc.perform(get("/api/v1/audit-logs/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.approvalId").value(5));
+    }
+
+    @Test
+    void statsReturnsAggregation() throws Exception {
+        when(auditLogService.stats(isNull())).thenReturn(
+                new AuditStatsResponse(2L, Map.of(RiskLevel.LOW, 1L, RiskLevel.BLOCKED, 1L),
+                        Map.of(ActionStatus.ALLOWED, 1L, ActionStatus.BLOCKED, 1L), 0.5));
+
+        mockMvc.perform(get("/api/v1/audit-logs/stats"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalCount").value(2))
+                .andExpect(jsonPath("$.blockRate").value(0.5));
     }
 }

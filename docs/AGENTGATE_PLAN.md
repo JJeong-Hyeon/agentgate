@@ -306,6 +306,7 @@ GET  /api/v1/approvals/{id}          - 단건 조회
 ```
 GET /api/v1/audit-logs                - 목록 (?agentId=&status=&riskLevel= 필터 가능, AND 조합)
 GET /api/v1/audit-logs/{id}           - 단건 조회
+GET /api/v1/audit-logs/stats          - 집계 (?agentId= 선택), totalCount/countByRiskLevel/countByStatus/blockRate
 ```
 
 `/api/v1/actions` 호출마다 평가 시점 스냅샷이 불변 기록으로 남는다. 이후 승인이 결정돼도 로그 자체는 갱신되지 않으며, 승인의 현재 상태는 `approvalId`로 승인 API를 조회해서 확인한다.
@@ -389,7 +390,7 @@ AgentGate는 AI Agent와 기업 시스템 사이에서
 ## Multi Agent Governance
 - [x] Agent 권한 관리 (위험도 상한, `maxRiskLevel`)
 - Agent 간 통신 검증
-- 행동 분석
+- [x] 행동 분석 (`GET /api/v1/audit-logs/stats`)
 
 ---
 
