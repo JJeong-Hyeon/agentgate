@@ -101,6 +101,27 @@ class AuditLogIntegrationTest {
     }
 
     @Test
+    void statsReflectsLoggedActions() throws Exception {
+        mockMvc.perform(post("/api/v1/actions").header("X-API-Key", API_KEY)
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                        {"agentId":"mail-agent","action":"VIEW_DATA","labels":[]}
+                        """))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/actions").header("X-API-Key", API_KEY)
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                        {"agentId":"mail-agent","action":"SEND_EMAIL","labels":["PII"]}
+                        """))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/audit-logs/stats?agentId=mail-agent").with(httpBasic("test-admin", "test-password")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalCount").value(2))
+                .andExpect(jsonPath("$.countByRiskLevel.LOW").value(1))
+                .andExpect(jsonPath("$.countByRiskLevel.HIGH").value(1))
+                .andExpect(jsonPath("$.blockRate").value(0.0));
+    }
+
+    @Test
     void listWithoutCredentialsIsUnauthorized() throws Exception {
         mockMvc.perform(get("/api/v1/audit-logs"))
                 .andExpect(status().isUnauthorized());

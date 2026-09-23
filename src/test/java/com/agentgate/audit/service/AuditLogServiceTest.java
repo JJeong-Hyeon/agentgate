@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 
 import com.agentgate.audit.domain.AuditLog;
 import com.agentgate.audit.dto.AuditLogResponse;
+import com.agentgate.audit.dto.AuditStatsResponse;
 import com.agentgate.audit.repository.AuditLogRepository;
 import com.agentgate.common.exception.AuditLogNotFoundException;
 import com.agentgate.risk.ActionStatus;
@@ -67,5 +68,30 @@ class AuditLogServiceTest {
         List<AuditLogResponse> result = service.list(null, null, null);
 
         assertThat(result).hasSize(1);
+    }
+
+    @Test
+    void statsAggregatesCountsAndBlockRate() {
+        when(auditLogRepository.findAll()).thenReturn(List.of(
+                new AuditLog("mail-agent", "VIEW_DATA", null, List.of(), RiskLevel.LOW, ActionStatus.ALLOWED, null),
+                new AuditLog("mail-agent", "DELETE_DATA", null, List.of(), RiskLevel.BLOCKED, ActionStatus.BLOCKED, null),
+                new AuditLog("other-agent", "VIEW_DATA", null, List.of(), RiskLevel.LOW, ActionStatus.ALLOWED, null)));
+
+        AuditStatsResponse stats = service.stats("mail-agent");
+
+        assertThat(stats.totalCount()).isEqualTo(2);
+        assertThat(stats.countByRiskLevel().get(RiskLevel.LOW)).isEqualTo(1);
+        assertThat(stats.countByRiskLevel().get(RiskLevel.BLOCKED)).isEqualTo(1);
+        assertThat(stats.blockRate()).isEqualTo(0.5);
+    }
+
+    @Test
+    void statsReturnsZeroBlockRateWhenEmpty() {
+        when(auditLogRepository.findAll()).thenReturn(List.of());
+
+        AuditStatsResponse stats = service.stats("mail-agent");
+
+        assertThat(stats.totalCount()).isEqualTo(0);
+        assertThat(stats.blockRate()).isEqualTo(0.0);
     }
 }

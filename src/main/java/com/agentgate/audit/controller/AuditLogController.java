@@ -1,6 +1,7 @@
 package com.agentgate.audit.controller;
 
 import com.agentgate.audit.dto.AuditLogResponse;
+import com.agentgate.audit.dto.AuditStatsResponse;
 import com.agentgate.audit.service.AuditLogService;
 import com.agentgate.risk.ActionStatus;
 import com.agentgate.risk.RiskLevel;
@@ -30,5 +31,10 @@ public class AuditLogController {
     @GetMapping("/{id}")
     public ResponseEntity<AuditLogResponse> get(@PathVariable Long id) {
         return ResponseEntity.ok(auditLogService.get(id));
+    }
+
+    @GetMapping("/stats")
+    public ResponseEntity<AuditStatsResponse> stats(@RequestParam(required = false) String agentId) {
+        return ResponseEntity.ok(auditLogService.stats(agentId));
     }
 }
