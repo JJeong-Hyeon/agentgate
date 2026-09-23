@@ -43,4 +43,10 @@ public class Policy {
     void onCreate() {
         this.createdAt = Instant.now();
     }
+
+    public void update(String actionType, String label, RiskLevel riskLevel) {
+        this.actionType = actionType;
+        this.label = label;
+        this.riskLevel = riskLevel;
+    }
 }

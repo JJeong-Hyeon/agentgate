@@ -262,6 +262,26 @@ Response:
 }
 ```
 
+## Policy 관리
+
+```
+POST   /api/v1/policies       - 생성
+GET    /api/v1/policies       - 전체 목록
+GET    /api/v1/policies/{id}  - 단건 조회
+PUT    /api/v1/policies/{id}  - 수정
+DELETE /api/v1/policies/{id}  - 삭제
+```
+
+Request/Response 예시:
+
+```json
+{
+  "actionType": "EXPORT_DATA",
+  "label": null,
+  "riskLevel": "MEDIUM"
+}
+```
+
 ---
 
 # 9. 패키지 구조
@@ -330,7 +350,7 @@ AgentGate는 AI Agent와 기업 시스템 사이에서
 - [x] Spring Boot 프로젝트 생성
 - [x] Java 21 환경 구성
 - [x] GitHub Repository 생성
-- [ ] Gateway API 구현
-- [ ] Policy Engine 구현
+- [x] Gateway API 구현
+- [x] Policy Engine 구현
 - [ ] Approval Workflow 구현
 - [ ] Audit Dashboard 구현

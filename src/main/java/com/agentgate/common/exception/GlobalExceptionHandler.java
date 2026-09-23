@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -20,6 +21,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AgentNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleAgentNotFound(AgentNotFoundException ex, HttpServletRequest request) {
         return build(HttpStatus.NOT_FOUND, "AGENT_NOT_FOUND", ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(PolicyNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handlePolicyNotFound(PolicyNotFoundException ex, HttpServletRequest request) {
+        return build(HttpStatus.NOT_FOUND, "POLICY_NOT_FOUND", ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleMalformedRequest(HttpMessageNotReadableException ex, HttpServletRequest request) {
+        return build(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "Malformed request body", request);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
