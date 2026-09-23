@@ -405,6 +405,8 @@ AgentGate는 AI Agent와 기업 시스템 사이에서
 
 `spring-boot-docker-compose`는 developmentOnly라 prod 빌드에는 포함되지 않음 — 위 값들을 직접 넣어야 함.
 
+AWS(EC2+RDS+ALB) 실제 배포 절차는 [`docs/DEPLOYMENT.md`](DEPLOYMENT.md) 참고.
+
 ---
 
 # Project Status
