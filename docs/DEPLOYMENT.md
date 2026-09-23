@@ -1,4 +1,4 @@
-# AWS 배포 (EC2 + RDS + ALB)
+# AWS 배포 (EC2 + RDS + ALB + 모니터링 EC2)
 
 상시 운영이 아니라 필요할 때만 켜는 걸 전제로 한다. EC2/RDS는 `scripts/aws-start.sh` / `aws-stop.sh`로 껐다 켤 수 있고, ALB는 "정지" 개념이 없어 떠있는 동안 계속 과금된다 — 안 쓸 땐 `terraform destroy -target=aws_lb.app`로 지웠다가 필요할 때 `terraform apply`로 다시 만드는 걸 권장한다.
 
@@ -22,7 +22,7 @@ terraform plan \
 terraform apply  # 위와 동일한 -var 플래그로
 ```
 
-`terraform output`으로 `ec2_public_ip`, `alb_dns_name`, `rds_endpoint` 확인.
+`terraform output`으로 `ec2_public_ip`, `alb_dns_name`, `rds_endpoint`, `monitoring_public_ip` 확인. 모니터링용 EC2 #2는 Prometheus+Grafana가 자동으로 기동되어 있음 — Grafana 접속/데이터소스 설정은 [`docs/GRAFANA_N8N_SETUP.md`](GRAFANA_N8N_SETUP.md) 참고.
 
 ## 2. EC2에 앱 배포
 

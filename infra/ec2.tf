@@ -28,6 +28,14 @@ resource "aws_security_group" "app" {
     security_groups = [aws_security_group.alb.id]
   }
 
+  ingress {
+    description     = "Metrics scraping from monitoring EC2"
+    from_port       = 8080
+    to_port         = 8080
+    protocol        = "tcp"
+    security_groups = [aws_security_group.monitoring.id]
+  }
+
   egress {
     from_port   = 0
     to_port     = 0

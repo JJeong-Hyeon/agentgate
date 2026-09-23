@@ -192,8 +192,8 @@ Grafana + Prometheus (도입 완료) — `/actuator/prometheus`로 메트릭 노
 - PostgreSQL
 
 ## Infrastructure
-- Docker
-- Docker Compose
+- Docker, Docker Compose (로컬)
+- AWS: EC2(앱), EC2(모니터링, Prometheus+Grafana 셀프호스팅), RDS(Postgres), ALB — `infra/`의 Terraform으로 관리(`docs/DEPLOYMENT.md`)
 
 ## Monitoring
 - Prometheus
