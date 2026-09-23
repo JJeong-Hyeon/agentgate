@@ -170,7 +170,7 @@ Redis (도입 완료 — 용도는 아래 참고)
 
 ## Monitoring
 
-Grafana + Prometheus (Phase 4 이후 도입, Actuator는 기반 마련됨)
+Grafana + Prometheus (도입 완료) — `/actuator/prometheus`로 메트릭 노출, `docker compose up`으로 prometheus(9090)/grafana(3000) 기동
 
 관리:
 - Agent 요청량
