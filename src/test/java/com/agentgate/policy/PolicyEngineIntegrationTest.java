@@ -1,5 +1,6 @@
 package com.agentgate.policy;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -50,6 +51,7 @@ class PolicyEngineIntegrationTest {
                 """;
 
         MvcResult createResult = mockMvc.perform(post("/api/v1/policies")
+                        .with(httpBasic("test-admin", "test-password"))
                         .contentType(MediaType.APPLICATION_JSON).content(createBody))
                 .andExpect(status().isCreated())
                 .andReturn();
@@ -63,7 +65,8 @@ class PolicyEngineIntegrationTest {
                 .andExpect(jsonPath("$.status").value("ALLOWED"))
                 .andExpect(jsonPath("$.riskLevel").value("MEDIUM"));
 
-        mockMvc.perform(delete("/api/v1/policies/" + policyId))
+        mockMvc.perform(delete("/api/v1/policies/" + policyId)
+                        .with(httpBasic("test-admin", "test-password")))
                 .andExpect(status().isNoContent());
 
         mockMvc.perform(post("/api/v1/actions").contentType(MediaType.APPLICATION_JSON).content(actionBody))

@@ -1,5 +1,6 @@
 package com.agentgate.audit;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -68,23 +69,30 @@ class AuditLogIntegrationTest {
         long approvalId = objectMapper.readTree(highRiskResult.getResponse().getContentAsString())
                 .get("approvalId").asLong();
 
-        mockMvc.perform(get("/api/v1/audit-logs"))
+        mockMvc.perform(get("/api/v1/audit-logs").with(httpBasic("test-admin", "test-password")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2));
 
-        mockMvc.perform(get("/api/v1/audit-logs?status=APPROVAL_REQUIRED"))
+        mockMvc.perform(get("/api/v1/audit-logs?status=APPROVAL_REQUIRED").with(httpBasic("test-admin", "test-password")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].approvalId").value(approvalId))
                 .andExpect(jsonPath("$[0].riskLevel").value("HIGH"));
 
         mockMvc.perform(post("/api/v1/approvals/" + approvalId + "/approve")
+                        .with(httpBasic("test-admin", "test-password"))
                         .contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isOk());
 
-        mockMvc.perform(get("/api/v1/audit-logs?status=APPROVAL_REQUIRED"))
+        mockMvc.perform(get("/api/v1/audit-logs?status=APPROVAL_REQUIRED").with(httpBasic("test-admin", "test-password")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].status").value("APPROVAL_REQUIRED"));
+    }
+
+    @Test
+    void listWithoutCredentialsIsUnauthorized() throws Exception {
+        mockMvc.perform(get("/api/v1/audit-logs"))
+                .andExpect(status().isUnauthorized());
     }
 }

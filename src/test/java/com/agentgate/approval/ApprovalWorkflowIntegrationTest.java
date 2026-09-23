@@ -1,5 +1,6 @@
 package com.agentgate.approval;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -67,18 +68,19 @@ class ApprovalWorkflowIntegrationTest {
         long approvalId = objectMapper.readTree(actionResult.getResponse().getContentAsString())
                 .get("approvalId").asLong();
 
-        mockMvc.perform(get("/api/v1/approvals/" + approvalId))
+        mockMvc.perform(get("/api/v1/approvals/" + approvalId).with(httpBasic("test-admin", "test-password")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("PENDING"));
 
         mockMvc.perform(post("/api/v1/approvals/" + approvalId + "/approve")
+                        .with(httpBasic("test-admin", "test-password"))
                         .contentType(MediaType.APPLICATION_JSON).content("""
                                 {"decidedBy":"alice"}
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("APPROVED"));
 
-        mockMvc.perform(get("/api/v1/approvals/" + approvalId))
+        mockMvc.perform(get("/api/v1/approvals/" + approvalId).with(httpBasic("test-admin", "test-password")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("APPROVED"))
                 .andExpect(jsonPath("$.decidedBy").value("alice"));
@@ -97,10 +99,12 @@ class ApprovalWorkflowIntegrationTest {
                 .get("approvalId").asLong();
 
         mockMvc.perform(post("/api/v1/approvals/" + approvalId + "/approve")
+                        .with(httpBasic("test-admin", "test-password"))
                         .contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isOk());
 
         mockMvc.perform(post("/api/v1/approvals/" + approvalId + "/approve")
+                        .with(httpBasic("test-admin", "test-password"))
                         .contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("INVALID_APPROVAL_STATE"));

@@ -232,6 +232,11 @@ Grafana + Prometheus (Phase 4 이후 도입, Actuator는 기반 마련됨)
 
 # 8. API 설계
 
+## 인증
+
+- `/api/v1/policies/**`, `/api/v1/approvals/**`, `/api/v1/audit-logs/**`: HTTP Basic Auth (운영자 계정, `agentgate.admin.username`/`agentgate.admin.password` 설정값)
+- `/api/v1/actions`: 아직 인증 없음 (Agent API Key는 별도 작업으로 진행 예정)
+
 ## Action 요청
 
 POST
