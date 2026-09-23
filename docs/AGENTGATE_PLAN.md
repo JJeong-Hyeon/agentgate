@@ -234,8 +234,27 @@ Grafana + Prometheus (Phase 4 이후 도입, Actuator는 기반 마련됨)
 
 ## 인증
 
-- `/api/v1/policies/**`, `/api/v1/approvals/**`, `/api/v1/audit-logs/**`: HTTP Basic Auth (운영자 계정, `agentgate.admin.username`/`agentgate.admin.password` 설정값)
-- `/api/v1/actions`: 아직 인증 없음 (Agent API Key는 별도 작업으로 진행 예정)
+- `/api/v1/policies/**`, `/api/v1/approvals/**`, `/api/v1/audit-logs/**`, `/api/v1/agents/**`: HTTP Basic Auth (운영자 계정, `agentgate.admin.username`/`agentgate.admin.password` 설정값)
+- `/api/v1/actions`: Agent API Key (`X-API-Key` 헤더). 키는 `POST /api/v1/agents`로 에이전트를 등록할 때 한 번만 평문으로 응답에 포함되며, 이후엔 해시만 저장되어 다시 조회할 수 없다.
+
+## Agent 등록
+
+```
+POST /api/v1/agents        - 생성 (관리자 인증 필요), 응답에 평문 apiKey 1회만 포함, 201
+GET  /api/v1/agents        - 목록 (관리자 인증 필요, 키 미노출), 200
+GET  /api/v1/agents/{id}   - 단건 (관리자 인증 필요, 키 미노출), 200
+```
+
+`/api/v1/actions` 호출 예시:
+
+```
+curl -u admin:<password> -X POST localhost:8080/api/v1/agents \
+  -H "Content-Type: application/json" -d '{"agentId":"mail-agent","name":"Mail Agent"}'
+# 응답의 apiKey를 그대로 사용
+
+curl -X POST localhost:8080/api/v1/actions -H "X-API-Key: <apiKey>" \
+  -H "Content-Type: application/json" -d '{"agentId":"mail-agent","action":"VIEW_DATA","labels":[]}'
+```
 
 ## Action 요청
 

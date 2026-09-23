@@ -17,6 +17,8 @@ import com.agentgate.approval.domain.ApprovalRequest;
 import com.agentgate.approval.service.ApprovalService;
 import com.agentgate.audit.service.AuditLogService;
 import com.agentgate.common.exception.AgentNotFoundException;
+import com.agentgate.common.exception.InvalidApiKeyException;
+import com.agentgate.common.security.ApiKeyGenerator;
 import com.agentgate.risk.ActionStatus;
 import com.agentgate.risk.RiskEvaluationResult;
 import com.agentgate.risk.RiskEvaluationService;
@@ -32,6 +34,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
 class AgentActionServiceTest {
+
+    private static final String API_KEY = "test-key";
 
     @Mock
     private AgentRepository agentRepository;
@@ -58,20 +62,31 @@ class AgentActionServiceTest {
 
         ActionRequest request = new ActionRequest("ghost-agent", "VIEW_DATA", null, List.of());
 
-        assertThatThrownBy(() -> service.evaluate(request))
+        assertThatThrownBy(() -> service.evaluate(request, API_KEY))
                 .isInstanceOf(AgentNotFoundException.class);
+    }
+
+    @Test
+    void throwsWhenApiKeyIsWrong() {
+        when(agentRepository.findByAgentId("mail-agent"))
+                .thenReturn(Optional.of(new Agent("mail-agent", "Mail Agent", ApiKeyGenerator.hash(API_KEY))));
+
+        ActionRequest request = new ActionRequest("mail-agent", "VIEW_DATA", null, List.of());
+
+        assertThatThrownBy(() -> service.evaluate(request, "wrong-key"))
+                .isInstanceOf(InvalidApiKeyException.class);
     }
 
     @Test
     void returnsEvaluationResultWhenAgentExists() {
         when(agentRepository.findByAgentId("mail-agent"))
-                .thenReturn(Optional.of(new Agent("mail-agent", "Mail Agent")));
+                .thenReturn(Optional.of(new Agent("mail-agent", "Mail Agent", ApiKeyGenerator.hash(API_KEY))));
         when(riskEvaluationService.evaluate("VIEW_DATA", List.of()))
                 .thenReturn(new RiskEvaluationResult(RiskLevel.LOW, ActionStatus.ALLOWED));
 
         ActionRequest request = new ActionRequest("mail-agent", "VIEW_DATA", null, List.of());
 
-        ActionResponse response = service.evaluate(request);
+        ActionResponse response = service.evaluate(request, API_KEY);
 
         assertThat(response.status()).isEqualTo(ActionStatus.ALLOWED);
         assertThat(response.riskLevel()).isEqualTo(RiskLevel.LOW);
@@ -82,7 +97,7 @@ class AgentActionServiceTest {
     @Test
     void createsApprovalRequestWhenApprovalIsRequired() {
         when(agentRepository.findByAgentId("mail-agent"))
-                .thenReturn(Optional.of(new Agent("mail-agent", "Mail Agent")));
+                .thenReturn(Optional.of(new Agent("mail-agent", "Mail Agent", ApiKeyGenerator.hash(API_KEY))));
         when(riskEvaluationService.evaluate("SEND_EMAIL", List.of("PII")))
                 .thenReturn(new RiskEvaluationResult(RiskLevel.HIGH, ActionStatus.APPROVAL_REQUIRED));
         ApprovalRequest created = new ApprovalRequest("mail-agent", "SEND_EMAIL", null, List.of("PII"), RiskLevel.HIGH);
@@ -92,7 +107,7 @@ class AgentActionServiceTest {
 
         ActionRequest request = new ActionRequest("mail-agent", "SEND_EMAIL", null, List.of("PII"));
 
-        ActionResponse response = service.evaluate(request);
+        ActionResponse response = service.evaluate(request, API_KEY);
 
         assertThat(response.status()).isEqualTo(ActionStatus.APPROVAL_REQUIRED);
         assertThat(response.approvalId()).isEqualTo(42L);

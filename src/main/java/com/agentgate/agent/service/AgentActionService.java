@@ -5,8 +5,11 @@ import com.agentgate.agent.dto.ActionResponse;
 import com.agentgate.agent.repository.AgentRepository;
 import com.agentgate.approval.domain.ApprovalRequest;
 import com.agentgate.approval.service.ApprovalService;
+import com.agentgate.agent.domain.Agent;
 import com.agentgate.audit.service.AuditLogService;
 import com.agentgate.common.exception.AgentNotFoundException;
+import com.agentgate.common.exception.InvalidApiKeyException;
+import com.agentgate.common.security.ApiKeyGenerator;
 import com.agentgate.risk.ActionStatus;
 import com.agentgate.risk.RiskEvaluationResult;
 import com.agentgate.risk.RiskEvaluationService;
@@ -22,9 +25,13 @@ public class AgentActionService {
     private final ApprovalService approvalService;
     private final AuditLogService auditLogService;
 
-    public ActionResponse evaluate(ActionRequest request) {
-        agentRepository.findByAgentId(request.agentId())
+    public ActionResponse evaluate(ActionRequest request, String apiKey) {
+        Agent agent = agentRepository.findByAgentId(request.agentId())
                 .orElseThrow(() -> new AgentNotFoundException(request.agentId()));
+
+        if (apiKey == null || !ApiKeyGenerator.hash(apiKey).equals(agent.getApiKeyHash())) {
+            throw new InvalidApiKeyException();
+        }
 
         RiskEvaluationResult result = riskEvaluationService.evaluate(request.action(), request.labels());
 

@@ -28,11 +28,15 @@ public class Agent {
     @Column(nullable = false)
     private String name;
 
+    @Column(nullable = false)
+    private String apiKeyHash;
+
     private Instant createdAt;
 
-    public Agent(String agentId, String name) {
+    public Agent(String agentId, String name, String apiKeyHash) {
         this.agentId = agentId;
         this.name = name;
+        this.apiKeyHash = apiKeyHash;
     }
 
     @PrePersist
