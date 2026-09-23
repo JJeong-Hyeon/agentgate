@@ -1,0 +1,16 @@
+[Unit]
+Description=AgentGate
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=ec2-user
+WorkingDirectory=/home/ec2-user/agentgate
+EnvironmentFile=/home/ec2-user/agentgate/.env
+ExecStartPre=/usr/bin/docker start agentgate-redis
+ExecStart=/home/ec2-user/agentgate/gradlew bootRun --args='--spring.profiles.active=prod'
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
