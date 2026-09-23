@@ -7,6 +7,7 @@ import com.agentgate.policy.dto.PolicyResponse;
 import com.agentgate.policy.repository.PolicyRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,6 +18,7 @@ public class PolicyManagementService {
     private final PolicyRepository policyRepository;
 
     @Transactional
+    @CacheEvict(cacheNames = "policies", allEntries = true)
     public PolicyResponse create(PolicyRequest request) {
         Policy policy = new Policy(request.actionType(), request.label(), request.riskLevel());
         return PolicyResponse.from(policyRepository.save(policy));
@@ -33,6 +35,7 @@ public class PolicyManagementService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = "policies", allEntries = true)
     public PolicyResponse update(Long id, PolicyRequest request) {
         Policy policy = findOrThrow(id);
         policy.update(request.actionType(), request.label(), request.riskLevel());
@@ -40,6 +43,7 @@ public class PolicyManagementService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = "policies", allEntries = true)
     public void delete(Long id) {
         if (!policyRepository.existsById(id)) {
             throw new PolicyNotFoundException(id);

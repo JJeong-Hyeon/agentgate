@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.cache.CacheManager;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
@@ -35,10 +36,14 @@ class AgentActionIntegrationTest {
     @Autowired
     private PolicyRepository policyRepository;
 
+    @Autowired
+    private CacheManager cacheManager;
+
     @BeforeEach
     void seed() {
         agentRepository.deleteAll();
         policyRepository.deleteAll();
+        cacheManager.getCache("policies").clear();
 
         agentRepository.save(new Agent("mail-agent", "Mail Agent", ApiKeyGenerator.hash(API_KEY)));
         policyRepository.save(new Policy(null, "PII", RiskLevel.HIGH));

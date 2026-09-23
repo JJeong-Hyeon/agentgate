@@ -162,11 +162,11 @@ PostgreSQL
 
 ## Cache / Queue
 
-Redis (Phase 3 승인 시스템 구현 시점에 도입)
+Redis (도입 완료 — 용도는 아래 참고)
 
 활용:
-- 승인 대기 상태 관리
-- 이벤트 처리
+- Policy 조회 캐싱: `/api/v1/actions` 호출마다 Policy 테이블 전체를 다시 읽지 않도록 캐싱. Policy 생성/수정/삭제 시 즉시 무효화되며, TTL(5분)은 안전망으로만 존재
+- Approval 상태는 캐싱하지 않음 — Postgres가 이미 트랜잭션으로 완전히 관리하고 있어 중복 저장할 이유가 없음
 
 ## Monitoring
 
