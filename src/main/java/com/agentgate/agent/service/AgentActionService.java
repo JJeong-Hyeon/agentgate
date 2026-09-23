@@ -5,6 +5,7 @@ import com.agentgate.agent.dto.ActionResponse;
 import com.agentgate.agent.repository.AgentRepository;
 import com.agentgate.approval.domain.ApprovalRequest;
 import com.agentgate.approval.service.ApprovalService;
+import com.agentgate.audit.service.AuditLogService;
 import com.agentgate.common.exception.AgentNotFoundException;
 import com.agentgate.risk.ActionStatus;
 import com.agentgate.risk.RiskEvaluationResult;
@@ -19,6 +20,7 @@ public class AgentActionService {
     private final AgentRepository agentRepository;
     private final RiskEvaluationService riskEvaluationService;
     private final ApprovalService approvalService;
+    private final AuditLogService auditLogService;
 
     public ActionResponse evaluate(ActionRequest request) {
         agentRepository.findByAgentId(request.agentId())
@@ -32,6 +34,9 @@ public class AgentActionService {
                     request.agentId(), request.action(), request.target(), request.labels(), result.riskLevel());
             approvalId = approvalRequest.getId();
         }
+
+        auditLogService.record(request.agentId(), request.action(), request.target(), request.labels(),
+                result.riskLevel(), result.status(), approvalId);
 
         return new ActionResponse(result.status(), result.riskLevel(), approvalId);
     }

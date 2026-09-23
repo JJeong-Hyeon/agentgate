@@ -16,6 +16,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/actions").permitAll()
                         .requestMatchers("/api/v1/policies", "/api/v1/policies/**").permitAll()
                         .requestMatchers("/api/v1/approvals", "/api/v1/approvals/**").permitAll()
+                        .requestMatchers("/api/v1/audit-logs", "/api/v1/audit-logs/**").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                         .anyRequest().denyAll()
                 );
