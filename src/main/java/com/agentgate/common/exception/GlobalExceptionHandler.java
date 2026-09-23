@@ -28,6 +28,16 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.NOT_FOUND, "POLICY_NOT_FOUND", ex.getMessage(), request);
     }
 
+    @ExceptionHandler(ApprovalNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleApprovalNotFound(ApprovalNotFoundException ex, HttpServletRequest request) {
+        return build(HttpStatus.NOT_FOUND, "APPROVAL_NOT_FOUND", ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(IllegalApprovalStateException.class)
+    public ResponseEntity<ErrorResponse> handleIllegalApprovalState(IllegalApprovalStateException ex, HttpServletRequest request) {
+        return build(HttpStatus.CONFLICT, "INVALID_APPROVAL_STATE", ex.getMessage(), request);
+    }
+
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ErrorResponse> handleMalformedRequest(HttpMessageNotReadableException ex, HttpServletRequest request) {
         return build(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "Malformed request body", request);

@@ -258,8 +258,20 @@ Response:
 ```json
 {
   "status": "APPROVAL_REQUIRED",
-  "riskLevel": "HIGH"
+  "riskLevel": "HIGH",
+  "approvalId": 1
 }
+```
+
+`riskLevel`이 `HIGH`일 때만 `approvalId`가 채워지며, 아래 승인 API로 추적한다.
+
+## 승인 (Approval)
+
+```
+POST /api/v1/approvals/{id}/approve  - 승인
+POST /api/v1/approvals/{id}/reject   - 거절
+GET  /api/v1/approvals               - 목록 (?status=PENDING 필터 가능)
+GET  /api/v1/approvals/{id}          - 단건 조회
 ```
 
 ## Policy 관리
@@ -352,5 +364,5 @@ AgentGate는 AI Agent와 기업 시스템 사이에서
 - [x] GitHub Repository 생성
 - [x] Gateway API 구현
 - [x] Policy Engine 구현
-- [ ] Approval Workflow 구현
+- [x] Approval Workflow 구현
 - [ ] Audit Dashboard 구현

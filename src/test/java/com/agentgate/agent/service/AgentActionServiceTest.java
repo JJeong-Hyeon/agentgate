@@ -2,19 +2,28 @@ package com.agentgate.agent.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.agentgate.agent.domain.Agent;
 import com.agentgate.agent.dto.ActionRequest;
 import com.agentgate.agent.dto.ActionResponse;
 import com.agentgate.agent.repository.AgentRepository;
+import com.agentgate.approval.domain.ApprovalRequest;
+import com.agentgate.approval.service.ApprovalService;
 import com.agentgate.common.exception.AgentNotFoundException;
 import com.agentgate.risk.ActionStatus;
 import com.agentgate.risk.RiskEvaluationResult;
 import com.agentgate.risk.RiskEvaluationService;
 import com.agentgate.risk.RiskLevel;
+import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -29,10 +38,19 @@ class AgentActionServiceTest {
     @Mock
     private RiskEvaluationService riskEvaluationService;
 
+    @Mock
+    private ApprovalService approvalService;
+
+    private AgentActionService service;
+
+    @BeforeEach
+    void setUp() {
+        service = new AgentActionService(agentRepository, riskEvaluationService, approvalService);
+    }
+
     @Test
     void throwsWhenAgentIsUnknown() {
         when(agentRepository.findByAgentId("ghost-agent")).thenReturn(Optional.empty());
-        AgentActionService service = new AgentActionService(agentRepository, riskEvaluationService);
 
         ActionRequest request = new ActionRequest("ghost-agent", "VIEW_DATA", null, List.of());
 
@@ -46,7 +64,6 @@ class AgentActionServiceTest {
                 .thenReturn(Optional.of(new Agent("mail-agent", "Mail Agent")));
         when(riskEvaluationService.evaluate("VIEW_DATA", List.of()))
                 .thenReturn(new RiskEvaluationResult(RiskLevel.LOW, ActionStatus.ALLOWED));
-        AgentActionService service = new AgentActionService(agentRepository, riskEvaluationService);
 
         ActionRequest request = new ActionRequest("mail-agent", "VIEW_DATA", null, List.of());
 
@@ -54,5 +71,36 @@ class AgentActionServiceTest {
 
         assertThat(response.status()).isEqualTo(ActionStatus.ALLOWED);
         assertThat(response.riskLevel()).isEqualTo(RiskLevel.LOW);
+        assertThat(response.approvalId()).isNull();
+        verify(approvalService, never()).createRequest(anyString(), anyString(), any(), any(), any());
+    }
+
+    @Test
+    void createsApprovalRequestWhenApprovalIsRequired() {
+        when(agentRepository.findByAgentId("mail-agent"))
+                .thenReturn(Optional.of(new Agent("mail-agent", "Mail Agent")));
+        when(riskEvaluationService.evaluate("SEND_EMAIL", List.of("PII")))
+                .thenReturn(new RiskEvaluationResult(RiskLevel.HIGH, ActionStatus.APPROVAL_REQUIRED));
+        ApprovalRequest created = new ApprovalRequest("mail-agent", "SEND_EMAIL", null, List.of("PII"), RiskLevel.HIGH);
+        setId(created, 42L);
+        when(approvalService.createRequest(eq("mail-agent"), eq("SEND_EMAIL"), any(), eq(List.of("PII")), eq(RiskLevel.HIGH)))
+                .thenReturn(created);
+
+        ActionRequest request = new ActionRequest("mail-agent", "SEND_EMAIL", null, List.of("PII"));
+
+        ActionResponse response = service.evaluate(request);
+
+        assertThat(response.status()).isEqualTo(ActionStatus.APPROVAL_REQUIRED);
+        assertThat(response.approvalId()).isEqualTo(42L);
+    }
+
+    private static void setId(ApprovalRequest approvalRequest, Long id) {
+        try {
+            Field field = ApprovalRequest.class.getDeclaredField("id");
+            field.setAccessible(true);
+            field.set(approvalRequest, id);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException(e);
+        }
     }
 }

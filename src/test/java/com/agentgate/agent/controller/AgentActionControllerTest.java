@@ -55,7 +55,7 @@ class AgentActionControllerTest {
     @Test
     void returnsEvaluationResultWhenRequestIsValid() throws Exception {
         when(agentActionService.evaluate(org.mockito.ArgumentMatchers.any()))
-                .thenReturn(new ActionResponse(ActionStatus.ALLOWED, RiskLevel.LOW));
+                .thenReturn(new ActionResponse(ActionStatus.ALLOWED, RiskLevel.LOW, null));
         String body = """
                 {"agentId":"mail-agent","action":"VIEW_DATA","labels":[]}
                 """;
