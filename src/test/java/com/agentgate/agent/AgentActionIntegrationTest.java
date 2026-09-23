@@ -46,6 +46,9 @@ class AgentActionIntegrationTest {
         cacheManager.getCache("policies").clear();
 
         agentRepository.save(new Agent("mail-agent", "Mail Agent", ApiKeyGenerator.hash(API_KEY)));
+        Agent cappedAgent = new Agent("capped-agent", "Capped Agent", ApiKeyGenerator.hash(API_KEY));
+        cappedAgent.restrictTo(RiskLevel.LOW);
+        agentRepository.save(cappedAgent);
         policyRepository.save(new Policy(null, "PII", RiskLevel.HIGH));
         policyRepository.save(new Policy("VIEW_DATA", null, RiskLevel.LOW));
         policyRepository.save(new Policy("DELETE_DATA", null, RiskLevel.BLOCKED));
@@ -88,6 +91,20 @@ class AgentActionIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("BLOCKED"))
                 .andExpect(jsonPath("$.riskLevel").value("BLOCKED"));
+    }
+
+    @Test
+    void agentRiskCapOverridesToBlocked() throws Exception {
+        String body = """
+                {"agentId":"capped-agent","action":"SEND_EMAIL","target":"user@test.com","labels":["PII"]}
+                """;
+
+        mockMvc.perform(post("/api/v1/actions").header("X-API-Key", API_KEY)
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("BLOCKED"))
+                .andExpect(jsonPath("$.riskLevel").value("BLOCKED"))
+                .andExpect(jsonPath("$.approvalId").value(org.hamcrest.CoreMatchers.nullValue()));
     }
 
     @Test

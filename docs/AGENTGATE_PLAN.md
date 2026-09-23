@@ -243,7 +243,10 @@ Grafana + Prometheus (도입 완료) — `/actuator/prometheus`로 메트릭 노
 POST /api/v1/agents        - 생성 (관리자 인증 필요), 응답에 평문 apiKey 1회만 포함, 201
 GET  /api/v1/agents        - 목록 (관리자 인증 필요, 키 미노출), 200
 GET  /api/v1/agents/{id}   - 단건 (관리자 인증 필요, 키 미노출), 200
+PUT  /api/v1/agents/{id}/max-risk-level  - 위험도 상한 설정/해제(null), 200
 ```
+
+`maxRiskLevel`이 설정된 Agent는 평가 결과가 그 상한을 넘으면 정책과 무관하게 `BLOCKED`로 강제 격하된다.
 
 `/api/v1/actions` 호출 예시:
 
@@ -384,7 +387,7 @@ AgentGate는 AI Agent와 기업 시스템 사이에서
 - 업무 승인 정책
 
 ## Multi Agent Governance
-- Agent 권한 관리
+- [x] Agent 권한 관리 (위험도 상한, `maxRiskLevel`)
 - Agent 간 통신 검증
 - 행동 분석
 

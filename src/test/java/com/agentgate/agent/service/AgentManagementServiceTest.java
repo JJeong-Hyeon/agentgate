@@ -10,6 +10,8 @@ import com.agentgate.agent.dto.AgentCreateRequest;
 import com.agentgate.agent.dto.AgentCreateResponse;
 import com.agentgate.agent.repository.AgentRepository;
 import com.agentgate.common.exception.AgentNotFoundException;
+import com.agentgate.agent.dto.AgentResponse;
+import com.agentgate.risk.RiskLevel;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -53,5 +55,22 @@ class AgentManagementServiceTest {
         when(agentRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.get(99L)).isInstanceOf(AgentNotFoundException.class);
+    }
+
+    @Test
+    void restrictSetsMaxRiskLevel() {
+        Agent agent = new Agent("mail-agent", "Mail Agent", "hash");
+        when(agentRepository.findById(1L)).thenReturn(Optional.of(agent));
+
+        AgentResponse response = service.restrict(1L, RiskLevel.MEDIUM);
+
+        assertThat(response.maxRiskLevel()).isEqualTo(RiskLevel.MEDIUM);
+    }
+
+    @Test
+    void restrictThrowsWhenAgentMissing() {
+        when(agentRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.restrict(99L, RiskLevel.LOW)).isInstanceOf(AgentNotFoundException.class);
     }
 }
