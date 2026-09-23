@@ -2,6 +2,7 @@ package com.agentgate.policy.service;
 
 import com.agentgate.common.exception.PolicyNotFoundException;
 import com.agentgate.policy.domain.Policy;
+import com.agentgate.policy.domain.PolicyCategory;
 import com.agentgate.policy.dto.PolicyRequest;
 import com.agentgate.policy.dto.PolicyResponse;
 import com.agentgate.policy.repository.PolicyRepository;
@@ -20,12 +21,13 @@ public class PolicyManagementService {
     @Transactional
     @CacheEvict(cacheNames = "policies", allEntries = true)
     public PolicyResponse create(PolicyRequest request) {
-        Policy policy = new Policy(request.actionType(), request.label(), request.riskLevel());
+        Policy policy = new Policy(request.actionType(), request.label(), request.riskLevel(), request.category());
         return PolicyResponse.from(policyRepository.save(policy));
     }
 
-    public List<PolicyResponse> list() {
+    public List<PolicyResponse> list(PolicyCategory category) {
         return policyRepository.findAll().stream()
+                .filter(policy -> category == null || policy.getCategory() == category)
                 .map(PolicyResponse::from)
                 .toList();
     }
@@ -38,7 +40,7 @@ public class PolicyManagementService {
     @CacheEvict(cacheNames = "policies", allEntries = true)
     public PolicyResponse update(Long id, PolicyRequest request) {
         Policy policy = findOrThrow(id);
-        policy.update(request.actionType(), request.label(), request.riskLevel());
+        policy.update(request.actionType(), request.label(), request.riskLevel(), request.category());
         return PolicyResponse.from(policy);
     }
 

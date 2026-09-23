@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.agentgate.common.exception.PolicyNotFoundException;
+import com.agentgate.policy.domain.PolicyCategory;
 import com.agentgate.policy.dto.PolicyResponse;
 import com.agentgate.policy.service.PolicyManagementService;
 import com.agentgate.risk.RiskLevel;
@@ -57,7 +58,7 @@ class PolicyControllerTest {
     @Test
     void createsPolicyAndReturnsCreated() throws Exception {
         when(policyManagementService.create(any()))
-                .thenReturn(new PolicyResponse(1L, "VIEW_DATA", null, RiskLevel.LOW, Instant.now()));
+                .thenReturn(new PolicyResponse(1L, "VIEW_DATA", null, RiskLevel.LOW, PolicyCategory.PRIVACY, Instant.now()));
         String body = """
                 {"actionType":"VIEW_DATA","label":null,"riskLevel":"LOW"}
                 """;

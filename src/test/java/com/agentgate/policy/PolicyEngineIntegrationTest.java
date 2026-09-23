@@ -112,7 +112,7 @@ class PolicyEngineIntegrationTest {
 
         // 3. Mutate directly, bypassing PolicyManagementService — no cache eviction happens.
         Policy policy = policyRepository.findById(policyId).orElseThrow();
-        policy.update("CACHE_TEST", null, RiskLevel.HIGH);
+        policy.update("CACHE_TEST", null, RiskLevel.HIGH, null);
         policyRepository.save(policy);
 
         // 4. Still LOW: proves the evaluation is served from the cache, not a fresh DB read.

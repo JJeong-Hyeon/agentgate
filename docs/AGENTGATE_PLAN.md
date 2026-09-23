@@ -314,12 +314,14 @@ GET /api/v1/audit-logs/stats          - 집계 (?agentId= 선택), totalCount/co
 ## Policy 관리
 
 ```
-POST   /api/v1/policies       - 생성
-GET    /api/v1/policies       - 전체 목록
-GET    /api/v1/policies/{id}  - 단건 조회
-PUT    /api/v1/policies/{id}  - 수정
-DELETE /api/v1/policies/{id}  - 삭제
+POST   /api/v1/policies             - 생성
+GET    /api/v1/policies             - 전체 목록 (?category= 필터 가능)
+GET    /api/v1/policies/{id}        - 단건 조회
+PUT    /api/v1/policies/{id}        - 수정
+DELETE /api/v1/policies/{id}        - 삭제
 ```
+
+`category`는 `PRIVACY`(개인정보 정책) / `SECURITY`(보안 정책) / `APPROVAL_WORKFLOW`(업무 승인 정책) 중 하나이며 선택값(null 가능) — 매칭 로직에는 영향 없고 분류/조회 필터용.
 
 Request/Response 예시:
 
@@ -327,7 +329,8 @@ Request/Response 예시:
 {
   "actionType": "EXPORT_DATA",
   "label": null,
-  "riskLevel": "MEDIUM"
+  "riskLevel": "MEDIUM",
+  "category": "PRIVACY"
 }
 ```
 
@@ -383,9 +386,7 @@ AgentGate는 AI Agent와 기업 시스템 사이에서
 - Database
 
 ## Enterprise Policy Management
-- 개인정보 정책
-- 보안 정책
-- 업무 승인 정책
+- [x] Policy 카테고리 분류 (`PRIVACY`/`SECURITY`/`APPROVAL_WORKFLOW`, `?category=` 필터)
 
 ## Multi Agent Governance
 - [x] Agent 권한 관리 (위험도 상한, `maxRiskLevel`)

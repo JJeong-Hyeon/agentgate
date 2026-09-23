@@ -1,5 +1,6 @@
 package com.agentgate.policy.controller;
 
+import com.agentgate.policy.domain.PolicyCategory;
 import com.agentgate.policy.dto.PolicyRequest;
 import com.agentgate.policy.dto.PolicyResponse;
 import com.agentgate.policy.service.PolicyManagementService;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -30,8 +32,8 @@ public class PolicyController {
     }
 
     @GetMapping
-    public ResponseEntity<List<PolicyResponse>> list() {
-        return ResponseEntity.ok(policyManagementService.list());
+    public ResponseEntity<List<PolicyResponse>> list(@RequestParam(required = false) PolicyCategory category) {
+        return ResponseEntity.ok(policyManagementService.list(category));
     }
 
     @GetMapping("/{id}")
