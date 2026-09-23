@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -41,6 +42,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalApprovalStateException.class)
     public ResponseEntity<ErrorResponse> handleIllegalApprovalState(IllegalApprovalStateException ex, HttpServletRequest request) {
         return build(HttpStatus.CONFLICT, "INVALID_APPROVAL_STATE", ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(InvalidApiKeyException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidApiKey(InvalidApiKeyException ex, HttpServletRequest request) {
+        return build(HttpStatus.UNAUTHORIZED, "INVALID_API_KEY", ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ResponseEntity<ErrorResponse> handleMissingHeader(MissingRequestHeaderException ex, HttpServletRequest request) {
+        return build(HttpStatus.UNAUTHORIZED, "INVALID_API_KEY", "Missing or invalid API key", request);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)

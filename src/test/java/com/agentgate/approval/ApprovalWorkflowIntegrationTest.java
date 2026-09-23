@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.agentgate.agent.domain.Agent;
 import com.agentgate.agent.repository.AgentRepository;
 import com.agentgate.approval.repository.ApprovalRequestRepository;
+import com.agentgate.common.security.ApiKeyGenerator;
 import com.agentgate.policy.domain.Policy;
 import com.agentgate.policy.repository.PolicyRepository;
 import com.agentgate.risk.RiskLevel;
@@ -27,6 +28,8 @@ import tools.jackson.databind.ObjectMapper;
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class ApprovalWorkflowIntegrationTest {
+
+    private static final String API_KEY = "test-key";
 
     @Autowired
     private MockMvc mockMvc;
@@ -49,7 +52,7 @@ class ApprovalWorkflowIntegrationTest {
         policyRepository.deleteAll();
         approvalRequestRepository.deleteAll();
 
-        agentRepository.save(new Agent("mail-agent", "Mail Agent"));
+        agentRepository.save(new Agent("mail-agent", "Mail Agent", ApiKeyGenerator.hash(API_KEY)));
         policyRepository.save(new Policy(null, "PII", RiskLevel.HIGH));
     }
 
@@ -59,7 +62,7 @@ class ApprovalWorkflowIntegrationTest {
                 {"agentId":"mail-agent","action":"SEND_EMAIL","target":"user@test.com","labels":["PII"]}
                 """;
 
-        MvcResult actionResult = mockMvc.perform(post("/api/v1/actions")
+        MvcResult actionResult = mockMvc.perform(post("/api/v1/actions").header("X-API-Key", API_KEY)
                         .contentType(MediaType.APPLICATION_JSON).content(actionBody))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("APPROVAL_REQUIRED"))
@@ -91,7 +94,7 @@ class ApprovalWorkflowIntegrationTest {
         String actionBody = """
                 {"agentId":"mail-agent","action":"SEND_EMAIL","labels":["PII"]}
                 """;
-        MvcResult actionResult = mockMvc.perform(post("/api/v1/actions")
+        MvcResult actionResult = mockMvc.perform(post("/api/v1/actions").header("X-API-Key", API_KEY)
                         .contentType(MediaType.APPLICATION_JSON).content(actionBody))
                 .andExpect(status().isOk())
                 .andReturn();

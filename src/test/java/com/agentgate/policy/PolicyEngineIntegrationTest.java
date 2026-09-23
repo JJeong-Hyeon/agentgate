@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.agentgate.agent.domain.Agent;
 import com.agentgate.agent.repository.AgentRepository;
+import com.agentgate.common.security.ApiKeyGenerator;
 import com.agentgate.policy.repository.PolicyRepository;
 import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,6 +26,8 @@ import org.springframework.test.web.servlet.MvcResult;
 @ActiveProfiles("test")
 class PolicyEngineIntegrationTest {
 
+    private static final String API_KEY = "test-key";
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -41,7 +44,7 @@ class PolicyEngineIntegrationTest {
     void seed() {
         agentRepository.deleteAll();
         policyRepository.deleteAll();
-        agentRepository.save(new Agent("mail-agent", "Mail Agent"));
+        agentRepository.save(new Agent("mail-agent", "Mail Agent", ApiKeyGenerator.hash(API_KEY)));
     }
 
     @Test
@@ -60,7 +63,7 @@ class PolicyEngineIntegrationTest {
         String actionBody = """
                 {"agentId":"mail-agent","action":"EXPORT_DATA","labels":[]}
                 """;
-        mockMvc.perform(post("/api/v1/actions").contentType(MediaType.APPLICATION_JSON).content(actionBody))
+        mockMvc.perform(post("/api/v1/actions").header("X-API-Key", API_KEY).contentType(MediaType.APPLICATION_JSON).content(actionBody))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ALLOWED"))
                 .andExpect(jsonPath("$.riskLevel").value("MEDIUM"));
@@ -69,7 +72,7 @@ class PolicyEngineIntegrationTest {
                         .with(httpBasic("test-admin", "test-password")))
                 .andExpect(status().isNoContent());
 
-        mockMvc.perform(post("/api/v1/actions").contentType(MediaType.APPLICATION_JSON).content(actionBody))
+        mockMvc.perform(post("/api/v1/actions").header("X-API-Key", API_KEY).contentType(MediaType.APPLICATION_JSON).content(actionBody))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("APPROVAL_REQUIRED"))
                 .andExpect(jsonPath("$.riskLevel").value("HIGH"));

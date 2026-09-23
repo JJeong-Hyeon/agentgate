@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.agentgate.agent.domain.Agent;
 import com.agentgate.agent.repository.AgentRepository;
 import com.agentgate.audit.repository.AuditLogRepository;
+import com.agentgate.common.security.ApiKeyGenerator;
 import com.agentgate.policy.domain.Policy;
 import com.agentgate.policy.repository.PolicyRepository;
 import com.agentgate.risk.RiskLevel;
@@ -27,6 +28,8 @@ import tools.jackson.databind.ObjectMapper;
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class AuditLogIntegrationTest {
+
+    private static final String API_KEY = "test-key";
 
     @Autowired
     private MockMvc mockMvc;
@@ -49,19 +52,21 @@ class AuditLogIntegrationTest {
         policyRepository.deleteAll();
         auditLogRepository.deleteAll();
 
-        agentRepository.save(new Agent("mail-agent", "Mail Agent"));
+        agentRepository.save(new Agent("mail-agent", "Mail Agent", ApiKeyGenerator.hash(API_KEY)));
         policyRepository.save(new Policy(null, "PII", RiskLevel.HIGH));
         policyRepository.save(new Policy("VIEW_DATA", null, RiskLevel.LOW));
     }
 
     @Test
     void everyActionEvaluationIsLoggedAndQueryable() throws Exception {
-        mockMvc.perform(post("/api/v1/actions").contentType(MediaType.APPLICATION_JSON).content("""
+        mockMvc.perform(post("/api/v1/actions").header("X-API-Key", API_KEY)
+                        .contentType(MediaType.APPLICATION_JSON).content("""
                         {"agentId":"mail-agent","action":"VIEW_DATA","labels":[]}
                         """))
                 .andExpect(status().isOk());
 
-        MvcResult highRiskResult = mockMvc.perform(post("/api/v1/actions").contentType(MediaType.APPLICATION_JSON).content("""
+        MvcResult highRiskResult = mockMvc.perform(post("/api/v1/actions").header("X-API-Key", API_KEY)
+                        .contentType(MediaType.APPLICATION_JSON).content("""
                         {"agentId":"mail-agent","action":"SEND_EMAIL","labels":["PII"]}
                         """))
                 .andExpect(status().isOk())

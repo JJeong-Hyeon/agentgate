@@ -1,5 +1,6 @@
 package com.agentgate.agent.controller;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -40,27 +41,40 @@ class AgentActionControllerTest {
     }
 
     @Test
+    void returnsUnauthorizedWhenApiKeyHeaderIsMissing() throws Exception {
+        String body = """
+                {"agentId":"mail-agent","action":"VIEW_DATA","labels":[]}
+                """;
+
+        mockMvc.perform(post("/api/v1/actions").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("INVALID_API_KEY"));
+    }
+
+    @Test
     void returnsNotFoundWhenAgentIsUnknown() throws Exception {
-        when(agentActionService.evaluate(org.mockito.ArgumentMatchers.any()))
+        when(agentActionService.evaluate(any(), any()))
                 .thenThrow(new AgentNotFoundException("ghost-agent"));
         String body = """
                 {"agentId":"ghost-agent","action":"VIEW_DATA","labels":[]}
                 """;
 
-        mockMvc.perform(post("/api/v1/actions").contentType(MediaType.APPLICATION_JSON).content(body))
+        mockMvc.perform(post("/api/v1/actions").header("X-API-Key", "test-key")
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("AGENT_NOT_FOUND"));
     }
 
     @Test
     void returnsEvaluationResultWhenRequestIsValid() throws Exception {
-        when(agentActionService.evaluate(org.mockito.ArgumentMatchers.any()))
+        when(agentActionService.evaluate(any(), any()))
                 .thenReturn(new ActionResponse(ActionStatus.ALLOWED, RiskLevel.LOW, null));
         String body = """
                 {"agentId":"mail-agent","action":"VIEW_DATA","labels":[]}
                 """;
 
-        mockMvc.perform(post("/api/v1/actions").contentType(MediaType.APPLICATION_JSON).content(body))
+        mockMvc.perform(post("/api/v1/actions").header("X-API-Key", "test-key")
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ALLOWED"))
                 .andExpect(jsonPath("$.riskLevel").value("LOW"));
