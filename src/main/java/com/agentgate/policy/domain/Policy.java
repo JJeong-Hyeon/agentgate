@@ -31,12 +31,20 @@ public class Policy {
     @Enumerated(EnumType.STRING)
     private RiskLevel riskLevel;
 
+    @Enumerated(EnumType.STRING)
+    private PolicyCategory category;
+
     private Instant createdAt;
 
     public Policy(String actionType, String label, RiskLevel riskLevel) {
+        this(actionType, label, riskLevel, null);
+    }
+
+    public Policy(String actionType, String label, RiskLevel riskLevel, PolicyCategory category) {
         this.actionType = actionType;
         this.label = label;
         this.riskLevel = riskLevel;
+        this.category = category;
     }
 
     @PrePersist
@@ -44,9 +52,10 @@ public class Policy {
         this.createdAt = Instant.now();
     }
 
-    public void update(String actionType, String label, RiskLevel riskLevel) {
+    public void update(String actionType, String label, RiskLevel riskLevel, PolicyCategory category) {
         this.actionType = actionType;
         this.label = label;
         this.riskLevel = riskLevel;
+        this.category = category;
     }
 }
