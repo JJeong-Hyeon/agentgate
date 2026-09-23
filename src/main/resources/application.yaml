@@ -6,6 +6,12 @@ spring:
       ddl-auto: update
     open-in-view: false
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+
 agentgate:
   admin:
     # 로컬 개발용 기본값. 운영 배포 전 반드시 환경변수(AGENTGATE_ADMIN_USERNAME/AGENTGATE_ADMIN_PASSWORD)로 override할 것.

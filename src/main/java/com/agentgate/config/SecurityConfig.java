@@ -26,7 +26,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/approvals", "/api/v1/approvals/**").authenticated()
                         .requestMatchers("/api/v1/audit-logs", "/api/v1/audit-logs/**").authenticated()
                         .requestMatchers("/api/v1/agents", "/api/v1/agents/**").authenticated()
-                        .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                        .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/prometheus").permitAll()
                         .anyRequest().denyAll()
                 );
         return http.build();
