@@ -86,4 +86,6 @@ com.agentgate
 
 ## 문서
 
-전체 기획/설계 문서: [`docs/AGENTGATE_PLAN.md`](docs/AGENTGATE_PLAN.md)
+- 전체 기획/설계: [`docs/AGENTGATE_PLAN.md`](docs/AGENTGATE_PLAN.md)
+- AWS 배포: [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)
+- Grafana Cloud / n8n 연동: [`docs/GRAFANA_N8N_SETUP.md`](docs/GRAFANA_N8N_SETUP.md)
