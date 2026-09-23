@@ -15,6 +15,7 @@ import com.agentgate.agent.dto.ActionResponse;
 import com.agentgate.agent.repository.AgentRepository;
 import com.agentgate.approval.domain.ApprovalRequest;
 import com.agentgate.approval.service.ApprovalService;
+import com.agentgate.audit.service.AuditLogService;
 import com.agentgate.common.exception.AgentNotFoundException;
 import com.agentgate.risk.ActionStatus;
 import com.agentgate.risk.RiskEvaluationResult;
@@ -41,11 +42,14 @@ class AgentActionServiceTest {
     @Mock
     private ApprovalService approvalService;
 
+    @Mock
+    private AuditLogService auditLogService;
+
     private AgentActionService service;
 
     @BeforeEach
     void setUp() {
-        service = new AgentActionService(agentRepository, riskEvaluationService, approvalService);
+        service = new AgentActionService(agentRepository, riskEvaluationService, approvalService, auditLogService);
     }
 
     @Test
