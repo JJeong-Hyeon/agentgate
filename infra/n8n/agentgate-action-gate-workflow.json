@@ -1,0 +1,151 @@
+{
+  "name": "AgentGate Action Gate",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger-1",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "1", "name": "baseUrl", "type": "string", "value": "https://<your-agentgate-url>" },
+            { "id": "2", "name": "apiKey", "type": "string", "value": "<agent api key>" },
+            { "id": "3", "name": "agentId", "type": "string", "value": "mail-agent" },
+            { "id": "4", "name": "action", "type": "string", "value": "SEND_EMAIL" },
+            { "id": "5", "name": "target", "type": "string", "value": "user@test.com" }
+          ]
+        }
+      },
+      "id": "set-1",
+      "name": "Action Params",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.baseUrl }}/api/v1/actions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-API-Key", "value": "={{ $json.apiKey }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ agentId: $json.agentId, action: $json.action, target: $json.target, labels: [\"PII\"] }) }}"
+      },
+      "id": "http-1",
+      "name": "Ask AgentGate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": { "leftValue": "", "caseSensitive": true, "typeValidation": "strict" },
+                "conditions": [
+                  {
+                    "id": "cond-allowed",
+                    "leftValue": "={{ $json.status }}",
+                    "rightValue": "ALLOWED",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "ALLOWED"
+            },
+            {
+              "conditions": {
+                "options": { "leftValue": "", "caseSensitive": true, "typeValidation": "strict" },
+                "conditions": [
+                  {
+                    "id": "cond-approval",
+                    "leftValue": "={{ $json.status }}",
+                    "rightValue": "APPROVAL_REQUIRED",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "APPROVAL_REQUIRED"
+            },
+            {
+              "conditions": {
+                "options": { "leftValue": "", "caseSensitive": true, "typeValidation": "strict" },
+                "conditions": [
+                  {
+                    "id": "cond-blocked",
+                    "leftValue": "={{ $json.status }}",
+                    "rightValue": "BLOCKED",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "BLOCKED"
+            }
+          ]
+        }
+      },
+      "id": "switch-1",
+      "name": "Route by Status",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {},
+      "id": "noop-allowed",
+      "name": "Proceed with action",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1140, 140]
+    },
+    {
+      "parameters": {},
+      "id": "noop-approval",
+      "name": "Wait for human approval",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1140, 300]
+    },
+    {
+      "parameters": {},
+      "id": "noop-blocked",
+      "name": "Stop - blocked",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1140, 460]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": { "main": [[{ "node": "Action Params", "type": "main", "index": 0 }]] },
+    "Action Params": { "main": [[{ "node": "Ask AgentGate", "type": "main", "index": 0 }]] },
+    "Ask AgentGate": { "main": [[{ "node": "Route by Status", "type": "main", "index": 0 }]] },
+    "Route by Status": {
+      "main": [
+        [{ "node": "Proceed with action", "type": "main", "index": 0 }],
+        [{ "node": "Wait for human approval", "type": "main", "index": 0 }],
+        [{ "node": "Stop - blocked", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": { "templateCredsSetupCompleted": false }
+}
