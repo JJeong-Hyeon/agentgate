@@ -436,3 +436,109 @@ h3 {
 .react-flow__edge-path {
   stroke: var(--muted);
 }
+
+/* Execution status on canvas nodes */
+.dsl-node.status-running {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+.dsl-node.status-waiting {
+  border-color: var(--warn);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 35%, transparent);
+}
+.dsl-node.status-completed {
+  border-color: var(--ok);
+}
+.dsl-node.status-failed {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 30%, transparent);
+}
+.status-running .dsl-node-status {
+  color: var(--accent);
+}
+.status-waiting .dsl-node-status {
+  color: var(--warn);
+}
+.status-completed .dsl-node-status {
+  color: var(--ok);
+}
+.status-failed .dsl-node-status {
+  color: var(--danger);
+}
+@keyframes pulse {
+  50% {
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 10%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dsl-node.status-running {
+    animation: none;
+  }
+}
+
+/* Execution studio */
+.start-execution {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.start-execution input {
+  flex: 1;
+  min-width: 200px;
+}
+.builder-header .start-execution {
+  margin: 0;
+}
+.studio {
+  display: grid;
+  gap: 12px;
+}
+.studio-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+}
+.approval-panel {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  border-color: var(--warn);
+  flex-wrap: wrap;
+}
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.step {
+  border-left: 3px solid var(--border);
+  padding: 6px 10px;
+}
+.step-running {
+  border-left-color: var(--accent);
+}
+.step-waiting {
+  border-left-color: var(--warn);
+}
+.step-completed {
+  border-left-color: var(--ok);
+}
+.step-failed {
+  border-left-color: var(--danger);
+}
+.step pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 12px;
+  margin: 6px 0 0;
+  max-height: 240px;
+  overflow: auto;
+}

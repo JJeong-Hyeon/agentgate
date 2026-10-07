@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { Link } from "react-router-dom";
 import { useClient } from "../auth/AuthContext";
 import { useAsync } from "../useAsync";
 
@@ -31,12 +32,16 @@ export function ExecutionsPage() {
               {executions.data.map((e) => (
                 <tr key={e.executionId}>
                   <td>
-                    <span className={`badge status-${e.status.toLowerCase()}`}>{e.status}</span>
+                    <Link to={`/executions/${e.executionId}`}>
+                      <span className={`badge status-${e.status.toLowerCase()}`}>{e.status}</span>
+                    </Link>
                   </td>
                   <td>
                     {e.workflowId} <span className="muted">v{e.workflowVersion}</span>
                   </td>
-                  <td className="truncate">{e.task}</td>
+                  <td className="truncate">
+                    <Link to={`/executions/${e.executionId}`}>{e.task}</Link>
+                  </td>
                   <td className="muted">{new Date(e.createdAt).toLocaleString()}</td>
                 </tr>
               ))}

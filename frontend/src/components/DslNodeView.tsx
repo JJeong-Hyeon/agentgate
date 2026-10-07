@@ -10,6 +10,13 @@ const TYPE_CLASS: Record<string, string> = {
   APPROVAL: "tool",
 };
 
+const STATUS_TEXT: Record<string, string> = {
+  RUNNING: "실행 중",
+  WAITING: "승인 대기",
+  COMPLETED: "완료",
+  FAILED: "실패",
+};
+
 /** Canvas node for any DSL node type: type badge, label, and handles where edges are allowed. */
 export function DslNodeView({ data, selected }: NodeProps<FlowNode>) {
   const { dsl, error, status } = data;
@@ -24,7 +31,7 @@ export function DslNodeView({ data, selected }: NodeProps<FlowNode>) {
       <Handle id="back-in" type="target" position={Position.Bottom} className="back-handle" isConnectable={false} />
       <span className="dsl-node-type">{dsl.type}</span>
       <span className="dsl-node-label">{dsl.label || dsl.id}</span>
-      {status && <span className="dsl-node-status">{status}</span>}
+      {status && <span className="dsl-node-status">{STATUS_TEXT[status] ?? status}</span>}
       {dsl.type !== "END" && <Handle type="source" position={Position.Right} />}
       <Handle id="back-out" type="source" position={Position.Bottom} className="back-handle" isConnectable={false} />
     </div>
