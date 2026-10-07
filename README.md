@@ -86,6 +86,8 @@ com.agentgate
 
 ## 문서
 
-- 전체 기획/설계: [`docs/AGENTGATE_PLAN.md`](docs/AGENTGATE_PLAN.md)
+- 기획 / Governance Core 설계: [`docs/AGENTGATE_PLAN.md`](docs/AGENTGATE_PLAN.md)
+- 확장 아키텍처 (Workflow Builder + LangGraph Runtime): [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+- API 스펙: [`docs/API_SPEC.md`](docs/API_SPEC.md)
 - AWS 배포: [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)
-- Grafana Cloud / n8n 연동: [`docs/GRAFANA_N8N_SETUP.md`](docs/GRAFANA_N8N_SETUP.md)
+- 모니터링 (Prometheus + Grafana): [`docs/MONITORING.md`](docs/MONITORING.md)

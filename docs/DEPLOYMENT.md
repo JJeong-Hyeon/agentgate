@@ -22,7 +22,7 @@ terraform plan \
 terraform apply  # 위와 동일한 -var 플래그로
 ```
 
-`terraform output`으로 `ec2_public_ip`, `alb_dns_name`, `rds_endpoint`, `monitoring_public_ip` 확인. 모니터링용 EC2 #2는 Prometheus+Grafana가 자동으로 기동되어 있음 — Grafana 접속/데이터소스 설정은 [`docs/GRAFANA_N8N_SETUP.md`](GRAFANA_N8N_SETUP.md) 참고.
+`terraform output`으로 `ec2_public_ip`, `alb_dns_name`, `rds_endpoint`, `monitoring_public_ip` 확인. 모니터링용 EC2 #2는 Prometheus+Grafana가 자동으로 기동되어 있음 — Grafana 접속/데이터소스 설정은 [`docs/MONITORING.md`](MONITORING.md) 참고.
 
 ## 2. EC2에 앱 배포
 
