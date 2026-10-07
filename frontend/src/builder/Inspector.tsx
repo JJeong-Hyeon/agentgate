@@ -170,6 +170,40 @@ export function NodeInspector({ node, nodes, error, onChange, onRename, onDelete
           </label>
         </>
       )}
+      {node.type === "MCP_TOOL" && (
+        <>
+          <label>
+            MCP 서버 (Runtime 설정의 서버 이름)
+            <input value={str("server")} onChange={(e) => set("server", e.target.value)} />
+          </label>
+          <label>
+            도구 이름
+            <input value={str("tool")} onChange={(e) => set("tool", e.target.value)} />
+          </label>
+          <div className="field">
+            <label>
+              인자 (한 줄에 이름=값)
+              <CommitInput
+                multiline
+                rows={4}
+                value={Object.entries((config.arguments as Record<string, string>) ?? {})
+                  .map(([name, value]) => `${name}=${value}`)
+                  .join("\n")}
+                onCommit={(v) => set("arguments", parseCases(v))}
+              />
+            </label>
+            <span className="hint">값에 {"{task}"}, {"{노드id}"}를 쓸 수 있습니다.</span>
+          </div>
+          <label>
+            AgentGate 행동 이름 (비우면 MCP:서버:도구)
+            <input value={str("action")} onChange={(e) => set("action", e.target.value)} />
+          </label>
+          <label>
+            위험 라벨 (쉼표로 구분)
+            <CommitInput value={list("labels")} onCommit={(v) => set("labels", splitList(v))} />
+          </label>
+        </>
+      )}
       {node.type === "APPROVAL" && (
         <>
           <div className="field">

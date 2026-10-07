@@ -220,16 +220,29 @@ LangGraph Tool Node
       ↓
 AgentGate (POST /api/v1/actions)
       ↓ ALLOWED
-Tool Executor
- ├─ HTTP Tool   (MVP)
- └─ MCP Client  (Phase 6)
-     ├─ File
-     ├─ Database
-     └─ Git
+Tool Executor (app/tools/base.py: GovernedTool)
+ ├─ HTTP Tool   (HTTP_TOOL 노드)
+ └─ MCP Tool    (MCP_TOOL 노드, stdio / Streamable HTTP MCP 서버)
 ```
 
 Tool Executor는 AgentGate 응답이 `ALLOWED`일 때만 실제 호출을 수행한다.
-Governance를 우회하는 Tool 실행 경로는 두지 않는다.
+Governance를 우회하는 Tool 실행 경로는 두지 않는다. HTTP / MCP 모두 같은 검사 → (승인 대기) → 실행 흐름을 쓴다.
+
+MCP:
+
+- 사용할 MCP 서버는 Runtime 설정 파일(`MCP_CONFIG_PATH`)에 `mcpServers` 형식으로 등록한다. `command`/`args`는 stdio, `url`은 Streamable HTTP 서버다.
+
+```json
+{"mcpServers": {
+  "files": {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "/data"]},
+  "search": {"url": "http://search-mcp:8000/mcp"}
+}}
+```
+
+- `MCP_TOOL` 노드: `server`, `tool`, `arguments`(값은 프롬프트처럼 `{task}`, `{노드id}` 템플릿, 문자열로 전달), `action`(기본 `MCP:<server>:<tool>`), `labels`.
+- AgentGate에는 `action`과 `target = mcp://<server>/<tool>`로 평가를 요청하므로 도구 단위로 정책을 걸 수 있다.
+- 호출마다 세션을 새로 연다. 도구 오류(`isError`)나 연결 실패는 `FAILED`로 기록하고, 결과 텍스트는 `state[노드id]`에 저장한다.
+- 등록되지 않은 서버를 쓰는 워크플로는 실행 시작 시 거부된다(Runtime 설정 의존이라 저장 시 검증에서는 확인하지 않음).
 
 ---
 

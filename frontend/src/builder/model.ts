@@ -13,6 +13,7 @@ export const PALETTE: { type: NodeType; title: string; description: string }[] =
   { type: "REVIEWER", title: "Reviewer", description: "APPROVE / REVISE 판정" },
   { type: "CONDITION", title: "Condition", description: "상태 값으로 분기" },
   { type: "HTTP_TOOL", title: "HTTP Tool", description: "AgentGate 검사 후 HTTP 호출" },
+  { type: "MCP_TOOL", title: "MCP Tool", description: "AgentGate 검사 후 MCP 서버 도구 호출" },
   { type: "APPROVAL", title: "Approval", description: "사람의 승인 (거절 시 실행 종료)" },
 ];
 
@@ -29,6 +30,8 @@ export function defaultConfig(type: NodeType): Record<string, unknown> | undefin
       return { key: "task", cases: { yes: "yes" }, default: "no" };
     case "HTTP_TOOL":
       return { action: "SEND_REPORT", url: "https://", method: "POST", labels: [], payloadKeys: ["task"] };
+    case "MCP_TOOL":
+      return { server: "", tool: "", arguments: {} };
     case "APPROVAL":
       return { message: "{task} 진행을 승인할까요?" };
     default:

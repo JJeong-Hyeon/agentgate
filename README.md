@@ -72,6 +72,8 @@ AgentGate가 `APPROVAL_REQUIRED`를 반환하면 실행은 `WAITING_APPROVAL` �
 AGENTGATE_RUNTIME_BASE_URL=http://localhost:8000 AGENTGATE_RUNTIME_TOKEN=dev-runtime-token ./gradlew bootRun
 ```
 
+MCP 도구를 쓰려면 `mcpServers` 형식의 설정 파일을 만들고 `MCP_CONFIG_PATH`로 지정합니다 (형식은 [ARCHITECTURE 9장](docs/ARCHITECTURE.md#9-tool--mcp)).
+
 로컬에서 직접 실행할 때는 Python 3.12 이상이 필요합니다.
 
 ```bash

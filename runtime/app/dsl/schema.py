@@ -114,6 +114,24 @@ class HttpToolNode(NodeBase):
     config: HttpToolConfig
 
 
+class McpToolConfig(DslModel):
+    # Server name from the runtime's MCP config (MCP_CONFIG_PATH).
+    server: str = Field(min_length=1)
+    tool: str = Field(min_length=1)
+    # Tool arguments; each value is a template like prompts ({task}, {nodeId}).
+    arguments: dict[str, str] = {}
+    # Action name AgentGate evaluates; default "MCP:<server>:<tool>" lets a policy target one tool.
+    action: str | None = None
+    labels: list[str] = []
+
+
+class McpToolNode(NodeBase):
+    """MCP tool call governed by AgentGate (ALLOWED / APPROVAL_REQUIRED / BLOCKED)."""
+
+    type: Literal["MCP_TOOL"]
+    config: McpToolConfig
+
+
 class ApprovalConfig(DslModel):
     # Shown to the approver; may use {task} / {nodeId} like prompts.
     message: str | None = None
@@ -138,12 +156,13 @@ Node = Annotated[
     | ReviewerNode
     | ConditionNode
     | HttpToolNode
+    | McpToolNode
     | ApprovalNode,
     Field(discriminator="type"),
 ]
 
 # Node types whose output is written to state[node.id].
-OUTPUT_TYPES = {"LLM", "AGENT", "ROUTER", "REVIEWER", "HTTP_TOOL", "APPROVAL"}
+OUTPUT_TYPES = {"LLM", "AGENT", "ROUTER", "REVIEWER", "HTTP_TOOL", "MCP_TOOL", "APPROVAL"}
 
 
 class Edge(DslModel):

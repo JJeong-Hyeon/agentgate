@@ -33,7 +33,7 @@ REDIS_PORT=$(docker compose -f "$ROOT/compose.yaml" -p agentgate-e2e port redis 
 
 echo "==> AgentGate"
 (cd "$ROOT" && ./gradlew -q bootJar)
-JAR=$(ls "$ROOT"/build/libs/*.jar | grep -v plain | head -1)
+JAR=$(find "$ROOT/build/libs" -name '*.jar' ! -name '*-plain.jar' | head -1)
 SPRING_DATASOURCE_URL="jdbc:postgresql://localhost:$PG_PORT/mydatabase" \
 SPRING_DATASOURCE_USERNAME=myuser SPRING_DATASOURCE_PASSWORD=secret \
 SPRING_DATA_REDIS_HOST=localhost SPRING_DATA_REDIS_PORT="$REDIS_PORT" \
@@ -53,10 +53,14 @@ API_KEY=$(curl -sf -u admin:changeme -X POST http://localhost:8080/api/v1/agents
   | "$PYTHON" -c 'import json,sys; print(json.load(sys.stdin)["apiKey"])')
 
 echo "==> Runtime"
+# MCP server for the MCP tool scenario: the runtime's own test echo server over stdio.
+cat > "$WORK/mcp.json" <<JSON
+{"mcpServers": {"echo": {"command": "$(command -v "$PYTHON")", "args": ["$ROOT/runtime/tests/mcp_echo_server.py"]}}}
+JSON
 (cd "$ROOT/runtime" && \
   AGENTGATE_BASE_URL=http://localhost:8080 AGENTGATE_API_KEY="$API_KEY" \
   LLM_BASE_URL=http://localhost:18081/v1 LLM_MODEL=fake-model \
-  RUNTIME_TOKEN="$TOKEN" \
+  RUNTIME_TOKEN="$TOKEN" MCP_CONFIG_PATH="$WORK/mcp.json" \
   "$PYTHON" -m uvicorn app.main:app --port 8000 > "$WORK/runtime.log" 2>&1) &
 PIDS+=($!)
 wait_for http://localhost:8000/health Runtime "$WORK/runtime.log"

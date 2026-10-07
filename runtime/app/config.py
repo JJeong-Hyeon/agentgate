@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     runtime_database_url: str = ""
     # Shared secret AgentGate sends as X-Runtime-Token on resume. Empty → resume disabled.
     runtime_token: str = ""
+    # JSON file with MCP servers ({"mcpServers": {...}}); empty → no MCP tools available.
+    mcp_config_path: str = ""
 
 
 @lru_cache
