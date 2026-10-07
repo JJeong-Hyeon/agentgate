@@ -14,7 +14,7 @@ def client(handler) -> AgentGateClient:
 def test_sends_action_with_api_key():
     gate = FakeAgentGate()
 
-    client(gate).evaluate("SEND_REPORT", target="http://hook", labels=["PII"])
+    client(gate).evaluate("SEND_REPORT", target="http://hook", labels=["PII"], execution_id="e-1")
 
     request = gate.requests[0]
     assert request.url == "http://agentgate:8080/api/v1/actions"
@@ -24,6 +24,7 @@ def test_sends_action_with_api_key():
         "action": "SEND_REPORT",
         "target": "http://hook",
         "labels": ["PII"],
+        "executionId": "e-1",
     }
 
 

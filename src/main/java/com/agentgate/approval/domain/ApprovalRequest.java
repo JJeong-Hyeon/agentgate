@@ -11,6 +11,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
@@ -22,7 +23,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "approval_requests")
+@Table(name = "approval_requests", indexes = @Index(columnList = "execution_id"))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ApprovalRequest {
@@ -53,7 +54,16 @@ public class ApprovalRequest {
 
     private String decidedBy;
 
+    // Runtime execution (LangGraph thread) waiting on this approval; null for direct API callers.
+    private String executionId;
+
     public ApprovalRequest(String agentId, String action, String target, List<String> labels, RiskLevel riskLevel) {
+        this(agentId, action, target, labels, riskLevel, null);
+    }
+
+    public ApprovalRequest(String agentId, String action, String target, List<String> labels, RiskLevel riskLevel,
+                           String executionId) {
+        this.executionId = executionId;
         this.agentId = agentId;
         this.action = action;
         this.target = target;

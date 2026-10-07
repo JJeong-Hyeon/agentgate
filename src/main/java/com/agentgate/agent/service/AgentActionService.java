@@ -39,7 +39,8 @@ public class AgentActionService {
         Long approvalId = null;
         if (result.status() == ActionStatus.APPROVAL_REQUIRED) {
             ApprovalRequest approvalRequest = approvalService.createRequest(
-                    request.agentId(), request.action(), request.target(), request.labels(), result.riskLevel());
+                    request.agentId(), request.action(), request.target(), request.labels(), result.riskLevel(),
+                    request.executionId());
             approvalId = approvalRequest.getId();
         }
 

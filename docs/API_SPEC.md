@@ -20,13 +20,15 @@ X-API-Key: <agent api key>
   "agentId": "mail-agent",
   "action": "SEND_EMAIL",
   "target": "customer@test.com",
-  "labels": ["PII"]
+  "labels": ["PII"],
+  "executionId": "b80f8eea-fbd9-46f3-9223-2ce401b49e3d"
 }
 ```
 - `agentId` (필수): 사전에 등록된 에이전트 ID
 - `action` (필수): 행동 종류를 나타내는 문자열, 자유 형식(예: `SEND_EMAIL`, `DELETE_USER`, `EXPORT_DATA`)
 - `target` (선택): 행동 대상
 - `labels` (선택, 배열): 위험 판단에 쓰이는 태그(예: `"PII"`). 없으면 빈 배열로 취급
+- `executionId` (선택, 최대 64자): Runtime 실행 ID(LangGraph `thread_id`). 승인 요청이 생성되면 함께 저장되어 승인 후 어떤 실행을 재개할지 식별하는 데 쓰임
 
 **응답**
 ```json
@@ -63,6 +65,13 @@ Authorization: Basic <admin 계정>
 Content-Type: application/json
 
 {"decidedBy": "관리자 이름"}
+```
+
+승인 목록 조회 (`status`, `executionId` 필터 선택, 함께 사용 가능):
+
+```
+GET /api/v1/approvals?status=PENDING&executionId=<실행 ID>
+Authorization: Basic <admin 계정>
 ```
 
 ## 4. 에러 응답 공통 형식

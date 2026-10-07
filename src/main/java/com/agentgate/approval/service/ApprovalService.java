@@ -18,8 +18,9 @@ public class ApprovalService {
     private final ApprovalRequestRepository approvalRequestRepository;
 
     @Transactional
-    public ApprovalRequest createRequest(String agentId, String action, String target, List<String> labels, RiskLevel riskLevel) {
-        ApprovalRequest approvalRequest = new ApprovalRequest(agentId, action, target, labels, riskLevel);
+    public ApprovalRequest createRequest(String agentId, String action, String target, List<String> labels, RiskLevel riskLevel,
+                                         String executionId) {
+        ApprovalRequest approvalRequest = new ApprovalRequest(agentId, action, target, labels, riskLevel, executionId);
         return approvalRequestRepository.save(approvalRequest);
     }
 
@@ -43,10 +44,17 @@ public class ApprovalService {
     }
 
     @Transactional(readOnly = true)
-    public List<ApprovalResponse> list(ApprovalStatus statusFilter) {
-        List<ApprovalRequest> approvalRequests = (statusFilter == null)
-                ? approvalRequestRepository.findAll()
-                : approvalRequestRepository.findByStatus(statusFilter);
+    public List<ApprovalResponse> list(ApprovalStatus statusFilter, String executionId) {
+        List<ApprovalRequest> approvalRequests;
+        if (executionId != null) {
+            approvalRequests = (statusFilter == null)
+                    ? approvalRequestRepository.findByExecutionId(executionId)
+                    : approvalRequestRepository.findByStatusAndExecutionId(statusFilter, executionId);
+        } else {
+            approvalRequests = (statusFilter == null)
+                    ? approvalRequestRepository.findAll()
+                    : approvalRequestRepository.findByStatus(statusFilter);
+        }
         return approvalRequests.stream().map(ApprovalResponse::from).toList();
     }
 

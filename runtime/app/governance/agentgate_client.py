@@ -36,13 +36,18 @@ class AgentGateClient:
         )
 
     def evaluate(
-        self, action: str, target: str | None = None, labels: list[str] | None = None
+        self,
+        action: str,
+        target: str | None = None,
+        labels: list[str] | None = None,
+        execution_id: str | None = None,
     ) -> Decision:
         body = {
             "agentId": self._agent_id,
             "action": action,
             "target": target,
             "labels": labels or [],
+            "executionId": execution_id,
         }
         try:
             response = self._client.post("/api/v1/actions", json=body)

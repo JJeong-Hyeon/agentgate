@@ -117,4 +117,39 @@ class ApprovalWorkflowIntegrationTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("INVALID_APPROVAL_STATE"));
     }
+
+    @Test
+    void approvalRecordsExecutionIdAndCanBeFilteredByIt() throws Exception {
+        mockMvc.perform(post("/api/v1/actions").header("X-API-Key", API_KEY)
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                                {"agentId":"mail-agent","action":"SEND_EMAIL","labels":["PII"],"executionId":"exec-1"}
+                                """))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/actions").header("X-API-Key", API_KEY)
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                                {"agentId":"mail-agent","action":"SEND_EMAIL","labels":["PII"]}
+                                """))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/approvals").param("executionId", "exec-1")
+                        .with(httpBasic("test-admin", "test-password")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].executionId").value("exec-1"))
+                .andExpect(jsonPath("$[0].status").value("PENDING"));
+
+        mockMvc.perform(get("/api/v1/approvals").param("executionId", "exec-1").param("status", "APPROVED")
+                        .with(httpBasic("test-admin", "test-password")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void executionIdLongerThan64CharsIsRejected() throws Exception {
+        mockMvc.perform(post("/api/v1/actions").header("X-API-Key", API_KEY)
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                                {"agentId":"mail-agent","action":"SEND_EMAIL","executionId":"%s"}
+                                """.formatted("x".repeat(65))))
+                .andExpect(status().isBadRequest());
+    }
 }

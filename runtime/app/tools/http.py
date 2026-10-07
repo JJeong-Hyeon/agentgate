@@ -43,10 +43,14 @@ class HttpTool:
         self._gate = gate
         self._client = httpx.Client(transport=transport, timeout=timeout)
 
-    def run(self, payload: dict[str, Any] | None = None) -> ToolResult:
+    def run(
+        self, payload: dict[str, Any] | None = None, execution_id: str | None = None
+    ) -> ToolResult:
         spec = self.spec
         try:
-            decision = self._gate.evaluate(spec.action, target=spec.url, labels=spec.labels)
+            decision = self._gate.evaluate(
+                spec.action, target=spec.url, labels=spec.labels, execution_id=execution_id
+            )
         except AgentGateError as e:
             return ToolResult(tool=spec.name, status="FAILED", error=str(e))
 
