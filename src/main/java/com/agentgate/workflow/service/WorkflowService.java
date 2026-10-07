@@ -41,7 +41,8 @@ public class WorkflowService {
 
     @Transactional
     public WorkflowVersionResponse addVersion(String workflowId, JsonNode dsl) {
-        Workflow workflow = findOrThrow(workflowId);
+        Workflow workflow = workflowRepository.findForUpdate(workflowId)
+                .orElseThrow(() -> new WorkflowNotFoundException("Workflow '%s' not found".formatted(workflowId)));
         JsonNode saved = saveVersion(workflow, dsl);
         if (dsl.hasNonNull("name")) {
             workflow.rename(dsl.get("name").asString());
