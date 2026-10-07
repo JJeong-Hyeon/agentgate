@@ -379,6 +379,8 @@ AgentGate는 AI Agent와 기업 시스템 사이에서
 
 # 11. 향후 확장 방향
 
+> Visual Workflow Builder + LangGraph Runtime + Local LLM으로의 확장 계획은 [`ARCHITECTURE.md`](ARCHITECTURE.md)를 기준으로 한다.
+
 ## Connector 확장
 - Gmail
 - Slack
