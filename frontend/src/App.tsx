@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes } from "react-router-dom";
 import { useAuth } from "./auth/AuthContext";
+import { BuilderPage } from "./builder/BuilderPage";
 import { ApprovalsPage } from "./pages/ApprovalsPage";
 import { ExecutionsPage } from "./pages/ExecutionsPage";
 import { LoginPage } from "./pages/LoginPage";
@@ -37,6 +38,8 @@ export function App() {
       <Routes>
         <Route element={<Layout />}>
           <Route path="/workflows" element={<WorkflowsPage />} />
+          <Route path="/workflows/new" element={<BuilderPage />} />
+          <Route path="/workflows/:workflowId/edit" element={<BuilderPage />} />
           <Route path="/executions" element={<ExecutionsPage />} />
           <Route path="/approvals" element={<ApprovalsPage />} />
           <Route path="*" element={<Navigate to="/workflows" replace />} />

@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { Link } from "react-router-dom";
 import { useClient } from "../auth/AuthContext";
 import { WorkflowPreview } from "../components/WorkflowPreview";
 import { useAsync } from "../useAsync";
@@ -17,7 +18,12 @@ export function WorkflowsPage() {
   return (
     <div className="split">
       <section className="card list">
-        <h2>Workflows</h2>
+        <div className="row">
+          <h2>Workflows</h2>
+          <Link className="button" to="/workflows/new">
+            새 워크플로
+          </Link>
+        </div>
         {workflows.error && <p className="error">{workflows.error.message}</p>}
         {workflows.data?.length === 0 && <p className="muted">저장된 워크플로가 없습니다.</p>}
         <ul>
@@ -41,9 +47,14 @@ export function WorkflowsPage() {
         {detail.error && <p className="error">{detail.error.message}</p>}
         {detail.data?.dsl && (
           <>
-            <h2>
-              {detail.data.name} <span className="muted">v{detail.data.latestVersion}</span>
-            </h2>
+            <div className="row">
+              <h2>
+                {detail.data.name} <span className="muted">v{detail.data.latestVersion}</span>
+              </h2>
+              <Link className="button" to={`/workflows/${detail.data.workflowId}/edit`}>
+                편집
+              </Link>
+            </div>
             <WorkflowPreview dsl={detail.data.dsl} />
           </>
         )}
