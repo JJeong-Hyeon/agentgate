@@ -45,8 +45,8 @@ resource "aws_security_group" "app" {
 }
 
 resource "aws_instance" "app" {
-  ami                    = data.aws_ami.al2023_arm64.id
-  instance_type          = "t4g.micro"
+  ami                         = data.aws_ami.al2023_arm64.id
+  instance_type               = "t4g.micro"
   key_name                    = var.key_pair_name
   subnet_id                   = data.aws_subnets.default.ids[0]
   vpc_security_group_ids      = [aws_security_group.app.id]

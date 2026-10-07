@@ -46,3 +46,24 @@ dependencies {
 tasks.named('test') {
     useJUnitPlatform()
 }
+
+// `./gradlew bootJar -PwithFrontend` bundles the React UI (frontend/) into the jar as static resources.
+def frontendDir = layout.projectDirectory.dir('frontend')
+
+tasks.register('buildFrontend', Exec) {
+    description = 'Builds the frontend with npm.'
+    workingDir frontendDir
+    commandLine 'sh', '-c', 'npm ci && npm run build'
+    inputs.dir(frontendDir.dir('src'))
+    inputs.files(frontendDir.file('package.json'), frontendDir.file('package-lock.json'), frontendDir.file('index.html'))
+    outputs.dir(frontendDir.dir('dist'))
+}
+
+if (project.hasProperty('withFrontend')) {
+    tasks.named('processResources') {
+        dependsOn 'buildFrontend'
+        from(frontendDir.dir('dist')) {
+            into 'static'
+        }
+    }
+}

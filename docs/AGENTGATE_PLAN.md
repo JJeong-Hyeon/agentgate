@@ -193,7 +193,7 @@ Grafana + Prometheus (도입 완료) — `/actuator/prometheus`로 메트릭 노
 
 ## Infrastructure
 - Docker, Docker Compose (로컬)
-- AWS: EC2(앱), EC2(모니터링, Prometheus+Grafana 셀프호스팅), RDS(Postgres), ALB — `infra/`의 Terraform으로 관리(`docs/DEPLOYMENT.md`)
+- AWS: EC2(앱, 프론트엔드 포함 jar), EC2(Runtime + Ollama), EC2(모니터링, Prometheus+Grafana 셀프호스팅), RDS(Postgres), ALB — `infra/`의 Terraform으로 관리(`docs/DEPLOYMENT.md`)
 
 ## Monitoring
 - Prometheus
@@ -406,7 +406,7 @@ AgentGate는 AI Agent와 기업 시스템 사이에서
 
 `spring-boot-docker-compose`는 developmentOnly라 prod 빌드에는 포함되지 않음 — 위 값들을 직접 넣어야 함.
 
-AWS(EC2+RDS+ALB) 실제 배포 절차는 [`docs/DEPLOYMENT.md`](DEPLOYMENT.md) 참고.
+AWS(ALB + App/Runtime EC2 + RDS) 실제 배포 절차는 [`docs/DEPLOYMENT.md`](DEPLOYMENT.md) 참고.
 
 ---
 

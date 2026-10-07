@@ -137,7 +137,7 @@ PYTHON=python3.12 ./scripts/e2e.sh   # Docker, Java 21, Python 3.12 + runtime �
 
 ## 배포
 
-`spring.profiles.active=prod`로 기동 시 필수 환경변수가 없거나 기본 admin 비밀번호가 그대로면 기동에 실패합니다. AWS(EC2+RDS+ALB) 배포 절차는 [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md), 필요한 환경변수 목록은 [배포 섹션](docs/AGENTGATE_PLAN.md#12-배포-prod-프로파일)을 참고하세요.
+`spring.profiles.active=prod`로 기동 시 필수 환경변수가 없거나 기본 admin 비밀번호가 그대로면 기동에 실패합니다. AWS(ALB + App/Runtime EC2 + RDS) 배포 절차는 [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) (`scripts/deploy-app.sh`, `scripts/deploy-runtime.sh`), 필요한 환경변수 목록은 [배포 섹션](docs/AGENTGATE_PLAN.md#12-배포-prod-프로파일)을 참고하세요.
 
 ## 문서
 

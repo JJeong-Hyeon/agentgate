@@ -9,7 +9,8 @@ User=ec2-user
 WorkingDirectory=/home/ec2-user/agentgate
 EnvironmentFile=/home/ec2-user/agentgate/.env
 ExecStartPre=/usr/bin/docker start agentgate-redis
-ExecStart=/home/ec2-user/agentgate/gradlew bootRun --args='--spring.profiles.active=prod'
+# Built and uploaded by scripts/deploy-app.sh (includes the frontend).
+ExecStart=/usr/bin/java -Xmx512m -jar /home/ec2-user/agentgate/agentgate.jar --spring.profiles.active=prod
 Restart=on-failure
 
 [Install]
