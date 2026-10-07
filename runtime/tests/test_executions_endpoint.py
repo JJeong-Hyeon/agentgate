@@ -5,10 +5,12 @@ from langchain_core.language_models import FakeListChatModel
 from langgraph.checkpoint.memory import InMemorySaver
 
 from app.config import Settings, get_settings
-from app.executions import get_graph
+from app.dsl.compiler import WorkflowCompiler
+from app.executions import get_runner
 from app.governance.agentgate_client import AgentGateClient
 from app.graph.research import build_research_graph
 from app.main import app
+from app.runner import WorkflowRunner
 from app.tools.http import HttpTool, HttpToolSpec
 from tests.fakes import FakeAgentGate, FakeTarget
 
@@ -16,12 +18,15 @@ TOKEN = "runtime-secret"
 
 
 def make_client(report_tool=None) -> TestClient:
+    checkpointer = InMemorySaver()
     graph = build_research_graph(
         FakeListChatModel(responses=["1. step", "findings", "VERDICT: APPROVE"]),
-        InMemorySaver(),
+        checkpointer,
         report_tool=report_tool,
     )
-    app.dependency_overrides[get_graph] = lambda: graph
+    compiler = WorkflowCompiler(lambda model, temperature: FakeListChatModel(responses=["ok"]))
+    runner = WorkflowRunner(graph, compiler, checkpointer)
+    app.dependency_overrides[get_runner] = lambda: runner
     app.dependency_overrides[get_settings] = lambda: Settings(_env_file=None, runtime_token=TOKEN)
     return TestClient(app)
 
@@ -157,3 +162,68 @@ def test_resume_disabled_without_configured_token(approval_client):
 
 def test_resume_unknown_execution_is_404(approval_client):
     assert resume(approval_client, "unknown").status_code == 404
+
+
+SIMPLE_WORKFLOW = {
+    "workflowId": "echo",
+    "nodes": [
+        {"id": "start", "type": "START"},
+        {"id": "answer", "type": "LLM", "config": {"prompt": "{task}"}},
+        {"id": "end", "type": "END"},
+    ],
+    "edges": [
+        {"source": "start", "target": "answer"},
+        {"source": "answer", "target": "end"},
+    ],
+}
+
+
+def test_create_execution_from_workflow(client):
+    response = client.post("/runtime/executions", json={"task": "t", "workflow": SIMPLE_WORKFLOW})
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["status"] == "COMPLETED"
+    assert body["state"]["answer"] == "ok"
+    assert body["state"]["workflow"]["workflowId"] == "echo"
+
+
+def test_workflow_execution_is_restored_by_id(client):
+    execution_id = client.post(
+        "/runtime/executions", json={"task": "t", "workflow": SIMPLE_WORKFLOW}
+    ).json()["execution_id"]
+
+    body = client.get(f"/runtime/executions/{execution_id}").json()
+
+    assert body["state"]["answer"] == "ok"
+
+
+def test_invalid_workflow_is_rejected_with_errors(client):
+    broken = {**SIMPLE_WORKFLOW, "edges": SIMPLE_WORKFLOW["edges"][:1]}
+
+    response = client.post("/runtime/executions", json={"task": "t", "workflow": broken})
+
+    assert response.status_code == 422
+    node_ids = {e["node_id"] for e in response.json()["detail"]["errors"]}
+    assert {"answer", "end"} <= node_ids
+
+
+def test_unsupported_workflow_is_rejected(client):
+    workflow = {
+        **SIMPLE_WORKFLOW,
+        "nodes": [
+            *SIMPLE_WORKFLOW["nodes"][:2],
+            {"id": "ok", "type": "APPROVAL"},
+            SIMPLE_WORKFLOW["nodes"][2],
+        ],
+        "edges": [
+            {"source": "start", "target": "answer"},
+            {"source": "answer", "target": "ok"},
+            {"source": "ok", "target": "end"},
+        ],
+    }
+
+    response = client.post("/runtime/executions", json={"task": "t", "workflow": workflow})
+
+    assert response.status_code == 422
+    assert "APPROVAL" in response.json()["detail"]

@@ -5,8 +5,10 @@ Each test sets the risk of SEND_REPORT (the research graph's report action) thro
 the policy API, then runs the graph and checks what reached the tool target.
 """
 
+import json
 import os
 import time
+from pathlib import Path
 
 import httpx
 import pytest
@@ -43,8 +45,18 @@ def reports_received() -> int:
     return httpx.get(f"{FAKE}/report/count").json()["count"]
 
 
-def start_execution() -> dict:
-    response = httpx.post(f"{RUNTIME}/runtime/executions", json={"task": "e2e"}, timeout=60)
+def research_workflow() -> dict:
+    """The research example as DSL, reporting to the fake tool target."""
+    path = Path(__file__).parent.parent / "runtime" / "examples" / "research.json"
+    workflow = json.loads(path.read_text())
+    report = next(n for n in workflow["nodes"] if n["id"] == "report")
+    report["config"]["url"] = f"{FAKE}/report"
+    return workflow
+
+
+def start_execution(workflow: dict | None = None) -> dict:
+    body = {"task": "e2e", "workflow": workflow} if workflow else {"task": "e2e"}
+    response = httpx.post(f"{RUNTIME}/runtime/executions", json=body, timeout=60)
     response.raise_for_status()
     return response.json()
 
@@ -86,16 +98,21 @@ def test_blocked_tool_never_runs(report_risk):
 
 
 @pytest.mark.parametrize(
-    ("decision", "expected_tool_status", "expected_reports"),
-    [("approve", "EXECUTED", 1), ("reject", "REJECTED", 0)],
+    ("decision", "expected_tool_status", "expected_reports", "use_dsl"),
+    [
+        ("approve", "EXECUTED", 1, False),
+        ("reject", "REJECTED", 0, False),
+        ("approve", "EXECUTED", 1, True),
+    ],
+    ids=["approve", "reject", "approve-dsl-workflow"],
 )
 def test_high_risk_tool_waits_for_human_decision(
-    admin, report_risk, decision, expected_tool_status, expected_reports
+    admin, report_risk, decision, expected_tool_status, expected_reports, use_dsl
 ):
     report_risk("HIGH")
     before = reports_received()
 
-    execution = start_execution()
+    execution = start_execution(research_workflow() if use_dsl else None)
     assert execution["status"] == "WAITING_APPROVAL"
     assert reports_received() == before
 
