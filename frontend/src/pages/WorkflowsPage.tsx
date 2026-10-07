@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { Link } from "react-router-dom";
 import { useClient } from "../auth/AuthContext";
 import { WorkflowPreview } from "../components/WorkflowPreview";
+import { StartExecution } from "../execution/StartExecution";
 import { useAsync } from "../useAsync";
 
 export function WorkflowsPage() {
@@ -55,6 +56,11 @@ export function WorkflowsPage() {
                 편집
               </Link>
             </div>
+            <StartExecution
+              key={detail.data.workflowId}
+              workflowId={detail.data.workflowId}
+              version={detail.data.latestVersion}
+            />
             <WorkflowPreview dsl={detail.data.dsl} />
           </>
         )}

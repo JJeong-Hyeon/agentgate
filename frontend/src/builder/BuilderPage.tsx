@@ -19,6 +19,7 @@ import { useClient } from "../auth/AuthContext";
 import { nodeTypes } from "../components/DslNodeView";
 import { dslToFlow, edgeId, flowToDsl, routeEdges, type FlowNode } from "../dsl/flow";
 import { useAsync } from "../useAsync";
+import { StartExecution } from "../execution/StartExecution";
 import { EdgeInspector, NodeInspector } from "./Inspector";
 import { emptyWorkflow, labelForNewEdge, newNode, PALETTE, renameNode } from "./model";
 
@@ -212,6 +213,7 @@ function Editor({ initial, workflowId, initialName, version: initialVersion }: E
         <input aria-label="이름" placeholder="이름" value={name} onChange={(e) => setName(e.target.value)} />
         <span className="spacer" />
         {message && <span className={message.kind === "ok" ? "ok" : "error"}>{message.text}</span>}
+        {workflowId && version > 0 && <StartExecution workflowId={workflowId} version={version} />}
         <button onClick={save} disabled={saving}>
           {saving ? "저장 중…" : workflowId ? "새 버전 저장" : "만들기"}
         </button>
