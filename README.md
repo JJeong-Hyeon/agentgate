@@ -116,6 +116,14 @@ com.agentgate
 
 67개 테스트 (단위 + `@SpringBootTest` 통합 테스트, H2 기반이라 Docker 불필요). PR마다 GitHub Actions로 자동 실행됩니다.
 
+### End-to-end 테스트
+
+Spring AgentGate와 Runtime을 실제로 띄우고 Fake LLM으로 거버넌스 경로(ALLOWED / BLOCKED / 승인 / 거절)를 검증합니다. CI의 `e2e` job에서도 실행됩니다.
+
+```bash
+PYTHON=python3.12 ./scripts/e2e.sh   # Docker, Java 21, Python 3.12 + runtime 의존성 필요
+```
+
 ## 배포
 
 `spring.profiles.active=prod`로 기동 시 필수 환경변수가 없거나 기본 admin 비밀번호가 그대로면 기동에 실패합니다. AWS(EC2+RDS+ALB) 배포 절차는 [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md), 필요한 환경변수 목록은 [배포 섹션](docs/AGENTGATE_PLAN.md#12-배포-prod-프로파일)을 참고하세요.

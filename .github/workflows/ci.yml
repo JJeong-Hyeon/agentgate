@@ -39,3 +39,20 @@ jobs:
       - run: ruff check .
       - run: ruff format --check .
       - run: pytest
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: runtime/pyproject.toml
+      - run: pip install -e "runtime[dev]"
+      - run: ./scripts/e2e.sh
