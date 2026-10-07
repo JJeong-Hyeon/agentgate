@@ -9,7 +9,10 @@ class Settings(BaseSettings):
     agentgate_base_url: str = "http://localhost:8080"
     agentgate_api_key: str = ""
     llm_base_url: str = "http://localhost:11434/v1"
+    llm_api_key: str = ""
     llm_model: str = "qwen2.5:7b"
+    llm_temperature: float = 0.0
+    llm_timeout_seconds: float = 60.0
 
 
 @lru_cache
