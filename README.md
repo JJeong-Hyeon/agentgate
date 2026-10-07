@@ -55,6 +55,17 @@ docker compose exec ollama ollama pull qwen2.5:7b
 curl localhost:8000/health
 ```
 
+Runtime의 Tool은 실행 직전에 AgentGate(`POST /api/v1/actions`)를 호출하고, `ALLOWED`일 때만 실제 요청을 보냅니다. Runtime 전용 Agent를 한 번 등록하고 발급된 키를 넘겨주세요.
+
+```bash
+curl -u admin:changeme -X POST localhost:8080/api/v1/agents \
+  -H "Content-Type: application/json" -d '{"agentId":"runtime-agent","name":"Runtime Agent"}'
+# 응답의 apiKey 사용
+AGENTGATE_API_KEY=<apiKey> REPORT_URL=<결과를 보낼 URL> docker compose --profile runtime up -d
+```
+
+`REPORT_URL`을 설정하면 리서치 그래프가 Reviewer 승인 후 결과를 해당 URL로 전송합니다 (행동 이름은 `REPORT_ACTION`, 기본 `SEND_REPORT`).
+
 로컬에서 직접 실행할 때는 Python 3.12 이상이 필요합니다.
 
 ```bash

@@ -1,17 +1,24 @@
 import os
 import uuid
 
+import httpx
 import pytest
 from langchain_core.language_models import FakeListChatModel
 from langgraph.checkpoint.memory import InMemorySaver
 
+from app.governance.agentgate_client import AgentGateClient
 from app.graph.research import build_research_graph
 from app.nodes.agent import parse_verdict
+from app.tools.http import HttpTool, HttpToolSpec
+from tests.fakes import FakeAgentGate, FakeTarget
 
 
-def run(responses: list[str], max_revisions: int = 1, checkpointer=None):
+def run(responses: list[str], max_revisions: int = 1, checkpointer=None, report_tool=None):
     graph = build_research_graph(
-        FakeListChatModel(responses=responses), checkpointer or InMemorySaver(), max_revisions
+        FakeListChatModel(responses=responses),
+        checkpointer or InMemorySaver(),
+        max_revisions,
+        report_tool,
     )
     config = {"configurable": {"thread_id": str(uuid.uuid4())}}
     return graph, config, graph.invoke({"task": "Compare Ollama and vLLM", "revisions": 0}, config)
@@ -79,3 +86,46 @@ def test_state_is_checkpointed_in_postgres():
     with open_checkpointer(os.environ["RUNTIME_DATABASE_URL"]) as saver:
         restored = build_research_graph(FakeListChatModel(responses=["x"]), saver)
         assert restored.get_state(config).values["findings"] == "findings"
+
+
+def report_tool(gate: FakeAgentGate, target: FakeTarget) -> HttpTool:
+    client = AgentGateClient("http://agentgate", "runtime-agent", "k", httpx.MockTransport(gate))
+    spec = HttpToolSpec(name="report", action="SEND_REPORT", url="http://hook/report")
+    return HttpTool(spec, client, httpx.MockTransport(target))
+
+
+def test_approved_findings_are_reported():
+    target = FakeTarget()
+
+    _, _, state = run(
+        ["1. step", "findings", "VERDICT: APPROVE"],
+        report_tool=report_tool(FakeAgentGate(), target),
+    )
+
+    assert [r["status"] for r in state["tool_results"]] == ["EXECUTED"]
+    assert b'"findings":"findings"' in target.requests[0].content
+
+
+def test_report_waits_when_agentgate_requires_approval():
+    target = FakeTarget()
+
+    _, _, state = run(
+        ["1. step", "findings", "VERDICT: APPROVE"],
+        report_tool=report_tool(FakeAgentGate("APPROVAL_REQUIRED", "HIGH", 3), target),
+    )
+
+    assert state["tool_results"][0]["status"] == "APPROVAL_REQUIRED"
+    assert state["tool_results"][0]["approval_id"] == 3
+    assert target.requests == []
+
+
+def test_unapproved_findings_are_not_reported():
+    gate = FakeAgentGate()
+
+    _, _, state = run(
+        ["1. step", "v1", "VERDICT: REVISE", "v2", "VERDICT: REVISE"],
+        report_tool=report_tool(gate, FakeTarget()),
+    )
+
+    assert state.get("tool_results", []) == []
+    assert gate.requests == []
