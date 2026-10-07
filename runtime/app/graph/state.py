@@ -10,3 +10,5 @@ class ResearchState(TypedDict, total=False):
     verdict: Literal["APPROVE", "REVISE"]
     revisions: int
     tool_results: Annotated[list[dict], operator.add]
+    # Gate result of the tool currently waiting for approval or execution.
+    pending_tool: dict | None

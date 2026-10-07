@@ -1,5 +1,10 @@
 package com.agentgate.approval;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -8,7 +13,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.agentgate.agent.domain.Agent;
 import com.agentgate.agent.repository.AgentRepository;
+import com.agentgate.approval.domain.ApprovalStatus;
 import com.agentgate.approval.repository.ApprovalRequestRepository;
+import com.agentgate.approval.runtime.RuntimeClient;
 import com.agentgate.common.security.ApiKeyGenerator;
 import com.agentgate.policy.domain.Policy;
 import com.agentgate.policy.repository.PolicyRepository;
@@ -21,6 +28,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.cache.CacheManager;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import tools.jackson.databind.ObjectMapper;
@@ -49,6 +57,9 @@ class ApprovalWorkflowIntegrationTest {
 
     @Autowired
     private CacheManager cacheManager;
+
+    @MockitoBean
+    private RuntimeClient runtimeClient;
 
     @BeforeEach
     void seed() {
@@ -151,5 +162,46 @@ class ApprovalWorkflowIntegrationTest {
                                 {"agentId":"mail-agent","action":"SEND_EMAIL","executionId":"%s"}
                                 """.formatted("x".repeat(65))))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void decidingAnExecutionApprovalResumesTheRuntime() throws Exception {
+        when(runtimeClient.isEnabled()).thenReturn(true);
+        when(runtimeClient.resume(any(), any(), any())).thenReturn(true);
+        MvcResult actionResult = mockMvc.perform(post("/api/v1/actions").header("X-API-Key", API_KEY)
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                                {"agentId":"mail-agent","action":"SEND_EMAIL","labels":["PII"],"executionId":"exec-1"}
+                                """))
+                .andExpect(status().isOk())
+                .andReturn();
+        long approvalId = objectMapper.readTree(actionResult.getResponse().getContentAsString())
+                .get("approvalId").asLong();
+
+        mockMvc.perform(post("/api/v1/approvals/" + approvalId + "/reject")
+                        .with(httpBasic("test-admin", "test-password"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isOk());
+
+        verify(runtimeClient).resume("exec-1", approvalId, ApprovalStatus.REJECTED);
+        assertThat(approvalRequestRepository.findById(approvalId).orElseThrow().getRuntimeNotifiedAt()).isNotNull();
+    }
+
+    @Test
+    void decidingADirectApprovalDoesNotCallTheRuntime() throws Exception {
+        when(runtimeClient.isEnabled()).thenReturn(true);
+        MvcResult actionResult = mockMvc.perform(post("/api/v1/actions").header("X-API-Key", API_KEY)
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                                {"agentId":"mail-agent","action":"SEND_EMAIL","labels":["PII"]}
+                                """))
+                .andReturn();
+        long approvalId = objectMapper.readTree(actionResult.getResponse().getContentAsString())
+                .get("approvalId").asLong();
+
+        mockMvc.perform(post("/api/v1/approvals/" + approvalId + "/approve")
+                        .with(httpBasic("test-admin", "test-password"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isOk());
+
+        verify(runtimeClient, never()).resume(any(), any(), any());
     }
 }

@@ -17,3 +17,9 @@ agentgate:
     # 로컬 개발용 기본값. 운영 배포 전 반드시 환경변수(AGENTGATE_ADMIN_USERNAME/AGENTGATE_ADMIN_PASSWORD)로 override할 것.
     username: admin
     password: changeme
+  runtime:
+    # Python agent runtime (runtime/). 비워두면 승인 결정 후 실행 재개 호출을 하지 않는다.
+    base-url: ${AGENTGATE_RUNTIME_BASE_URL:}
+    # Runtime의 RUNTIME_TOKEN과 같은 값. base-url을 설정했다면 필수.
+    token: ${AGENTGATE_RUNTIME_TOKEN:}
+    retry-delay: PT30S

@@ -2,12 +2,15 @@ package com.agentgate.approval.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.agentgate.approval.domain.ApprovalRequest;
 import com.agentgate.approval.domain.ApprovalStatus;
 import com.agentgate.approval.dto.ApprovalResponse;
 import com.agentgate.approval.repository.ApprovalRequestRepository;
+import com.agentgate.approval.runtime.ApprovalDecidedEvent;
 import com.agentgate.common.exception.ApprovalNotFoundException;
 import com.agentgate.common.exception.IllegalApprovalStateException;
 import com.agentgate.risk.RiskLevel;
@@ -19,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 @ExtendWith(MockitoExtension.class)
 class ApprovalServiceTest {
@@ -26,11 +30,14 @@ class ApprovalServiceTest {
     @Mock
     private ApprovalRequestRepository approvalRequestRepository;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private ApprovalService service;
 
     @BeforeEach
     void setUp() {
-        service = new ApprovalService(approvalRequestRepository);
+        service = new ApprovalService(approvalRequestRepository, eventPublisher);
     }
 
     @Test
@@ -59,6 +66,7 @@ class ApprovalServiceTest {
         when(approvalRequestRepository.findById(1L)).thenReturn(Optional.of(existing));
 
         assertThatThrownBy(() -> service.approve(1L, "bob")).isInstanceOf(IllegalApprovalStateException.class);
+        verifyNoInteractions(eventPublisher);
     }
 
     @Test
@@ -70,6 +78,7 @@ class ApprovalServiceTest {
 
         assertThat(response.status()).isEqualTo(ApprovalStatus.APPROVED);
         assertThat(response.decidedBy()).isEqualTo("alice");
+        verify(eventPublisher).publishEvent(new ApprovalDecidedEvent(1L));
     }
 
     @Test

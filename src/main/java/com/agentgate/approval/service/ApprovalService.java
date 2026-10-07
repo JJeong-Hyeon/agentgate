@@ -4,10 +4,12 @@ import com.agentgate.approval.domain.ApprovalRequest;
 import com.agentgate.approval.domain.ApprovalStatus;
 import com.agentgate.approval.dto.ApprovalResponse;
 import com.agentgate.approval.repository.ApprovalRequestRepository;
+import com.agentgate.approval.runtime.ApprovalDecidedEvent;
 import com.agentgate.common.exception.ApprovalNotFoundException;
 import com.agentgate.risk.RiskLevel;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ApprovalService {
 
     private final ApprovalRequestRepository approvalRequestRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public ApprovalRequest createRequest(String agentId, String action, String target, List<String> labels, RiskLevel riskLevel,
@@ -28,6 +31,7 @@ public class ApprovalService {
     public ApprovalResponse approve(Long id, String decidedBy) {
         ApprovalRequest approvalRequest = findOrThrow(id);
         approvalRequest.approve(decidedBy);
+        eventPublisher.publishEvent(new ApprovalDecidedEvent(id));
         return ApprovalResponse.from(approvalRequest);
     }
 
@@ -35,6 +39,7 @@ public class ApprovalService {
     public ApprovalResponse reject(Long id, String decidedBy) {
         ApprovalRequest approvalRequest = findOrThrow(id);
         approvalRequest.reject(decidedBy);
+        eventPublisher.publishEvent(new ApprovalDecidedEvent(id));
         return ApprovalResponse.from(approvalRequest);
     }
 

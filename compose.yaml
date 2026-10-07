@@ -28,6 +28,7 @@ services:
       - 'AGENTGATE_BASE_URL=http://host.docker.internal:8080'
       - 'AGENTGATE_API_KEY=${AGENTGATE_API_KEY:-}'
       - 'REPORT_URL=${REPORT_URL:-}'
+      - 'RUNTIME_TOKEN=${RUNTIME_TOKEN:-dev-runtime-token}'
       - 'LLM_BASE_URL=http://ollama:11434/v1'
       - 'LLM_MODEL=${LLM_MODEL:-qwen2.5:7b}'
       - 'RUNTIME_DATABASE_URL=postgresql://myuser:secret@postgres:5432/mydatabase'

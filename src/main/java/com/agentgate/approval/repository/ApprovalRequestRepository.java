@@ -12,4 +12,6 @@ public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequest
     List<ApprovalRequest> findByExecutionId(String executionId);
 
     List<ApprovalRequest> findByStatusAndExecutionId(ApprovalStatus status, String executionId);
+
+    List<ApprovalRequest> findByExecutionIdIsNotNullAndStatusNotAndRuntimeNotifiedAtIsNull(ApprovalStatus status);
 }
