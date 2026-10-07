@@ -116,6 +116,17 @@ com.agentgate
 
 67개 테스트 (단위 + `@SpringBootTest` 통합 테스트, H2 기반이라 Docker 불필요). PR마다 GitHub Actions로 자동 실행됩니다.
 
+### Frontend (React + React Flow)
+
+```bash
+cd frontend
+npm install
+npm run dev        # http://localhost:5173, /api는 localhost:8080(AgentGate)으로 프록시
+npm test
+```
+
+관리자 계정(기본 `admin` / `changeme`)으로 로그인합니다. 자격 증명은 브라우저 탭 세션 동안만 보관됩니다.
+
 ### End-to-end 테스트
 
 Spring AgentGate와 Runtime을 실제로 띄우고 Fake LLM으로 거버넌스 경로(ALLOWED / BLOCKED / 승인 / 거절)를 검증합니다. CI의 `e2e` job에서도 실행됩니다.
