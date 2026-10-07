@@ -47,6 +47,25 @@ curl -u admin:changeme -X POST localhost:8080/api/v1/approvals/1/approve \
   -H "Content-Type: application/json" -d '{"decidedBy":"me"}'
 ```
 
+### Agent Runtime (Python + LangGraph)
+
+```bash
+docker compose --profile runtime up -d --build   # runtime(:8000) + ollama(:11434)
+docker compose exec ollama ollama pull qwen2.5:7b
+curl localhost:8000/health
+```
+
+로컬에서 직접 실행할 때는 Python 3.12 이상이 필요합니다.
+
+```bash
+cd runtime
+python3.12 -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+cp .env.example .env
+uvicorn app.main:app --reload
+pytest
+```
+
 ## API 개요
 
 | 영역 | 엔드포인트 | 인증 |
