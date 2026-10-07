@@ -3,6 +3,7 @@ package com.agentgate.config;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.userdetails.User;
@@ -27,6 +28,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/audit-logs", "/api/v1/audit-logs/**").authenticated()
                         .requestMatchers("/api/v1/agents", "/api/v1/agents/**").authenticated()
                         .requestMatchers("/api/v1/workflows", "/api/v1/workflows/**").authenticated()
+                        // The runtime authenticates progress events with the shared runtime token instead.
+                        .requestMatchers(HttpMethod.POST, "/api/v1/executions/*/events").permitAll()
+                        .requestMatchers("/api/v1/executions", "/api/v1/executions/**").authenticated()
                         .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/prometheus").permitAll()
                         .anyRequest().denyAll()
                 );

@@ -310,6 +310,11 @@ Node별 확인 항목:
 
 실행 상태는 Runtime이 Spring Boot에 이벤트로 보고하고, Frontend는 SSE로 구독한다.
 
+- Runtime은 LangGraph `tasks` 스트림으로 `NODE_STARTED` / `NODE_COMPLETED` / `NODE_WAITING` / `NODE_FAILED`, `EXECUTION_WAITING` / `EXECUTION_COMPLETED` / `EXECUTION_FAILED`를 `POST /api/v1/executions/{id}/events`(`X-Runtime-Token`)로 보고한다. 보고는 best effort이며 실패해도 실행은 계속된다.
+- Spring은 `executions` / `node_executions`에 기록하고 `GET /api/v1/executions/{id}/stream`(SSE)으로 `snapshot` 1회 후 `update` 이벤트를 보낸다.
+- 승인 대기로 멈췄다 재개된 단계는 같은 task id로 다시 실행되므로 같은 노드 기록이 갱신된다.
+- SSE 구독자는 인스턴스 메모리에 있으므로 다중 인스턴스 운영 시 Redis Pub/Sub 등으로 확장이 필요하다.
+
 ---
 
 ## 13. Backend (Spring Boot)
@@ -335,7 +340,8 @@ API:
 /api/v1/workflows
 /api/v1/workflows/{id}/versions
 /api/v1/executions
-/api/v1/executions/{id}/events   (SSE)
+/api/v1/executions/{id}/stream   (SSE, UI 구독)
+/api/v1/executions/{id}/events   (Runtime → AgentGate 진행 이벤트)
 ```
 
 기존 API 상세는 [`API_SPEC.md`](API_SPEC.md) 참고.

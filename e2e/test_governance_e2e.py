@@ -127,3 +127,38 @@ def test_high_risk_tool_waits_for_human_decision(
     finished = wait_for(execution["execution_id"], "COMPLETED")
     assert tool_statuses(finished) == [expected_tool_status]
     assert reports_received() == before + expected_reports
+
+
+def wait_for_agentgate(admin, execution_id: str, status: str, timeout: float = 20) -> dict:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        execution = admin.get(f"/api/v1/executions/{execution_id}").json()
+        if execution["status"] == status:
+            return execution
+        time.sleep(0.5)
+    raise AssertionError(f"{execution_id} did not reach {status} in AgentGate: {execution}")
+
+
+def test_execution_started_through_agentgate_is_tracked(admin, report_risk):
+    report_risk("HIGH")
+    workflow_id = f"research-{int(time.time() * 1000)}"
+    admin.post(
+        "/api/v1/workflows", json={"workflowId": workflow_id, "dsl": research_workflow()}
+    ).raise_for_status()
+    before = reports_received()
+
+    started = admin.post("/api/v1/executions", json={"workflowId": workflow_id, "task": "e2e"})
+    started.raise_for_status()
+    execution_id = started.json()["executionId"]
+
+    waiting = wait_for_agentgate(admin, execution_id, "WAITING_APPROVAL")
+    assert [n["nodeId"] for n in waiting["nodes"]][:3] == ["plan", "findings", "review"]
+    assert waiting["nodes"][-1]["status"] == "WAITING"
+    admin.post(
+        f"/api/v1/approvals/{waiting['waitingApprovalId']}/approve", json={}
+    ).raise_for_status()
+
+    done = wait_for_agentgate(admin, execution_id, "COMPLETED")
+    assert all(n["status"] == "COMPLETED" for n in done["nodes"])
+    assert [n["step"] for n in done["nodes"]][-2:] == ["report.approval", "report.execute"]
+    assert reports_received() == before + 1

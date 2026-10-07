@@ -32,3 +32,23 @@ class FakeTarget:
     def __call__(self, request: httpx.Request) -> httpx.Response:
         self.requests.append(request)
         return httpx.Response(self.status_code, json={"ok": True})
+
+
+class FakeAgentGateEvents:
+    """MockTransport handler standing in for AgentGate's execution event endpoint."""
+
+    def __init__(self, status_code=200):
+        self.status_code = status_code
+        self.requests: list[httpx.Request] = []
+
+    def __call__(self, request: httpx.Request) -> httpx.Response:
+        self.requests.append(request)
+        return httpx.Response(self.status_code)
+
+    @property
+    def events(self) -> list[dict]:
+        return [json.loads(r.content) for r in self.requests]
+
+    @property
+    def types(self) -> list[str]:
+        return [e["type"] for e in self.events]

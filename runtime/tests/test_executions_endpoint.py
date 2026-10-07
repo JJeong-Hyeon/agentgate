@@ -6,15 +6,17 @@ from langgraph.checkpoint.memory import InMemorySaver
 
 from app.config import Settings, get_settings
 from app.dsl.compiler import WorkflowCompiler
-from app.executions import get_runner
+from app.events import EventReporter
+from app.executions import get_reporter, get_runner
 from app.governance.agentgate_client import AgentGateClient
 from app.graph.research import build_research_graph
 from app.main import app
 from app.runner import WorkflowRunner
 from app.tools.http import HttpTool, HttpToolSpec
-from tests.fakes import FakeAgentGate, FakeTarget
+from tests.fakes import FakeAgentGate, FakeAgentGateEvents, FakeTarget
 
 TOKEN = "runtime-secret"
+events_sinks: list[FakeAgentGateEvents] = []
 
 
 def make_client(report_tool=None) -> TestClient:
@@ -27,6 +29,11 @@ def make_client(report_tool=None) -> TestClient:
     compiler = WorkflowCompiler(lambda model, temperature: FakeListChatModel(responses=["ok"]))
     runner = WorkflowRunner(graph, compiler, checkpointer)
     app.dependency_overrides[get_runner] = lambda: runner
+    sink = FakeAgentGateEvents()
+    app.dependency_overrides[get_reporter] = lambda: EventReporter(
+        "http://agentgate", "t", httpx.MockTransport(sink)
+    )
+    events_sinks.append(sink)
     app.dependency_overrides[get_settings] = lambda: Settings(_env_file=None, runtime_token=TOKEN)
     return TestClient(app)
 
@@ -227,3 +234,41 @@ def test_unsupported_workflow_is_rejected(client):
 
     assert response.status_code == 422
     assert "APPROVAL" in response.json()["detail"]
+
+
+def test_background_execution_with_caller_id(client):
+    response = client.post(
+        "/runtime/executions",
+        json={
+            "task": "t",
+            "workflow": SIMPLE_WORKFLOW,
+            "executionId": "exec-42",
+            "background": True,
+        },
+    )
+
+    assert response.status_code == 202
+    assert response.json() == {
+        "execution_id": "exec-42",
+        "status": "RUNNING",
+        "waiting_approval_id": None,
+        "state": None,
+    }
+    # TestClient runs background tasks before returning.
+    assert client.get("/runtime/executions/exec-42").json()["status"] == "COMPLETED"
+    assert events_sinks[-1].types[-1] == "EXECUTION_COMPLETED"
+
+
+def test_duplicate_execution_id_is_conflict(client):
+    body = {"task": "t", "executionId": "exec-dup"}
+    client.post("/runtime/executions", json=body)
+
+    assert client.post("/runtime/executions", json=body).status_code == 409
+
+
+def test_resume_reports_events(approval_client):
+    execution_id = start(approval_client)["execution_id"]
+
+    resume(approval_client, execution_id)
+
+    assert events_sinks[-1].types[-1] == "EXECUTION_COMPLETED"

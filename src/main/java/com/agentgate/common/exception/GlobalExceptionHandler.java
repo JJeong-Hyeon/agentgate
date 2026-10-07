@@ -62,6 +62,17 @@ public class GlobalExceptionHandler {
                 status.getReasonPhrase(), "INVALID_WORKFLOW", ex.getMessage(), request.getRequestURI(), ex.getErrors()));
     }
 
+    @ExceptionHandler(ExecutionNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleExecutionNotFound(ExecutionNotFoundException ex, HttpServletRequest request) {
+        return build(HttpStatus.NOT_FOUND, "EXECUTION_NOT_FOUND", ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(InvalidRuntimeTokenException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidRuntimeToken(InvalidRuntimeTokenException ex,
+                                                                   HttpServletRequest request) {
+        return build(HttpStatus.UNAUTHORIZED, "INVALID_RUNTIME_TOKEN", ex.getMessage(), request);
+    }
+
     @ExceptionHandler(RuntimeUnavailableException.class)
     public ResponseEntity<ErrorResponse> handleRuntimeUnavailable(RuntimeUnavailableException ex, HttpServletRequest request) {
         return build(HttpStatus.SERVICE_UNAVAILABLE, "RUNTIME_UNAVAILABLE", ex.getMessage(), request);

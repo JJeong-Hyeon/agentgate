@@ -39,6 +39,11 @@ class WorkflowRunner:
             self._compiled.popitem(last=False)
         return graph
 
+    def exists(self, execution_id: str) -> bool:
+        return (
+            self._checkpointer.get_tuple({"configurable": {"thread_id": execution_id}}) is not None
+        )
+
     def graph_for_execution(self, execution_id: str) -> CompiledStateGraph:
         saved = self._checkpointer.get_tuple({"configurable": {"thread_id": execution_id}})
         dsl: Any = saved.checkpoint["channel_values"].get("workflow") if saved else None

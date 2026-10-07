@@ -1,7 +1,11 @@
 package com.agentgate.runtime;
 
 import com.agentgate.approval.domain.ApprovalStatus;
+import com.agentgate.common.exception.InvalidWorkflowException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,6 +29,7 @@ public class RuntimeClient {
 
     private final RestClient restClient;
     private final boolean enabled;
+    private final String token;
 
     @Autowired
     public RuntimeClient(@Value("${agentgate.runtime.base-url:}") String baseUrl,
@@ -34,6 +39,7 @@ public class RuntimeClient {
 
     RuntimeClient(RestClient.Builder builder, String baseUrl, String token) {
         this.enabled = !baseUrl.isBlank();
+        this.token = token;
         if (enabled && token.isBlank()) {
             throw new IllegalStateException("agentgate.runtime.token must be set when agentgate.runtime.base-url is set");
         }
@@ -49,6 +55,12 @@ public class RuntimeClient {
 
     public boolean isEnabled() {
         return enabled;
+    }
+
+    /** Whether {@code presented} is the shared token the runtime sends with its calls to AgentGate. */
+    public boolean acceptsToken(String presented) {
+        return !token.isBlank() && presented != null
+                && MessageDigest.isEqual(token.getBytes(StandardCharsets.UTF_8), presented.getBytes(StandardCharsets.UTF_8));
     }
 
     /**
@@ -90,6 +102,31 @@ public class RuntimeClient {
         } catch (RestClientException e) {
             log.warn("Workflow validation failed", e);
             throw new RuntimeUnavailableException("Agent runtime could not validate the workflow");
+        }
+    }
+
+    /**
+     * Starts an execution in the background on the runtime; progress comes back as execution events.
+     *
+     * @throws InvalidWorkflowException when the runtime cannot run the workflow (e.g. unsupported node)
+     * @throws RuntimeUnavailableException when the runtime is disabled or cannot answer
+     */
+    public void startExecution(String executionId, String task, JsonNode workflow) {
+        if (!enabled) {
+            throw new RuntimeUnavailableException("Agent runtime is not configured");
+        }
+        try {
+            restClient.post()
+                    .uri("/runtime/executions")
+                    .body(Map.of("executionId", executionId, "task", task, "workflow", workflow, "background", true))
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (HttpClientErrorException.UnprocessableContent e) {
+            throw new InvalidWorkflowException("Runtime cannot run the workflow: " + e.getResponseBodyAsString(),
+                    List.of());
+        } catch (RestClientException e) {
+            log.warn("Failed to start execution {}", executionId, e);
+            throw new RuntimeUnavailableException("Agent runtime could not start the execution");
         }
     }
 }
