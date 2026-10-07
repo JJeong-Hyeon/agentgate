@@ -2,9 +2,12 @@ import type { Edge, Node } from "@xyflow/react";
 import type { DslNode, WorkflowDsl } from "../api/types";
 
 export interface FlowNodeData extends Record<string, unknown> {
-  label: string;
   dsl: DslNode;
+  error?: string;
+  status?: string;
 }
+
+export type FlowNode = Node<FlowNodeData, "dsl">;
 
 const COLUMN_WIDTH = 240;
 const ROW_HEIGHT = 110;
@@ -44,20 +47,58 @@ export function autoLayout(dsl: WorkflowDsl): Map<string, { x: number; y: number
   return positions;
 }
 
-export function dslToFlow(dsl: WorkflowDsl): { nodes: Node<FlowNodeData>[]; edges: Edge[] } {
+export function edgeId(edge: { source: string; target: string; label?: string | null }): string {
+  return `${edge.source}->${edge.target}${edge.label ? `:${edge.label}` : ""}`;
+}
+
+export function dslToFlow(dsl: WorkflowDsl): { nodes: FlowNode[]; edges: Edge[] } {
   const layout = autoLayout(dsl);
-  const nodes = dsl.nodes.map<Node<FlowNodeData>>((node) => ({
+  const nodes = dsl.nodes.map<FlowNode>((node) => ({
     id: node.id,
-    type: node.type === "START" ? "input" : node.type === "END" ? "output" : "default",
+    type: "dsl",
     position: node.position ?? layout.get(node.id)!,
-    className: `node node-${node.type.toLowerCase()}`,
-    data: { label: node.label ?? node.id, dsl: node },
+    data: { dsl: node },
   }));
   const edges = dsl.edges.map<Edge>((edge) => ({
-    id: `${edge.source}->${edge.target}${edge.label ? `:${edge.label}` : ""}`,
+    id: edgeId(edge),
     source: edge.source,
     target: edge.target,
     label: edge.label ?? undefined,
+    type: "smoothstep",
   }));
-  return { nodes, edges };
+  return { nodes, edges: routeEdges(nodes, edges) };
+}
+
+/**
+ * Edges that point back to a node at or left of their source (e.g. REVISE) leave and enter through the
+ * hidden bottom handles, so they loop under the row instead of overlapping the forward edges.
+ */
+export function routeEdges(nodes: FlowNode[], edges: Edge[]): Edge[] {
+  const x = new Map(nodes.map((n) => [n.id, n.position.x]));
+  return edges.map((edge) => {
+    const backwards = (x.get(edge.target) ?? 0) <= (x.get(edge.source) ?? 0);
+    return backwards
+      ? { ...edge, sourceHandle: "back-out", targetHandle: "back-in", className: "edge-back" }
+      : { ...edge, sourceHandle: null, targetHandle: null, className: undefined };
+  });
+}
+
+/** Inverse of dslToFlow; the canvas position becomes the node's DSL position. */
+export function flowToDsl(
+  nodes: FlowNode[],
+  edges: Edge[],
+  meta: Pick<WorkflowDsl, "name"> = {},
+): WorkflowDsl {
+  return {
+    ...meta,
+    nodes: nodes.map((node) => ({
+      ...node.data.dsl,
+      position: { x: Math.round(node.position.x), y: Math.round(node.position.y) },
+    })),
+    edges: edges.map((edge) => ({
+      source: edge.source,
+      target: edge.target,
+      ...(typeof edge.label === "string" && edge.label ? { label: edge.label } : {}),
+    })),
+  };
 }

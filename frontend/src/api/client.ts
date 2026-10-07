@@ -1,4 +1,4 @@
-import type { ApiErrorBody, Approval, Execution, WorkflowSummary } from "./types";
+import type { ApiErrorBody, Approval, Execution, WorkflowDsl, WorkflowSummary } from "./types";
 
 export interface Credentials {
   username: string;
@@ -32,6 +32,20 @@ export class AgentGateClient {
 
   getWorkflow(workflowId: string): Promise<WorkflowSummary> {
     return this.request(`/api/v1/workflows/${encodeURIComponent(workflowId)}`);
+  }
+
+  createWorkflow(workflowId: string, dsl: WorkflowDsl): Promise<WorkflowSummary> {
+    return this.request("/api/v1/workflows", {
+      method: "POST",
+      body: JSON.stringify({ workflowId, dsl }),
+    });
+  }
+
+  addWorkflowVersion(workflowId: string, dsl: WorkflowDsl): Promise<{ version: number; dsl: WorkflowDsl }> {
+    return this.request(`/api/v1/workflows/${encodeURIComponent(workflowId)}/versions`, {
+      method: "POST",
+      body: JSON.stringify({ dsl }),
+    });
   }
 
   listExecutions(workflowId?: string): Promise<Execution[]> {
