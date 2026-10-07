@@ -1,43 +1,61 @@
-# AWS 배포 (EC2 + RDS + ALB + 모니터링 EC2)
+# AWS 배포 (ALB + App EC2 + Runtime EC2 + RDS + 모니터링 EC2)
 
 상시 운영이 아니라 필요할 때만 켜는 걸 전제로 한다. EC2/RDS는 `scripts/aws-start.sh` / `aws-stop.sh`로 껐다 켤 수 있고, ALB는 "정지" 개념이 없어 떠있는 동안 계속 과금된다 — 안 쓸 땐 `terraform destroy -target=aws_lb.app`로 지웠다가 필요할 때 `terraform apply`로 다시 만드는 걸 권장한다.
+
+## 구성
+
+```text
+브라우저 ──HTTP──▶ ALB :80 ──▶ App EC2 :8080   AgentGate (Spring, 프론트엔드 포함 jar) + Redis
+                                   │   ▲
+                         resume /  │   │ 행동 평가 / 실행 이벤트
+                         검증 / 실행 ▼   │
+                               Runtime EC2 :8000  Runtime (LangGraph) + Ollama   (docker compose)
+                                   │
+            App EC2, Runtime EC2 ──┴──▶ RDS Postgres (AgentGate 데이터 + LangGraph checkpoint)
+Monitoring EC2 (Prometheus + Grafana) ──▶ App EC2 /actuator/prometheus
+```
+
+| 인스턴스 | 타입 (기본) | 역할 |
+|---|---|---|
+| App EC2 | `t4g.micro` | AgentGate jar (UI + API), Redis 컨테이너 |
+| Runtime EC2 | `t4g.large` (`runtime_instance_type`) | Runtime + Ollama. CPU 추론이라 8 GiB에서는 3B급 모델(`qwen2.5:3b`)이 적당하고, 7B는 `t4g.xlarge` 권장 |
+| RDS | `db.t4g.micro` | Postgres |
+| Monitoring EC2 | `t4g.micro` | Prometheus + Grafana ([`MONITORING.md`](MONITORING.md)) |
+
+Runtime은 App에서만(8000), App은 ALB·모니터링·Runtime에서만(8080), RDS는 App·Runtime에서만 접근 가능하다.
 
 ## 사전 준비
 
 1. AWS 계정 자격증명 설정: `aws configure`
-2. EC2 키페어 생성(콘솔 또는 `aws ec2 create-key-pair`) — SSH 접속용
-3. GitHub 저장소가 private이므로 EC2에서 clone하려면 [Deploy Key](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/managing-deploy-keys) 생성(읽기 전용으로 충분) 후 저장소 Settings → Deploy keys에 등록
+2. EC2 키페어 생성(콘솔 또는 `aws ec2 create-key-pair`) — SSH / 배포 스크립트용
+3. 로컬에 Java 21, Node 24(프론트엔드 빌드), Terraform, `rsync`
+
+서버에서 저장소를 clone하지 않는다. 배포 스크립트가 로컬에서 빌드한 jar와 Runtime 소스를 올린다.
 
 ## 1. 인프라 생성
 
 ```bash
 cd infra
 terraform init
-terraform validate
 terraform plan \
   -var="key_pair_name=<키페어 이름>" \
   -var="admin_cidr=<내 IP>/32" \
   -var="db_password=<RDS 비밀번호>" \
   -var="admin_password=<AgentGate 관리자 비밀번호>"
+  # 7B 모델을 쓸 거면: -var="runtime_instance_type=t4g.xlarge"
 terraform apply  # 위와 동일한 -var 플래그로
 ```
 
-`terraform output`으로 `ec2_public_ip`, `alb_dns_name`, `rds_endpoint`, `monitoring_public_ip` 확인. 모니터링용 EC2 #2는 Prometheus+Grafana가 자동으로 기동되어 있음 — Grafana 접속/데이터소스 설정은 [`docs/MONITORING.md`](MONITORING.md) 참고.
+`terraform output`으로 `alb_dns_name`, `ec2_public_ip`, `app_private_ip`, `runtime_public_ip`, `runtime_private_ip`, `rds_endpoint` 확인.
 
-## 2. EC2에 앱 배포
+## 2. AgentGate (App EC2)
+
+최초 1회, App EC2에 환경변수 파일을 만든다.
 
 ```bash
 ssh -i <키페어.pem> ec2-user@<ec2_public_ip>
-
-# Redis 컨테이너 (최초 1회)
-docker run -d --name agentgate-redis -p 6379:6379 --restart unless-stopped redis:latest
-
-# 앱 clone (deploy key 등록되어 있어야 함)
-git clone git@github.com:JJeong-Hyeon/agentgate.git
-cd agentgate
-
-# 환경변수 파일
-cat > .env <<EOF
+mkdir -p ~/agentgate
+cat > ~/agentgate/.env <<EOF
 SPRING_PROFILES_ACTIVE=prod
 SPRING_DATASOURCE_URL=jdbc:postgresql://<rds_endpoint>/agentgate
 SPRING_DATASOURCE_USERNAME=agentgate
@@ -46,24 +64,63 @@ SPRING_DATA_REDIS_HOST=localhost
 SPRING_DATA_REDIS_PORT=6379
 AGENTGATE_ADMIN_USERNAME=admin
 AGENTGATE_ADMIN_PASSWORD=<AgentGate 관리자 비밀번호>
+AGENTGATE_RUNTIME_BASE_URL=http://<runtime_private_ip>:8000
+AGENTGATE_RUNTIME_TOKEN=<임의의 긴 문자열, Runtime의 RUNTIME_TOKEN과 동일>
 EOF
-
-sudo cp infra/systemd/agentgate.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now agentgate
 ```
 
-`http://<alb_dns_name>/actuator/health`로 확인.
-
-## 3. 껐다 켜기
+이후 배포는 로컬에서:
 
 ```bash
-./scripts/aws-start.sh   # EC2 + RDS 기동
-./scripts/aws-stop.sh    # EC2 + RDS 정지
+scripts/deploy-app.sh <키페어.pem>
 ```
 
-RDS는 정지 후 7일이 지나면 AWS가 자동으로 재시작시킨다(AWS 정책, 스크립트로 막을 수 없음) — 장기간 안 쓸 거면 `terraform destroy` 전체를 고려할 것.
+`./gradlew bootJar -PwithFrontend`로 프론트엔드를 포함한 jar를 만들어 올리고, Redis 컨테이너 확인 후 systemd(`infra/systemd/agentgate.service`, `java -jar`)로 재시작한다. `http://<alb_dns_name>/`에서 UI, `/actuator/health`로 상태 확인.
 
-## prod 프로파일 안전장치
+## 3. Runtime + Ollama (Runtime EC2)
 
-`agentgate.admin.password`가 개발용 기본값("changeme")이면 `prod` 프로파일에서 기동이 즉시 실패한다(`SecurityHardeningCheck`) — `.env`에 반드시 실제 비밀번호를 넣을 것.
+Runtime이 AgentGate를 호출할 때 쓸 Agent를 한 번 등록한다.
+
+```bash
+curl -u admin:<관리자 비밀번호> -X POST http://<alb_dns_name>/api/v1/agents \
+  -H "Content-Type: application/json" -d '{"agentId":"runtime-agent","name":"Runtime Agent"}'
+# 응답의 apiKey는 이때 한 번만 보인다
+```
+
+최초 1회, Runtime EC2에 환경변수 파일을 만든다 ([`deploy/runtime/.env.example`](../deploy/runtime/.env.example)).
+
+```bash
+ssh -i <키페어.pem> ec2-user@<runtime_public_ip>
+mkdir -p ~/agentgate-runtime
+cat > ~/agentgate-runtime/.env <<EOF
+AGENTGATE_BASE_URL=http://<app_private_ip>:8080
+AGENTGATE_AGENT_ID=runtime-agent
+AGENTGATE_API_KEY=<위에서 받은 apiKey>
+RUNTIME_TOKEN=<App의 AGENTGATE_RUNTIME_TOKEN과 동일>
+RUNTIME_DATABASE_URL=postgresql://agentgate:<RDS 비밀번호>@<rds_endpoint>/agentgate
+LLM_MODEL=qwen2.5:3b
+EOF
+```
+
+이후 배포는 로컬에서:
+
+```bash
+scripts/deploy-runtime.sh <키페어.pem>
+```
+
+`runtime/` 소스와 [`deploy/runtime/compose.yaml`](../deploy/runtime/compose.yaml)을 rsync로 올리고, 컨테이너를 빌드·기동한 뒤 `LLM_MODEL`을 Ollama에 받아둔다(최초 1회는 모델 다운로드로 수 분 소요). AgentGate가 Runtime에 닿는지는 UI에서 워크플로를 저장해보면 된다(검증을 Runtime이 수행).
+
+## 4. 껐다 켜기
+
+```bash
+./scripts/aws-start.sh   # App / Monitoring / Runtime EC2 + RDS 기동
+./scripts/aws-stop.sh    # 정지
+```
+
+컨테이너(Redis, Runtime, Ollama)는 `restart: unless-stopped` / systemd로 자동 기동되고, 받아둔 모델은 볼륨에 남는다. RDS는 정지 후 7일이 지나면 AWS가 자동으로 재시작시킨다(AWS 정책) — 장기간 안 쓸 거면 `terraform destroy` 전체를 고려할 것.
+
+## 보안 참고
+
+- `agentgate.admin.password`가 개발용 기본값("changeme")이면 `prod` 프로파일에서 기동이 즉시 실패한다(`SecurityHardeningCheck`).
+- `AGENTGATE_RUNTIME_BASE_URL`을 설정했는데 `AGENTGATE_RUNTIME_TOKEN`이 비어 있으면 기동이 실패한다.
+- ALB는 현재 HTTP(80)만 연다. UI 로그인(Basic 인증)이 평문으로 전송되므로, 외부에 공개할 때는 도메인 + ACM 인증서로 HTTPS 리스너를 추가해야 한다.

@@ -78,7 +78,11 @@ export class AgentGateClient {
     signal: AbortSignal,
   ): Promise<void> {
     const response = await this.fetchImpl(`/api/v1/executions/${encodeURIComponent(executionId)}/stream`, {
-      headers: { Accept: "text/event-stream", Authorization: this.authorization() },
+      headers: {
+        Accept: "text/event-stream",
+        Authorization: this.authorization(),
+        "X-Requested-With": "XMLHttpRequest",
+      },
       signal,
     });
     if (!response.ok || !response.body) {
@@ -120,6 +124,8 @@ export class AgentGateClient {
       headers: {
         Accept: "application/json",
         Authorization: this.authorization(),
+        // Makes AgentGate answer 401 without WWW-Authenticate, so the browser's own login dialog never appears.
+        "X-Requested-With": "XMLHttpRequest",
         ...(init.body ? { "Content-Type": "application/json" } : {}),
         ...init.headers,
       },

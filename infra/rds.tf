@@ -31,7 +31,7 @@ resource "aws_db_instance" "postgres" {
   storage_type           = "gp3"
   db_name                = "agentgate"
   username               = "agentgate"
-  password                = var.db_password
+  password               = var.db_password
   db_subnet_group_name   = aws_db_subnet_group.default.name
   vpc_security_group_ids = [aws_security_group.rds.id]
   publicly_accessible    = false
