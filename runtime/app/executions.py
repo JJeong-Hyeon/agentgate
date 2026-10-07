@@ -1,7 +1,7 @@
 import secrets
 import threading
 import uuid
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request, status
 from langgraph.graph.state import CompiledStateGraph
@@ -10,12 +10,17 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from app.config import Settings, get_settings
+from app.dsl import validate_workflow
+from app.dsl.compiler import CompileError
+from app.runner import WorkflowRunner
 
 router = APIRouter(prefix="/runtime/executions", tags=["executions"])
 
 
 class ExecutionRequest(BaseModel):
     task: str = Field(min_length=1)
+    # Workflow DSL; omitted → the built-in research graph.
+    workflow: dict[str, Any] | None = None
 
 
 class ExecutionResponse(BaseModel):
@@ -33,11 +38,11 @@ class ResumeRequest(BaseModel):
     decision: Literal["APPROVED", "REJECTED"]
 
 
-def get_graph(request: Request) -> CompiledStateGraph:
-    return request.app.state.graph
+def get_runner(request: Request) -> WorkflowRunner:
+    return request.app.state.runner
 
 
-Graph = Annotated[CompiledStateGraph, Depends(get_graph)]
+Runner = Annotated[WorkflowRunner, Depends(get_runner)]
 
 # Executions with a resume in flight; a second resume for the same one is a conflict.
 _resuming: set[str] = set()
@@ -77,16 +82,32 @@ def _describe(graph: CompiledStateGraph, execution_id: str) -> ExecutionResponse
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
-def create_execution(body: ExecutionRequest, graph: Graph) -> ExecutionResponse:
+def create_execution(body: ExecutionRequest, runner: Runner) -> ExecutionResponse:
+    if body.workflow is None:
+        graph, initial = runner.default_graph, {"task": body.task, "revisions": 0}
+    else:
+        workflow, issues = validate_workflow(body.workflow)
+        if issues:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT,
+                {"message": "Invalid workflow", "errors": [i.model_dump() for i in issues]},
+            )
+        try:
+            graph = runner.graph_for_workflow(workflow)
+        except CompileError as e:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e)) from e
+        dsl = workflow.model_dump(mode="json", by_alias=True)
+        initial = {"task": body.task, "workflow": dsl, "revisions": {}}
+
     # Runs synchronously until it completes or pauses for approval.
     execution_id = str(uuid.uuid4())
-    graph.invoke({"task": body.task, "revisions": 0}, _config(execution_id))
+    graph.invoke(initial, _config(execution_id))
     return _describe(graph, execution_id)
 
 
 @router.get("/{execution_id}")
-def get_execution(execution_id: str, graph: Graph) -> ExecutionResponse:
-    return _describe(graph, execution_id)
+def get_execution(execution_id: str, runner: Runner) -> ExecutionResponse:
+    return _describe(runner.graph_for_execution(execution_id), execution_id)
 
 
 @router.post(
@@ -95,8 +116,9 @@ def get_execution(execution_id: str, graph: Graph) -> ExecutionResponse:
     dependencies=[Depends(require_runtime_token)],
 )
 def resume_execution(
-    execution_id: str, body: ResumeRequest, graph: Graph, background: BackgroundTasks
+    execution_id: str, body: ResumeRequest, runner: Runner, background: BackgroundTasks
 ) -> ExecutionResponse:
+    graph = runner.graph_for_execution(execution_id)
     with _resuming_lock:
         current = _describe(graph, execution_id)
         if execution_id in _resuming or current.status != "WAITING_APPROVAL":

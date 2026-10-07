@@ -14,7 +14,7 @@ from pydantic.alias_generators import to_camel
 
 NODE_ID_PATTERN = r"^[A-Za-z][A-Za-z0-9_]{0,63}$"
 # State keys the runtime owns; node ids must not shadow them.
-RESERVED_IDS = {"task", "tool_results", "pending_tool", "revisions"}
+RESERVED_IDS = {"task", "workflow", "tool_results", "pending_tool", "revisions"}
 
 
 class DslModel(BaseModel):
