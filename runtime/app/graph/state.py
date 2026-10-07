@@ -1,4 +1,5 @@
-from typing import Literal, TypedDict
+import operator
+from typing import Annotated, Literal, TypedDict
 
 
 class ResearchState(TypedDict, total=False):
@@ -8,3 +9,4 @@ class ResearchState(TypedDict, total=False):
     review: str
     verdict: Literal["APPROVE", "REVISE"]
     revisions: int
+    tool_results: Annotated[list[dict], operator.add]

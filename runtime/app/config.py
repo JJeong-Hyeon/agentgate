@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     agentgate_base_url: str = "http://localhost:8080"
+    agentgate_agent_id: str = "runtime-agent"
     agentgate_api_key: str = ""
     llm_base_url: str = "http://localhost:11434/v1"
     llm_api_key: str = ""
@@ -16,6 +17,10 @@ class Settings(BaseSettings):
     # Empty → in-memory checkpoints (lost on restart).
     runtime_database_url: str = ""
     max_review_revisions: int = 1
+    # Empty → the research graph has no report step.
+    report_url: str = ""
+    report_action: str = "SEND_REPORT"
+    report_labels: list[str] = []
 
 
 @lru_cache
