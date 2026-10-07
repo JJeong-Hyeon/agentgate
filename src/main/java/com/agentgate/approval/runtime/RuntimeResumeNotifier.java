@@ -3,6 +3,7 @@ package com.agentgate.approval.runtime;
 import com.agentgate.approval.domain.ApprovalRequest;
 import com.agentgate.approval.domain.ApprovalStatus;
 import com.agentgate.approval.repository.ApprovalRequestRepository;
+import com.agentgate.runtime.RuntimeClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;

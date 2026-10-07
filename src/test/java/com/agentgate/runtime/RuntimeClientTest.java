@@ -1,4 +1,4 @@
-package com.agentgate.approval.runtime;
+package com.agentgate.runtime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -13,6 +13,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.client.RestClient;
+import tools.jackson.databind.json.JsonMapper;
 
 class RuntimeClientTest {
 
@@ -21,6 +22,7 @@ class RuntimeClientTest {
     private final AtomicReference<String> token = new AtomicReference<>();
     private final AtomicReference<String> body = new AtomicReference<>();
     private volatile int responseStatus = 202;
+    private volatile String responseBody = null;
 
     @BeforeEach
     void startServer() throws IOException {
@@ -29,7 +31,14 @@ class RuntimeClientTest {
             path.set(exchange.getRequestURI().getPath());
             token.set(exchange.getRequestHeaders().getFirst("X-Runtime-Token"));
             body.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
-            exchange.sendResponseHeaders(responseStatus, -1);
+            if (responseBody == null) {
+                exchange.sendResponseHeaders(responseStatus, -1);
+            } else {
+                byte[] bytes = responseBody.getBytes(StandardCharsets.UTF_8);
+                exchange.getResponseHeaders().add("Content-Type", "application/json");
+                exchange.sendResponseHeaders(responseStatus, bytes.length);
+                exchange.getResponseBody().write(bytes);
+            }
             exchange.close();
         });
         server.start();
@@ -84,5 +93,36 @@ class RuntimeClientTest {
     void baseUrlWithoutTokenIsRejected() {
         assertThatThrownBy(() -> new RuntimeClient(RestClient.builder(), "http://runtime:8000", ""))
                 .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void validateWorkflowParsesRuntimeIssues() {
+        responseStatus = 200;
+        responseBody = """
+                {"valid":false,"errors":[{"path":"nodes","message":"Not reachable from START","node_id":"a"}]}
+                """;
+
+        WorkflowValidation result = client().validateWorkflow(new JsonMapper().readTree("{\"nodes\":[]}"));
+
+        assertThat(path.get()).isEqualTo("/runtime/workflows/validate");
+        assertThat(body.get()).isEqualTo("{\"nodes\":[]}");
+        assertThat(result.valid()).isFalse();
+        assertThat(result.errors()).containsExactly(new WorkflowValidation.Issue("nodes", "Not reachable from START", "a"));
+    }
+
+    @Test
+    void validateWorkflowFailsWhenRuntimeIsDown() {
+        responseStatus = 500;
+
+        assertThatThrownBy(() -> client().validateWorkflow(new JsonMapper().readTree("{}")))
+                .isInstanceOf(RuntimeUnavailableException.class);
+    }
+
+    @Test
+    void validateWorkflowFailsWhenRuntimeIsNotConfigured() {
+        RuntimeClient disabled = new RuntimeClient(RestClient.builder(), "", "");
+
+        assertThatThrownBy(() -> disabled.validateWorkflow(new JsonMapper().readTree("{}")))
+                .isInstanceOf(RuntimeUnavailableException.class);
     }
 }

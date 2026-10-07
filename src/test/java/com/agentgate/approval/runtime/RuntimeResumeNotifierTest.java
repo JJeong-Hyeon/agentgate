@@ -11,6 +11,7 @@ import com.agentgate.approval.domain.ApprovalRequest;
 import com.agentgate.approval.domain.ApprovalStatus;
 import com.agentgate.approval.repository.ApprovalRequestRepository;
 import com.agentgate.risk.RiskLevel;
+import com.agentgate.runtime.RuntimeClient;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;

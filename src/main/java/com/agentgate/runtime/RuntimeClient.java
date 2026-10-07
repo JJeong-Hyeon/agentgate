@@ -1,4 +1,4 @@
-package com.agentgate.approval.runtime;
+package com.agentgate.runtime;
 
 import com.agentgate.approval.domain.ApprovalStatus;
 import java.time.Duration;
@@ -12,9 +12,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import tools.jackson.databind.JsonNode;
 
 /**
- * Calls the Python agent runtime to resume an execution paused for approval.
+ * Calls the Python agent runtime: resuming executions paused for approval and validating workflows.
  * Disabled when {@code agentgate.runtime.base-url} is blank.
  */
 @Component
@@ -68,6 +69,27 @@ public class RuntimeClient {
         } catch (RestClientException e) {
             log.warn("Failed to resume execution {} for approval {}; will retry", executionId, approvalId, e);
             return false;
+        }
+    }
+
+    /**
+     * Validates a Workflow DSL document with the runtime, which owns the DSL schema.
+     *
+     * @throws RuntimeUnavailableException when the runtime is disabled or cannot answer
+     */
+    public WorkflowValidation validateWorkflow(JsonNode dsl) {
+        if (!enabled) {
+            throw new RuntimeUnavailableException("Agent runtime is not configured");
+        }
+        try {
+            return restClient.post()
+                    .uri("/runtime/workflows/validate")
+                    .body(dsl)
+                    .retrieve()
+                    .body(WorkflowValidation.class);
+        } catch (RestClientException e) {
+            log.warn("Workflow validation failed", e);
+            throw new RuntimeUnavailableException("Agent runtime could not validate the workflow");
         }
     }
 }
