@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     llm_model: str = "qwen2.5:7b"
     llm_temperature: float = 0.0
     llm_timeout_seconds: float = 60.0
+    # Empty → in-memory checkpoints (lost on restart).
+    runtime_database_url: str = ""
+    max_review_revisions: int = 1
 
 
 @lru_cache
