@@ -3,7 +3,7 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI, Response, status
 
-from app import executions
+from app import executions, workflows
 from app.config import Settings, get_settings
 from app.governance.agentgate_client import AgentGateClient
 from app.graph.checkpointer import open_checkpointer
@@ -42,6 +42,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="AgentGate Runtime", lifespan=lifespan)
 app.include_router(executions.router)
+app.include_router(workflows.router)
 
 
 @app.get("/health")

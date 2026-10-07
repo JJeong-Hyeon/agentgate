@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "workflowId": "research",
+  "version": 1,
+  "name": "Planner → Researcher → Reviewer → Report",
+  "nodes": [
+    { "id": "start", "type": "START" },
+    {
+      "id": "plan",
+      "type": "AGENT",
+      "label": "Planner",
+      "config": {
+        "system": "You are a planner. Break the user's task into 3-5 short, concrete research steps. Reply with a numbered list only.",
+        "prompt": "Task: {task}"
+      }
+    },
+    {
+      "id": "findings",
+      "type": "AGENT",
+      "label": "Researcher",
+      "config": {
+        "system": "You are a researcher. Follow the plan and write concise findings for the task. If reviewer feedback is given, address it.",
+        "prompt": "Task: {task}\n\nPlan:\n{plan}\n\nReviewer feedback (may be empty):\n{review}"
+      }
+    },
+    {
+      "id": "review",
+      "type": "REVIEWER",
+      "label": "Reviewer",
+      "config": {
+        "system": "You are a strict reviewer. Check whether the findings fully answer the task. Start your reply with exactly 'VERDICT: APPROVE' or 'VERDICT: REVISE', then give brief feedback.",
+        "prompt": "Task: {task}\n\nFindings:\n{findings}",
+        "maxRevisions": 1
+      }
+    },
+    {
+      "id": "report",
+      "type": "HTTP_TOOL",
+      "label": "Send report",
+      "config": {
+        "action": "SEND_REPORT",
+        "url": "http://localhost:18081/report",
+        "payloadKeys": ["task", "findings", "review"]
+      }
+    },
+    { "id": "end", "type": "END" }
+  ],
+  "edges": [
+    { "source": "start", "target": "plan" },
+    { "source": "plan", "target": "findings" },
+    { "source": "findings", "target": "review" },
+    { "source": "review", "target": "report", "label": "APPROVE" },
+    { "source": "review", "target": "findings", "label": "REVISE" },
+    { "source": "report", "target": "end" }
+  ]
+}
