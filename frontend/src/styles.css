@@ -1,0 +1,278 @@
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --border: #dfe3e8;
+  --text: #1c2128;
+  --muted: #667085;
+  --accent: #2f6fde;
+  --accent-text: #ffffff;
+  --danger: #c4372c;
+  --ok: #1f8a4c;
+  --warn: #b7791f;
+  --node-agent: #eaf1fd;
+  --node-tool: #fdf3e6;
+  --node-flow: #eef0f3;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12151a;
+    --surface: #1b1f26;
+    --border: #2c323c;
+    --text: #e6e9ee;
+    --muted: #98a2b3;
+    --accent: #5b8ef0;
+    --danger: #e5584c;
+    --ok: #3fb872;
+    --warn: #e0a43a;
+    --node-agent: #1d2a40;
+    --node-tool: #3a2c17;
+    --node-flow: #262b33;
+    color-scheme: dark;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+button {
+  font: inherit;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 6px 12px;
+  background: var(--accent);
+  color: var(--accent-text);
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+button.secondary {
+  background: transparent;
+  color: var(--text);
+  border-color: var(--border);
+}
+button.danger {
+  background: var(--danger);
+}
+
+input {
+  font: inherit;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+h1,
+h2 {
+  margin: 0 0 12px;
+}
+h2 {
+  font-size: 16px;
+}
+
+.muted {
+  color: var(--muted);
+}
+.mono {
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+}
+.error {
+  color: var(--danger);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* Login */
+.login {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+.login-card {
+  width: min(360px, 100%);
+  display: grid;
+  gap: 12px;
+}
+.login-card label {
+  display: grid;
+  gap: 4px;
+}
+
+/* Layout */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.brand {
+  font-weight: 700;
+}
+.topbar nav {
+  display: flex;
+  gap: 4px;
+}
+.topbar nav a {
+  color: var(--muted);
+  text-decoration: none;
+  padding: 4px 10px;
+  border-radius: 6px;
+}
+.topbar nav a.active {
+  color: var(--text);
+  background: var(--bg);
+}
+.spacer {
+  flex: 1;
+}
+.content {
+  padding: 16px;
+}
+
+/* Workflows */
+.split {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 16px;
+}
+@media (max-width: 720px) {
+  .split {
+    grid-template-columns: 1fr;
+  }
+}
+.list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.item {
+  width: 100%;
+  display: grid;
+  text-align: left;
+  background: transparent;
+  color: var(--text);
+  border-color: var(--border);
+}
+.item.selected {
+  border-color: var(--accent);
+}
+.canvas {
+  height: min(70vh, 640px);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+/* React Flow nodes by DSL type */
+.react-flow__node.node {
+  border-color: var(--border);
+  color: var(--text);
+  background: var(--node-flow);
+}
+.react-flow__node.node-llm,
+.react-flow__node.node-agent,
+.react-flow__node.node-router,
+.react-flow__node.node-reviewer {
+  background: var(--node-agent);
+}
+.react-flow__node.node-http_tool,
+.react-flow__node.node-approval {
+  background: var(--node-tool);
+}
+
+/* Tables and badges */
+.table-wrap {
+  overflow-x: auto;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+th,
+td {
+  text-align: left;
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.truncate {
+  max-width: 360px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  border: 1px solid currentColor;
+}
+.status-completed,
+.risk-low {
+  color: var(--ok);
+}
+.status-waiting_approval,
+.status-running,
+.risk-medium,
+.risk-high {
+  color: var(--warn);
+}
+.status-failed,
+.risk-blocked {
+  color: var(--danger);
+}
+
+/* Approvals */
+.approvals {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+.approval {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  flex-wrap: wrap;
+}
+.actions {
+  display: flex;
+  gap: 8px;
+  align-items: start;
+}
