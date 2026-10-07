@@ -21,3 +21,26 @@ services:
     image: 'grafana/grafana:latest'
     ports:
       - '3000:3000'
+  runtime:
+    build: ./runtime
+    profiles: ['runtime']
+    environment:
+      - 'AGENTGATE_BASE_URL=http://host.docker.internal:8080'
+      - 'LLM_BASE_URL=http://ollama:11434/v1'
+      - 'LLM_MODEL=qwen2.5:7b'
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    ports:
+      - '8000:8000'
+    depends_on:
+      - ollama
+  ollama:
+    image: 'ollama/ollama:latest'
+    profiles: ['runtime']
+    volumes:
+      - 'ollama-models:/root/.ollama'
+    ports:
+      - '11434:11434'
+
+volumes:
+  ollama-models:
