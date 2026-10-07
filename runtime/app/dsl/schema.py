@@ -115,11 +115,15 @@ class HttpToolNode(NodeBase):
 
 
 class ApprovalConfig(DslModel):
+    # Shown to the approver; may use {task} / {nodeId} like prompts.
     message: str | None = None
+    # Action name AgentGate evaluates and audits; a BLOCKED policy for it still blocks.
+    action: str = Field(default="HUMAN_APPROVAL", min_length=1)
+    labels: list[str] = []
 
 
 class ApprovalNode(NodeBase):
-    """Explicit human approval step, regardless of risk."""
+    """Explicit human approval step, regardless of risk. Rejection ends the execution."""
 
     type: Literal["APPROVAL"]
     config: ApprovalConfig = ApprovalConfig()
@@ -139,7 +143,7 @@ Node = Annotated[
 ]
 
 # Node types whose output is written to state[node.id].
-OUTPUT_TYPES = {"LLM", "AGENT", "ROUTER", "REVIEWER", "HTTP_TOOL"}
+OUTPUT_TYPES = {"LLM", "AGENT", "ROUTER", "REVIEWER", "HTTP_TOOL", "APPROVAL"}
 
 
 class Edge(DslModel):

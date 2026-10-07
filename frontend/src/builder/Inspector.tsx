@@ -172,11 +172,25 @@ export function NodeInspector({ node, nodes, error, onChange, onRename, onDelete
       )}
       {node.type === "APPROVAL" && (
         <>
+          <div className="field">
+            <label>
+              승인자에게 보일 메시지
+              <textarea rows={3} value={str("message")} onChange={(e) => set("message", e.target.value)} />
+            </label>
+            <span className="hint">{"{task}"}, {"{노드id}"}를 쓸 수 있습니다.</span>
+          </div>
           <label>
-            안내 메시지
-            <input value={str("message")} onChange={(e) => set("message", e.target.value)} />
+            AgentGate 행동 이름 (비우면 HUMAN_APPROVAL)
+            <input value={str("action")} onChange={(e) => set("action", e.target.value)} />
           </label>
-          <p className="hint">Runtime이 아직 APPROVAL 노드를 실행하지 못합니다.</p>
+          <label>
+            위험 라벨 (쉼표로 구분)
+            <CommitInput value={list("labels")} onCommit={(v) => set("labels", splitList(v))} />
+          </label>
+          <p className="hint">
+            위험도와 관계없이 승인을 받습니다. 거절되거나 정책상 차단되면 실행이 끝나고, 결과(APPROVED / REJECTED
+            …)는 {`{${node.id}}`}로 참조할 수 있습니다.
+          </p>
         </>
       )}
     </div>

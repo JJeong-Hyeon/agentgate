@@ -233,7 +233,7 @@ def test_unsupported_workflow_is_rejected(client):
     response = client.post("/runtime/executions", json={"task": "t", "workflow": workflow})
 
     assert response.status_code == 422
-    assert "APPROVAL" in response.json()["detail"]
+    assert "AgentGate" in response.json()["detail"]
 
 
 def test_background_execution_with_caller_id(client):

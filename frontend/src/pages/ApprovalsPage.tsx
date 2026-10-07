@@ -42,6 +42,7 @@ export function ApprovalsPage() {
                 {a.target && ` → ${a.target}`}
                 {a.labels.length > 0 && ` · ${a.labels.join(", ")}`}
               </div>
+              {a.reason && <div className="approval-reason">{a.reason}</div>}
               {a.executionId && <div className="muted mono">실행 {a.executionId}</div>}
             </div>
             <div className="actions">

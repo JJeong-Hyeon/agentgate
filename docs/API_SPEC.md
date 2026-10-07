@@ -28,6 +28,8 @@ X-API-Key: <agent api key>
 - `action` (필수): 행동 종류를 나타내는 문자열, 자유 형식(예: `SEND_EMAIL`, `DELETE_USER`, `EXPORT_DATA`)
 - `target` (선택): 행동 대상
 - `labels` (선택, 배열): 위험 판단에 쓰이는 태그(예: `"PII"`). 없으면 빈 배열로 취급
+- `requireApproval` (선택, boolean): `true`면 정책상 허용(`LOW`/`MEDIUM`)이어도 `APPROVAL_REQUIRED`로 승인 요청을 만든다. 정책상 `BLOCKED`는 그대로 차단
+- `reason` (선택, 최대 1000자): 승인 요청에 저장되어 승인자에게 표시되는 설명
 - `executionId` (선택, 최대 64자): Runtime 실행 ID(LangGraph `thread_id`). 승인 요청이 생성되면 함께 저장되어 승인 후 어떤 실행을 재개할지 식별하는 데 쓰임
 
 **응답**

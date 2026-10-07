@@ -99,6 +99,7 @@ function ApprovalPanel({ approvalId }: { approvalId: number }) {
             {a.labels.length > 0 && <span className="muted"> · {a.labels.join(", ")}</span>}
           </p>
         )}
+        {a?.reason && <p className="approval-reason">{a.reason}</p>}
         {a && a.status !== "PENDING" && <p className="muted">{a.status === "APPROVED" ? "승인됨" : "거절됨"} — 재개 중…</p>}
         {error && <p className="error">{error}</p>}
       </div>

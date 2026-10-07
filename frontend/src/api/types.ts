@@ -84,6 +84,7 @@ export interface Approval {
   decidedAt: string | null;
   decidedBy: string | null;
   executionId: string | null;
+  reason?: string | null;
 }
 
 export interface ApiErrorBody {

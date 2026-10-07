@@ -17,7 +17,8 @@ public record ApprovalResponse(
         Instant createdAt,
         Instant decidedAt,
         String decidedBy,
-        String executionId
+        String executionId,
+        String reason
 ) {
     public static ApprovalResponse from(ApprovalRequest approvalRequest) {
         return new ApprovalResponse(
@@ -31,7 +32,8 @@ public record ApprovalResponse(
                 approvalRequest.getCreatedAt(),
                 approvalRequest.getDecidedAt(),
                 approvalRequest.getDecidedBy(),
-                approvalRequest.getExecutionId()
+                approvalRequest.getExecutionId(),
+                approvalRequest.getReason()
         );
     }
 }

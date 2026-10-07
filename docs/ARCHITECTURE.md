@@ -197,7 +197,7 @@ JSON Schema는 `GET /runtime/workflows/schema`로 제공한다 (프론트엔드 
 - DSL은 실행 상태의 `workflow` 키에 함께 저장되어, 조회·재개 시 checkpoint만으로 같은 그래프를 복원한다 (Runtime 재시작 후에도).
 - `REVIEWER`가 `maxRevisions`를 다 쓰고도 `REVISE`면 실행을 종료한다 (승인되지 않은 결과로 다음 단계를 진행하지 않음).
 - `ROUTER`는 LLM 응답에서 route 이름을 찾고, 없으면 첫 번째 route로 간다.
-- `APPROVAL` 노드는 아직 컴파일되지 않는다 (Spring에 명시적 승인 요청 API가 필요).
+- `APPROVAL` 노드는 AgentGate에 `requireApproval: true`로 승인 요청을 만든다. 정책상 허용이어도 승인을 기다리고, 정책상 `BLOCKED`면 차단된다. 승인 시 다음 단계로, 거절·차단·AgentGate 실패 시 실행을 종료하며 결과를 `state[노드id]`에 기록한다.
 
 ---
 
