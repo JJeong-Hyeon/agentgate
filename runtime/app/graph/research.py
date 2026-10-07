@@ -5,7 +5,7 @@ from langgraph.graph.state import CompiledStateGraph
 
 from app.graph.state import ResearchState
 from app.nodes.agent import make_planner, make_researcher, make_reviewer
-from app.nodes.tool import make_http_tool_node
+from app.nodes.tool import add_http_tool
 from app.tools.http import HttpTool
 
 
@@ -37,8 +37,7 @@ def build_research_graph(
 
     destinations = ["researcher", END]
     if report_tool:
-        graph.add_node("report", make_http_tool_node(report_tool, _report_payload))
-        graph.add_edge("report", END)
+        add_http_tool(graph, "report", report_tool, _report_payload, next_node=END)
         destinations.append("report")
     graph.add_conditional_edges("reviewer", after_review, destinations)
     return graph.compile(checkpointer=checkpointer)

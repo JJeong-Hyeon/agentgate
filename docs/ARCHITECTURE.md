@@ -257,7 +257,9 @@ LangGraph resume
 ```
 
 - 재개는 **Spring Boot가 Runtime을 호출하는 콜백 방식**으로 한다 (Runtime 폴링 없음).
-- 콜백 실패 시를 대비해 Runtime 기동 시 `WAITING_APPROVAL` 실행 중 이미 결정된 승인건을 조회해 재개한다.
+- 호출은 `X-Runtime-Token` 공유 토큰으로 인증한다 (`AGENTGATE_RUNTIME_TOKEN` = `RUNTIME_TOKEN`).
+- 콜백 실패 시 Spring이 주기적으로(기본 30초) 재시도한다. 전달 성공 시 `approval_requests.runtime_notified_at`을 기록하고, Runtime이 409(이미 재개됨)/404를 반환하면 전달된 것으로 본다.
+- Tool 단계는 `검사 → 승인 대기 → 실행` 노드로 나뉜다. LangGraph는 재개 시 중단된 노드를 처음부터 다시 실행하므로, AgentGate 검사 결과를 상태에 저장한 뒤 별도 노드에서 대기해 중복 검사를 막는다.
 - checkpoint 저장소는 PostgreSQL(LangGraph PostgresSaver)을 사용한다.
 
 ---

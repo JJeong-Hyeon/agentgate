@@ -5,6 +5,7 @@ import httpx
 import pytest
 from langchain_core.language_models import FakeListChatModel
 from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.types import Command
 
 from app.governance.agentgate_client import AgentGateClient
 from app.graph.research import build_research_graph
@@ -106,16 +107,53 @@ def test_approved_findings_are_reported():
     assert b'"findings":"findings"' in target.requests[0].content
 
 
-def test_report_waits_when_agentgate_requires_approval():
+def run_until_approval(gate: FakeAgentGate, target: FakeTarget):
+    return run(["1. step", "findings", "VERDICT: APPROVE"], report_tool=report_tool(gate, target))
+
+
+def test_report_pauses_when_agentgate_requires_approval():
     target = FakeTarget()
 
-    _, _, state = run(
-        ["1. step", "findings", "VERDICT: APPROVE"],
-        report_tool=report_tool(FakeAgentGate("APPROVAL_REQUIRED", "HIGH", 3), target),
-    )
+    graph, config, _ = run_until_approval(FakeAgentGate("APPROVAL_REQUIRED", "HIGH", 3), target)
 
-    assert state["tool_results"][0]["status"] == "APPROVAL_REQUIRED"
+    snapshot = graph.get_state(config)
+    assert snapshot.interrupts[0].value == {"tool": "report", "approval_id": 3}
+    assert snapshot.values["pending_tool"]["approval_id"] == 3
+    assert snapshot.values.get("tool_results", []) == []
+    assert target.requests == []
+
+
+def test_approved_resume_executes_tool_without_asking_agentgate_again():
+    gate, target = FakeAgentGate("APPROVAL_REQUIRED", "HIGH", 3), FakeTarget()
+    graph, config, _ = run_until_approval(gate, target)
+
+    state = graph.invoke(Command(resume={"decision": "APPROVED"}), config)
+
+    assert [r["status"] for r in state["tool_results"]] == ["EXECUTED"]
     assert state["tool_results"][0]["approval_id"] == 3
+    assert len(target.requests) == 1
+    assert len(gate.requests) == 1
+    assert graph.get_state(config).next == ()
+
+
+def test_rejected_resume_skips_tool():
+    gate, target = FakeAgentGate("APPROVAL_REQUIRED", "HIGH", 3), FakeTarget()
+    graph, config, _ = run_until_approval(gate, target)
+
+    state = graph.invoke(Command(resume={"decision": "REJECTED"}), config)
+
+    assert [r["status"] for r in state["tool_results"]] == ["REJECTED"]
+    assert target.requests == []
+    assert graph.get_state(config).next == ()
+
+
+def test_blocked_report_is_recorded_without_pausing():
+    target = FakeTarget()
+
+    graph, config, state = run_until_approval(FakeAgentGate("BLOCKED", "BLOCKED"), target)
+
+    assert [r["status"] for r in state["tool_results"]] == ["BLOCKED"]
+    assert not graph.get_state(config).interrupts
     assert target.requests == []
 
 

@@ -66,6 +66,12 @@ AGENTGATE_API_KEY=<apiKey> REPORT_URL=<결과를 보낼 URL> docker compose --pr
 
 `REPORT_URL`을 설정하면 리서치 그래프가 Reviewer 승인 후 결과를 해당 URL로 전송합니다 (행동 이름은 `REPORT_ACTION`, 기본 `SEND_REPORT`).
 
+AgentGate가 `APPROVAL_REQUIRED`를 반환하면 실행은 `WAITING_APPROVAL` 상태로 멈추고, `/api/v1/approvals/{id}/approve|reject` 결정 후 AgentGate가 Runtime에 재개를 요청합니다. 이를 위해 Spring에 Runtime 주소와 토큰을 설정합니다 (compose의 Runtime 기본 토큰은 `dev-runtime-token`).
+
+```bash
+AGENTGATE_RUNTIME_BASE_URL=http://localhost:8000 AGENTGATE_RUNTIME_TOKEN=dev-runtime-token ./gradlew bootRun
+```
+
 로컬에서 직접 실행할 때는 Python 3.12 이상이 필요합니다.
 
 ```bash

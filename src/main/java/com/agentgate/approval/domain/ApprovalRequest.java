@@ -57,6 +57,8 @@ public class ApprovalRequest {
     // Runtime execution (LangGraph thread) waiting on this approval; null for direct API callers.
     private String executionId;
 
+    private Instant runtimeNotifiedAt;
+
     public ApprovalRequest(String agentId, String action, String target, List<String> labels, RiskLevel riskLevel) {
         this(agentId, action, target, labels, riskLevel, null);
     }
@@ -83,6 +85,14 @@ public class ApprovalRequest {
 
     public void reject(String decidedBy) {
         transitionTo(ApprovalStatus.REJECTED, decidedBy);
+    }
+
+    public boolean needsRuntimeNotification() {
+        return executionId != null && status != ApprovalStatus.PENDING && runtimeNotifiedAt == null;
+    }
+
+    public void markRuntimeNotified() {
+        this.runtimeNotifiedAt = Instant.now();
     }
 
     private void transitionTo(ApprovalStatus newStatus, String decidedBy) {
