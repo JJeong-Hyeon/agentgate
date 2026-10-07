@@ -30,7 +30,6 @@ from app.dsl.schema import (
     Workflow,
 )
 from app.governance.agentgate_client import AgentGateClient
-from app.nodes.agent import parse_verdict
 from app.nodes.approval import add_approval
 from app.nodes.tool import add_http_tool
 from app.tools.http import HttpTool, HttpToolSpec
@@ -39,6 +38,7 @@ from app.tools.http import HttpTool, HttpToolSpec
 LlmFactory = Callable[[str | None, float | None], BaseChatModel]
 
 VERDICT_INSTRUCTION = "Start your reply with exactly 'VERDICT: APPROVE' or 'VERDICT: REVISE'."
+_VERDICT = re.compile(r"VERDICT:\s*(APPROVE|REVISE)", re.IGNORECASE)
 
 
 class CompileError(Exception):
@@ -68,6 +68,12 @@ def render(template: str, state: dict) -> str:
     # Validation guarantees every variable is a known key; ones not produced yet are empty.
     values = defaultdict(str, {k: v for k, v in state.items() if isinstance(v, str)})
     return template.format_map(values)
+
+
+def parse_verdict(review: str) -> str:
+    match = _VERDICT.search(review)
+    # Unparseable reviews count as REVISE; the revision limit stops endless loops.
+    return match.group(1).upper() if match else "REVISE"
 
 
 def pick_route(reply: str, routes: list[str]) -> str:

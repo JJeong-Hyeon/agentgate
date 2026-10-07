@@ -61,10 +61,10 @@ Runtime의 Tool은 실행 직전에 AgentGate(`POST /api/v1/actions`)를 호출�
 curl -u admin:changeme -X POST localhost:8080/api/v1/agents \
   -H "Content-Type: application/json" -d '{"agentId":"runtime-agent","name":"Runtime Agent"}'
 # 응답의 apiKey 사용
-AGENTGATE_API_KEY=<apiKey> REPORT_URL=<결과를 보낼 URL> docker compose --profile runtime up -d
+AGENTGATE_API_KEY=<apiKey> docker compose --profile runtime up -d
 ```
 
-`REPORT_URL`을 설정하면 리서치 그래프가 Reviewer 승인 후 결과를 해당 URL로 전송합니다 (행동 이름은 `REPORT_ACTION`, 기본 `SEND_REPORT`).
+실행할 워크플로는 Workflow DSL로 정의합니다 (예: [`runtime/examples/research.json`](runtime/examples/research.json)). 보통은 프론트엔드 Builder로 만들어 AgentGate에 저장하고, `POST /api/v1/executions`(또는 화면의 실행 버튼)로 실행합니다.
 
 AgentGate가 `APPROVAL_REQUIRED`를 반환하면 실행은 `WAITING_APPROVAL` 상태로 멈추고, `/api/v1/approvals/{id}/approve|reject` 결정 후 AgentGate가 Runtime에 재개를 요청합니다. 이를 위해 Spring에 Runtime 주소와 토큰을 설정합니다 (compose의 Runtime 기본 토큰은 `dev-runtime-token`).
 

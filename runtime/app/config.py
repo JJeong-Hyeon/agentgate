@@ -16,13 +16,8 @@ class Settings(BaseSettings):
     llm_timeout_seconds: float = 60.0
     # Empty → in-memory checkpoints (lost on restart).
     runtime_database_url: str = ""
-    max_review_revisions: int = 1
     # Shared secret AgentGate sends as X-Runtime-Token on resume. Empty → resume disabled.
     runtime_token: str = ""
-    # Empty → the research graph has no report step.
-    report_url: str = ""
-    report_action: str = "SEND_REPORT"
-    report_labels: list[str] = []
 
 
 @lru_cache

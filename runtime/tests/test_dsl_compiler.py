@@ -9,7 +9,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
 
 from app.dsl import Workflow
-from app.dsl.compiler import CompileError, WorkflowCompiler, pick_route, render
+from app.dsl.compiler import CompileError, WorkflowCompiler, parse_verdict, pick_route, render
 from app.governance.agentgate_client import AgentGateClient
 from tests.fakes import FakeAgentGate, FakeTarget
 
@@ -46,6 +46,18 @@ def linear(*middle: dict, extra_edges=()) -> dict:
     ids = [n["id"] for n in nodes]
     edges = [{"source": a, "target": b} for a, b in zip(ids, ids[1:], strict=False)]
     return {"workflowId": "wf", "nodes": nodes, "edges": [*edges, *extra_edges]}
+
+
+@pytest.mark.parametrize(
+    ("review", "expected"),
+    [
+        ("VERDICT: APPROVE\nLooks good", "APPROVE"),
+        ("verdict: revise - missing detail", "REVISE"),
+        ("I think it is fine", "REVISE"),
+    ],
+)
+def test_parse_verdict(review, expected):
+    assert parse_verdict(review) == expected
 
 
 def test_render_fills_known_values_and_blanks_missing():

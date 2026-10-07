@@ -1,14 +1,14 @@
-import uuid
-
 import httpx
+import pytest
 from langchain_core.language_models import FakeListChatModel
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
 
+from app.dsl import Workflow
+from app.dsl.compiler import WorkflowCompiler
 from app.events import EventReporter, run_graph, task_event
-from app.graph.research import build_research_graph
-from tests.fakes import FakeAgentGate, FakeAgentGateEvents, FakeTarget
-from tests.test_research_graph import report_tool, run
+from tests.fakes import FakeAgentGate, FakeAgentGateEvents
+from tests.workflows import SIMPLE, compile_graph, initial_state, research
 
 
 def reporter(sink: FakeAgentGateEvents) -> EventReporter:
@@ -70,33 +70,35 @@ def test_failed_delivery_does_not_raise():
     EventReporter("http://a", "t", httpx.MockTransport(refuse)).report("e", {"type": "X"})
 
 
+def config(execution_id: str) -> dict:
+    return {"configurable": {"thread_id": execution_id}}
+
+
 def test_run_graph_reports_node_progress_then_completion():
     sink = FakeAgentGateEvents()
-    graph, config, _ = run(["1. step", "findings", "VERDICT: APPROVE"])
-    execution = {"configurable": {"thread_id": str(uuid.uuid4())}}
+    dsl = research()
+    graph = compile_graph(dsl, ["1. step", "findings", "VERDICT: APPROVE"])
 
-    run_graph(graph, {"task": "t", "revisions": 0}, execution, reporter(sink))
+    run_graph(graph, initial_state(dsl), config("e0"), reporter(sink))
 
-    assert sink.types == ["NODE_STARTED", "NODE_COMPLETED"] * 3 + ["EXECUTION_COMPLETED"]
-    assert [e["nodeId"] for e in sink.events[:-1:2]] == ["planner", "researcher", "reviewer"]
+    assert sink.types[-1] == "EXECUTION_COMPLETED"
+    started = [e["step"] for e in sink.events if e["type"] == "NODE_STARTED"]
+    assert started == ["plan", "findings", "review", "report", "report.execute"]
 
 
 def test_run_graph_reports_waiting_and_resumed_steps():
     sink = FakeAgentGateEvents()
-    tool = report_tool(FakeAgentGate("APPROVAL_REQUIRED", "HIGH", 9), FakeTarget())
-    graph = build_research_graph(
-        FakeListChatModel(responses=["p", "f", "VERDICT: APPROVE"]),
-        InMemorySaver(),
-        report_tool=tool,
+    dsl = research()
+    graph = compile_graph(
+        dsl, ["p", "f", "VERDICT: APPROVE"], FakeAgentGate("APPROVAL_REQUIRED", "HIGH", 9)
     )
-    config = {"configurable": {"thread_id": "e1"}}
 
-    run_graph(graph, {"task": "t", "revisions": 0}, config, reporter(sink))
+    run_graph(graph, initial_state(dsl), config("e1"), reporter(sink))
     assert sink.types[-2:] == ["NODE_WAITING", "EXECUTION_WAITING"]
     assert sink.events[-1]["approvalId"] == 9
 
     sink.requests.clear()
-    run_graph(graph, Command(resume={"decision": "APPROVED"}), config, reporter(sink))
+    run_graph(graph, Command(resume={"decision": "APPROVED"}), config("e1"), reporter(sink))
     assert [(e["type"], e.get("step")) for e in sink.events] == [
         ("NODE_STARTED", "report.approval"),
         ("NODE_COMPLETED", "report.approval"),
@@ -113,18 +115,13 @@ def test_run_graph_reports_failure_and_reraises():
         def invoke(self, *args, **kwargs):
             raise RuntimeError("llm down")
 
-    graph = build_research_graph(Broken(responses=["x"]), InMemorySaver())
-    try:
-        run_graph(
-            graph,
-            {"task": "t", "revisions": 0},
-            {"configurable": {"thread_id": "e2"}},
-            reporter(sink),
-        )
-    except RuntimeError:
-        pass
-    else:
-        raise AssertionError("expected failure")
+    llm = Broken(responses=["x"])
+    graph = WorkflowCompiler(lambda model, temperature: llm).compile(
+        Workflow.model_validate(SIMPLE), InMemorySaver()
+    )
+
+    with pytest.raises(RuntimeError):
+        run_graph(graph, initial_state(SIMPLE), config("e2"), reporter(sink))
 
     # LangGraph raises before emitting the failed task's result; AgentGate marks the
     # still-running node as failed when it receives EXECUTION_FAILED.
