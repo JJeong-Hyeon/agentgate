@@ -1,4 +1,4 @@
-"""Governed HTTP tool as a LangGraph sub-flow.
+"""Governed tool (HTTP / MCP) as a LangGraph sub-flow.
 
     <name>            ask AgentGate (once)
       ├─ ALLOWED            → <name>.execute
@@ -18,13 +18,13 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.graph import StateGraph
 from langgraph.types import Command, interrupt
 
-from app.tools.http import HttpTool, ToolResult
+from app.tools.base import GovernedTool, ToolResult
 
 
-def add_http_tool(
+def add_tool(
     graph: StateGraph,
     name: str,
-    tool: HttpTool,
+    tool: GovernedTool,
     build_payload: Callable[[dict], dict[str, Any]],
     next_node: str | list[str],
     output_key: str | None = None,

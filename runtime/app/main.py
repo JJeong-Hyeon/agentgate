@@ -11,6 +11,7 @@ from app.governance.agentgate_client import AgentGateClient
 from app.graph.checkpointer import open_checkpointer
 from app.llm import LlmHealth, check_llm_health, create_chat_model
 from app.runner import WorkflowRunner
+from app.tools.mcp import load_mcp_servers
 
 
 def build_gate(settings: Settings) -> AgentGateClient:
@@ -28,6 +29,7 @@ async def lifespan(app: FastAPI):
                 settings, model=model, temperature=temperature
             ),
             build_gate(settings),
+            mcp_servers=load_mcp_servers(settings.mcp_config_path),
         )
         app.state.runner = WorkflowRunner(compiler, checkpointer)
         app.state.reporter = EventReporter(settings.agentgate_base_url, settings.runtime_token)

@@ -14,6 +14,7 @@ from app.dsl.schema import (
     RESERVED_IDS,
     ConditionNode,
     HttpToolNode,
+    McpToolNode,
     ReviewerNode,
     RouterNode,
     Workflow,
@@ -165,23 +166,26 @@ class _Checker:
         for node in self.nodes.values():
             config = getattr(node, "config", None)
             for field in ("prompt", "system", "message"):
-                text = getattr(config, field, None)
-                if not text:
-                    continue
-                try:
-                    names = {name for _, name, _, _ in Formatter().parse(text) if name is not None}
-                except ValueError as e:
-                    self.error(f"config.{field}", f"Invalid template: {e}", node.id)
-                    continue
-                for name in names:
-                    if name not in available:
-                        self.error(f"config.{field}", f"Unknown variable '{{{name}}}'", node.id)
+                if text := getattr(config, field, None):
+                    self.check_template(f"config.{field}", text, node.id, available)
+            if isinstance(node, McpToolNode):
+                for arg, template in node.config.arguments.items():
+                    self.check_template(f"config.arguments.{arg}", template, node.id, available)
             if isinstance(node, HttpToolNode):
                 for key in node.config.payload_keys:
                     if key not in available:
                         self.error("config.payloadKeys", f"Unknown state key '{key}'", node.id)
             if isinstance(node, ConditionNode) and node.config.key not in available:
                 self.error("config.key", f"Unknown state key '{node.config.key}'", node.id)
+
+    def check_template(self, path: str, text: str, node_id: str, available: set[str]) -> None:
+        try:
+            names = {name for _, name, _, _ in Formatter().parse(text) if name is not None}
+        except ValueError as e:
+            self.error(path, f"Invalid template: {e}", node_id)
+            return
+        for name in sorted(names - available):
+            self.error(path, f"Unknown variable '{{{name}}}'", node_id)
 
 
 def _walk(starts: list[str], graph: dict[str, list[str]]) -> set[str]:

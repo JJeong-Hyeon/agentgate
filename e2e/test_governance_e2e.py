@@ -190,3 +190,45 @@ def test_approval_node_waits_for_a_human_then_continues(admin):
     finished = wait_for(execution["execution_id"], "COMPLETED")
     assert finished["state"]["confirm"] == "APPROVED"
     assert finished["state"]["answer"]
+
+
+@pytest.fixture
+def action_risk(admin):
+    created: list[int] = []
+
+    def set_risk(action: str, level: str) -> None:
+        policy = admin.post("/api/v1/policies", json={"actionType": action, "riskLevel": level})
+        policy.raise_for_status()
+        created.append(policy.json()["id"])
+
+    yield set_risk
+    for policy_id in created:
+        admin.delete(f"/api/v1/policies/{policy_id}")
+
+
+MCP_WORKFLOW = {
+    "workflowId": "mcp-e2e",
+    "nodes": [
+        {"id": "start", "type": "START"},
+        {
+            "id": "say",
+            "type": "MCP_TOOL",
+            "config": {"server": "echo", "tool": "echo", "arguments": {"text": "{task}"}},
+        },
+        {"id": "end", "type": "END"},
+    ],
+    "edges": [
+        {"source": "start", "target": "say"},
+        {"source": "say", "target": "end"},
+    ],
+}
+
+
+@pytest.mark.parametrize(("level", "expected"), [("LOW", "echo: e2e"), ("BLOCKED", "BLOCKED")])
+def test_mcp_tool_is_governed_by_agentgate(action_risk, level, expected):
+    action_risk("MCP:echo:echo", level)
+
+    execution = start_execution(MCP_WORKFLOW)
+
+    assert execution["status"] == "COMPLETED"
+    assert execution["state"]["say"] == expected

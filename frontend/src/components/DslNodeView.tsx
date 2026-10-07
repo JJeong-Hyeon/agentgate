@@ -7,6 +7,7 @@ const TYPE_CLASS: Record<string, string> = {
   ROUTER: "agent",
   REVIEWER: "agent",
   HTTP_TOOL: "tool",
+  MCP_TOOL: "tool",
   APPROVAL: "tool",
 };
 

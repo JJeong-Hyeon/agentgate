@@ -25,14 +25,16 @@ from app.dsl.schema import (
     HttpToolNode,
     LlmConfig,
     LlmNode,
+    McpToolNode,
     ReviewerNode,
     RouterNode,
     Workflow,
 )
 from app.governance.agentgate_client import AgentGateClient
 from app.nodes.approval import add_approval
-from app.nodes.tool import add_http_tool
+from app.nodes.tool import add_tool
 from app.tools.http import HttpTool, HttpToolSpec
+from app.tools.mcp import McpServerConfig, McpTool
 
 # (model, temperature) → chat model; None keeps the runtime default.
 LlmFactory = Callable[[str | None, float | None], BaseChatModel]
@@ -90,10 +92,12 @@ class WorkflowCompiler:
         llm_factory: LlmFactory,
         gate: AgentGateClient | None = None,
         tool_transport: httpx.BaseTransport | None = None,
+        mcp_servers: dict[str, McpServerConfig] | None = None,
     ):
         self._llm_factory = llm_factory
         self._gate = gate
         self._tool_transport = tool_transport
+        self._mcp_servers = mcp_servers or {}
 
     def compile(
         self, workflow: Workflow, checkpointer: BaseCheckpointSaver | None = None
@@ -133,11 +137,22 @@ class WorkflowCompiler:
                         node.id, self._condition_route(node), by_label(node.id)
                     )
                 case HttpToolNode():
-                    add_http_tool(
+                    add_tool(
                         graph,
                         node.id,
                         self._http_tool(node),
                         lambda s, keys=node.config.payload_keys: {k: s.get(k) for k in keys},
+                        next_node=targets(node.id),
+                        output_key=node.id,
+                    )
+                case McpToolNode():
+                    add_tool(
+                        graph,
+                        node.id,
+                        self._mcp_tool(node),
+                        lambda s, args=node.config.arguments: {
+                            name: render(template, s) for name, template in args.items()
+                        },
                         next_node=targets(node.id),
                         output_key=node.id,
                     )
@@ -229,3 +244,21 @@ class WorkflowCompiler:
             name=node.id, action=c.action, url=c.url, method=c.method, labels=c.labels
         )
         return HttpTool(spec, self._gate, self._tool_transport)
+
+    def _mcp_tool(self, node: McpToolNode) -> McpTool:
+        if self._gate is None:
+            raise CompileError(f"'{node.id}': MCP_TOOL needs an AgentGate client")
+        c = node.config
+        server = self._mcp_servers.get(c.server)
+        if server is None:
+            known = ", ".join(sorted(self._mcp_servers)) or "none configured"
+            raise CompileError(f"'{node.id}': unknown MCP server '{c.server}' ({known})")
+        return McpTool(
+            node.id,
+            c.server,
+            server,
+            c.tool,
+            c.action or f"MCP:{c.server}:{c.tool}",
+            c.labels,
+            self._gate,
+        )

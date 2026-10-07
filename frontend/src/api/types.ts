@@ -9,6 +9,7 @@ export type NodeType =
   | "REVIEWER"
   | "CONDITION"
   | "HTTP_TOOL"
+  | "MCP_TOOL"
   | "APPROVAL";
 
 export interface DslNode {

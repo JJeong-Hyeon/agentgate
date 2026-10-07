@@ -32,6 +32,10 @@ describe("builder model", () => {
       config: { prompt: "{task}", routes: ["a", "b"] },
     });
     expect(newNode("END", ["end"], { x: 0, y: 0 }).config).toBeUndefined();
+    expect(newNode("MCP_TOOL", [], { x: 0, y: 0 })).toMatchObject({
+      id: "mcp_tool_1",
+      config: { server: "", tool: "", arguments: {} },
+    });
   });
 
   it("validates node ids", () => {

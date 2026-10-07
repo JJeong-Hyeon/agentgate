@@ -12,6 +12,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from app.dsl import Workflow
 from app.dsl.compiler import WorkflowCompiler
 from app.governance.agentgate_client import AgentGateClient
+from app.tools.mcp import McpServerConfig
 from tests.fakes import FakeAgentGate, FakeTarget
 
 _RESEARCH = json.loads((Path(__file__).parent.parent / "examples" / "research.json").read_text())
@@ -42,6 +43,7 @@ def compiler(
     replies: list[str],
     gate: FakeAgentGate | None = None,
     target: FakeTarget | None = None,
+    mcp_servers: dict[str, McpServerConfig] | None = None,
 ) -> WorkflowCompiler:
     """Compiler whose LLM answers `replies` in call order and whose tools hit fakes."""
     llm = FakeListChatModel(responses=replies)
@@ -49,7 +51,10 @@ def compiler(
         "http://agentgate", "runtime-agent", "k", httpx.MockTransport(gate or FakeAgentGate())
     )
     return WorkflowCompiler(
-        lambda model, temperature: llm, gate_client, httpx.MockTransport(target or FakeTarget())
+        lambda model, temperature: llm,
+        gate_client,
+        httpx.MockTransport(target or FakeTarget()),
+        mcp_servers,
     )
 
 

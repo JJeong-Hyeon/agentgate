@@ -110,6 +110,10 @@ scripts/deploy-runtime.sh <키페어.pem>
 
 `runtime/` 소스와 [`deploy/runtime/compose.yaml`](../deploy/runtime/compose.yaml)을 rsync로 올리고, 컨테이너를 빌드·기동한 뒤 `LLM_MODEL`을 Ollama에 받아둔다(최초 1회는 모델 다운로드로 수 분 소요). AgentGate가 Runtime에 닿는지는 UI에서 워크플로를 저장해보면 된다(검증을 Runtime이 수행).
 
+### MCP 서버 (선택)
+
+`MCP_TOOL` 노드를 쓰려면 `~/agentgate-runtime/mcp.json`(`mcpServers` 형식, [ARCHITECTURE 9장](ARCHITECTURE.md#9-tool--mcp))을 만들고 `.env`에 `MCP_CONFIG_PATH=/app/mcp.json`을 추가한 뒤, `compose.yaml`의 runtime 서비스에 `volumes: ['./mcp.json:/app/mcp.json:ro']`를 넣어 재배포한다. Runtime 이미지는 Python만 포함하므로 `npx` 같은 명령이 필요한 stdio 서버보다 `url`(Streamable HTTP) 서버를 권장한다.
+
 ## 4. 껐다 켜기
 
 ```bash
