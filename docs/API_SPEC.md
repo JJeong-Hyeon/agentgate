@@ -127,3 +127,21 @@ GET  /api/v1/workflows/{workflowId}/versions/{n}    해당 버전 dsl
   "errors": [{"path": "config.prompt", "message": "Unknown variable '{ghost}'", "nodeId": "a"}]
 }
 ```
+
+## 7. Execution (관리자 인증 필요)
+
+저장된 Workflow 버전을 Runtime에서 실행하고 진행 상황을 기록한다.
+
+```
+POST /api/v1/executions                      {"workflowId": "research", "version": 2(선택, 생략 시 최신), "task": "..."}  → 201, status RUNNING
+GET  /api/v1/executions?workflowId=          최근 50건 (nodes 제외)
+GET  /api/v1/executions/{executionId}        노드별 기록(nodes) 포함
+GET  /api/v1/executions/{executionId}/stream SSE: snapshot 1회 → update(event, execution) 반복, 종료 상태면 스트림 종료
+```
+
+- `status`: `RUNNING` | `WAITING_APPROVAL`(`waitingApprovalId`) | `COMPLETED` | `FAILED`(`error`)
+- `nodes[]`: `nodeId`, `step`(Tool 하위 단계는 `report.approval` 형식), `status`(`RUNNING`/`WAITING`/`COMPLETED`/`FAILED`), `output`, `error`, `approvalId`, `startedAt`, `finishedAt`
+- 승인 대기 중인 실행은 `/api/v1/approvals/{waitingApprovalId}/approve|reject`로 결정하면 자동으로 재개된다.
+- Runtime이 응답하지 않으면 503 `RUNTIME_UNAVAILABLE` (실행은 `FAILED`로 기록), Runtime이 실행할 수 없는 DSL이면 422 `INVALID_WORKFLOW`.
+
+`POST /api/v1/executions/{executionId}/events`는 Runtime 전용(`X-Runtime-Token`)이다.

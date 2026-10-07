@@ -6,6 +6,7 @@ from fastapi import Depends, FastAPI, Response, status
 from app import executions, workflows
 from app.config import Settings, get_settings
 from app.dsl.compiler import WorkflowCompiler
+from app.events import EventReporter
 from app.governance.agentgate_client import AgentGateClient
 from app.graph.checkpointer import open_checkpointer
 from app.graph.research import build_research_graph
@@ -49,6 +50,7 @@ async def lifespan(app: FastAPI):
             build_gate(settings),
         )
         app.state.runner = WorkflowRunner(default_graph, compiler, checkpointer)
+        app.state.reporter = EventReporter(settings.agentgate_base_url, settings.runtime_token)
         yield
 
 

@@ -1,9 +1,19 @@
+import logging
 import secrets
 import threading
 import uuid
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    Header,
+    HTTPException,
+    Request,
+    Response,
+    status,
+)
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Command
 from pydantic import BaseModel, ConfigDict, Field
@@ -12,15 +22,24 @@ from pydantic.alias_generators import to_camel
 from app.config import Settings, get_settings
 from app.dsl import validate_workflow
 from app.dsl.compiler import CompileError
+from app.events import EventReporter, run_graph
 from app.runner import WorkflowRunner
 
+log = logging.getLogger(__name__)
 router = APIRouter(prefix="/runtime/executions", tags=["executions"])
 
 
 class ExecutionRequest(BaseModel):
+    # AgentGate (Spring) sends camelCase; snake_case is accepted too.
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
     task: str = Field(min_length=1)
     # Workflow DSL; omitted → the built-in research graph.
     workflow: dict[str, Any] | None = None
+    # Caller-chosen id (AgentGate creates the execution record first); generated if omitted.
+    execution_id: str | None = Field(default=None, pattern=r"^[A-Za-z0-9-]{1,64}$")
+    # Return 202 immediately and run in the background; progress is reported as events.
+    background: bool = False
 
 
 class ExecutionResponse(BaseModel):
@@ -42,7 +61,12 @@ def get_runner(request: Request) -> WorkflowRunner:
     return request.app.state.runner
 
 
+def get_reporter(request: Request) -> EventReporter:
+    return getattr(request.app.state, "reporter", None) or EventReporter("", "")
+
+
 Runner = Annotated[WorkflowRunner, Depends(get_runner)]
+Reporter = Annotated[EventReporter, Depends(get_reporter)]
 
 # Executions with a resume in flight; a second resume for the same one is a conflict.
 _resuming: set[str] = set()
@@ -82,7 +106,13 @@ def _describe(graph: CompiledStateGraph, execution_id: str) -> ExecutionResponse
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
-def create_execution(body: ExecutionRequest, runner: Runner) -> ExecutionResponse:
+def create_execution(
+    body: ExecutionRequest,
+    runner: Runner,
+    reporter: Reporter,
+    background: BackgroundTasks,
+    response: Response,
+) -> ExecutionResponse:
     if body.workflow is None:
         graph, initial = runner.default_graph, {"task": body.task, "revisions": 0}
     else:
@@ -99,9 +129,17 @@ def create_execution(body: ExecutionRequest, runner: Runner) -> ExecutionRespons
         dsl = workflow.model_dump(mode="json", by_alias=True)
         initial = {"task": body.task, "workflow": dsl, "revisions": {}}
 
+    execution_id = body.execution_id or str(uuid.uuid4())
+    if runner.exists(execution_id):
+        raise HTTPException(status.HTTP_409_CONFLICT, f"Execution '{execution_id}' already exists")
+
+    if body.background:
+        background.add_task(_run_logged, graph, initial, execution_id, reporter)
+        response.status_code = status.HTTP_202_ACCEPTED
+        return ExecutionResponse(execution_id=execution_id, status="RUNNING")
+
     # Runs synchronously until it completes or pauses for approval.
-    execution_id = str(uuid.uuid4())
-    graph.invoke(initial, _config(execution_id))
+    run_graph(graph, initial, _config(execution_id), reporter)
     return _describe(graph, execution_id)
 
 
@@ -116,7 +154,11 @@ def get_execution(execution_id: str, runner: Runner) -> ExecutionResponse:
     dependencies=[Depends(require_runtime_token)],
 )
 def resume_execution(
-    execution_id: str, body: ResumeRequest, runner: Runner, background: BackgroundTasks
+    execution_id: str,
+    body: ResumeRequest,
+    runner: Runner,
+    reporter: Reporter,
+    background: BackgroundTasks,
 ) -> ExecutionResponse:
     graph = runner.graph_for_execution(execution_id)
     with _resuming_lock:
@@ -130,13 +172,25 @@ def resume_execution(
             )
         _resuming.add(execution_id)
 
-    background.add_task(_resume, graph, execution_id, body.decision)
+    background.add_task(_resume, graph, execution_id, body.decision, reporter)
     return ExecutionResponse(execution_id=execution_id, status="RESUMING")
 
 
-def _resume(graph: CompiledStateGraph, execution_id: str, decision: str) -> None:
+def _resume(
+    graph: CompiledStateGraph, execution_id: str, decision: str, reporter: EventReporter
+) -> None:
     try:
-        graph.invoke(Command(resume={"decision": decision}), _config(execution_id))
+        _run_logged(graph, Command(resume={"decision": decision}), execution_id, reporter)
     finally:
         with _resuming_lock:
             _resuming.discard(execution_id)
+
+
+def _run_logged(
+    graph: CompiledStateGraph, graph_input: Any, execution_id: str, reporter: EventReporter
+) -> None:
+    # Background runs have no caller to raise to; the failure was reported as an event.
+    try:
+        run_graph(graph, graph_input, _config(execution_id), reporter)
+    except Exception:
+        log.exception("Execution %s failed", execution_id)

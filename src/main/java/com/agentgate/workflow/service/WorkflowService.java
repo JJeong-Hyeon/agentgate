@@ -76,6 +76,15 @@ public class WorkflowService {
         return new WorkflowVersionResponse(workflowId, version, found.getCreatedAt(), parse(found.getDsl()));
     }
 
+    /** The DSL of a version (the latest when {@code version} is null), as stored. */
+    @Transactional(readOnly = true)
+    public WorkflowVersionResponse resolve(String workflowId, Integer version) {
+        Workflow workflow = findOrThrow(workflowId);
+        int number = (version != null) ? version : workflow.getLatestVersion();
+        WorkflowVersion found = findVersion(workflow, number);
+        return new WorkflowVersionResponse(workflowId, number, found.getCreatedAt(), parse(found.getDsl()));
+    }
+
     /** Stamps the DSL with the workflow id and the next version number, validates it, and stores it. */
     private JsonNode saveVersion(Workflow workflow, JsonNode dsl) {
         if (!dsl.isObject()) {

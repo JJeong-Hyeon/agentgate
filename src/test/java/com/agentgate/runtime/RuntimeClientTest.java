@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.agentgate.approval.domain.ApprovalStatus;
+import com.agentgate.common.exception.InvalidWorkflowException;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -124,5 +125,34 @@ class RuntimeClientTest {
 
         assertThatThrownBy(() -> disabled.validateWorkflow(new JsonMapper().readTree("{}")))
                 .isInstanceOf(RuntimeUnavailableException.class);
+    }
+
+    @Test
+    void startExecutionRunsInBackgroundOnRuntime() {
+        responseStatus = 202;
+
+        client().startExecution("exec-1", "hello", new JsonMapper().readTree("{\"nodes\":[]}"));
+
+        assertThat(path.get()).isEqualTo("/runtime/executions");
+        assertThat(body.get()).contains("\"executionId\":\"exec-1\"").contains("\"background\":true")
+                .contains("\"workflow\":{\"nodes\":[]}");
+    }
+
+    @Test
+    void startExecutionRejectedWorkflowIsInvalid() {
+        responseStatus = 422;
+        responseBody = "{\"detail\":\"'ok': APPROVAL nodes are not supported yet\"}";
+
+        assertThatThrownBy(() -> client().startExecution("e", "t", new JsonMapper().readTree("{}")))
+                .isInstanceOf(InvalidWorkflowException.class)
+                .hasMessageContaining("APPROVAL");
+    }
+
+    @Test
+    void acceptsOnlyTheConfiguredToken() {
+        assertThat(client().acceptsToken("secret")).isTrue();
+        assertThat(client().acceptsToken("wrong")).isFalse();
+        assertThat(client().acceptsToken(null)).isFalse();
+        assertThat(new RuntimeClient(RestClient.builder(), "", "").acceptsToken("")).isFalse();
     }
 }
