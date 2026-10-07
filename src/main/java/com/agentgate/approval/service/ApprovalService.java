@@ -22,8 +22,9 @@ public class ApprovalService {
 
     @Transactional
     public ApprovalRequest createRequest(String agentId, String action, String target, List<String> labels, RiskLevel riskLevel,
-                                         String executionId) {
-        ApprovalRequest approvalRequest = new ApprovalRequest(agentId, action, target, labels, riskLevel, executionId);
+                                         String executionId, String reason) {
+        ApprovalRequest approvalRequest = new ApprovalRequest(agentId, action, target, labels, riskLevel, executionId,
+                reason);
         return approvalRequestRepository.save(approvalRequest);
     }
 

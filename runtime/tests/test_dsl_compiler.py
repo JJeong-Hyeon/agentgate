@@ -211,11 +211,67 @@ def test_parallel_fan_out_runs_both_branches():
     assert {state["b"], state["c"]} == {"y", "z"}
 
 
-def test_approval_node_is_not_supported_yet():
-    dsl = linear({"id": "ok", "type": "APPROVAL"})
+def approval_workflow() -> dict:
+    return linear(
+        {
+            "id": "confirm",
+            "type": "APPROVAL",
+            "config": {"message": "Send a report about {task}?", "labels": ["PII"]},
+        },
+        {"id": "answer", "type": "LLM", "config": {"prompt": "{task}"}},
+    )
 
-    with pytest.raises(CompileError, match="APPROVAL"):
-        WorkflowCompiler(Llm()).compile(Workflow.model_validate(dsl))
+
+def test_approval_waits_then_continues_when_approved():
+    gate = FakeAgentGate("APPROVAL_REQUIRED", "LOW", 4)
+    graph, config, _ = compile_and_run(approval_workflow(), Llm("answered"), gate)
+
+    assert graph.get_state(config).interrupts[0].value == {"tool": "confirm", "approval_id": 4}
+    assert gate.bodies[0] == {
+        "agentId": "runtime-agent",
+        "action": "HUMAN_APPROVAL",
+        "target": None,
+        "labels": ["PII"],
+        "executionId": config["configurable"]["thread_id"],
+        "requireApproval": True,
+        "reason": "Send a report about Compare runtimes?",
+    }
+
+    state = graph.invoke(Command(resume={"decision": "APPROVED"}), config)
+
+    assert state["confirm"] == "APPROVED"
+    assert state["answer"] == "answered"
+    assert len(gate.requests) == 1
+
+
+def test_rejected_approval_ends_execution():
+    graph, config, _ = compile_and_run(
+        approval_workflow(), Llm("answered"), FakeAgentGate("APPROVAL_REQUIRED", "LOW", 4)
+    )
+
+    state = graph.invoke(Command(resume={"decision": "REJECTED"}), config)
+
+    assert state["confirm"] == "REJECTED"
+    assert "answer" not in state
+    assert graph.get_state(config).next == ()
+
+
+@pytest.mark.parametrize(
+    ("gate", "expected"),
+    [(FakeAgentGate("BLOCKED", "BLOCKED"), "BLOCKED"), (FakeAgentGate(http_status=500), "FAILED")],
+)
+def test_blocked_or_failed_approval_ends_without_waiting(gate, expected):
+    graph, config, state = compile_and_run(approval_workflow(), Llm("answered"), gate)
+
+    assert state["confirm"] == expected
+    assert state["tool_results"][0]["status"] == expected
+    assert "answer" not in state
+    assert not graph.get_state(config).interrupts
+
+
+def test_approval_requires_agentgate():
+    with pytest.raises(CompileError, match="AgentGate"):
+        WorkflowCompiler(Llm()).compile(Workflow.model_validate(approval_workflow()))
 
 
 def test_http_tool_requires_agentgate():

@@ -31,6 +31,7 @@ from app.dsl.schema import (
 )
 from app.governance.agentgate_client import AgentGateClient
 from app.nodes.agent import parse_verdict
+from app.nodes.approval import add_approval
 from app.nodes.tool import add_http_tool
 from app.tools.http import HttpTool, HttpToolSpec
 
@@ -135,7 +136,18 @@ class WorkflowCompiler:
                         output_key=node.id,
                     )
                 case ApprovalNode():
-                    raise CompileError(f"'{node.id}': APPROVAL nodes are not supported yet")
+                    if self._gate is None:
+                        raise CompileError(f"'{node.id}': APPROVAL needs an AgentGate client")
+                    message = node.config.message
+                    add_approval(
+                        graph,
+                        node.id,
+                        self._gate,
+                        node.config.action,
+                        node.config.labels,
+                        lambda s, m=message: render(m, s) if m else None,
+                        next_nodes=targets(node.id),
+                    )
 
         start = next(n for n in workflow.nodes if n.type == "START")
         graph.add_edge(START, target(outgoing[start.id][0].target))

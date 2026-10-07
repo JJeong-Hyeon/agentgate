@@ -162,3 +162,36 @@ def test_execution_started_through_agentgate_is_tracked(admin, report_risk):
     assert all(n["status"] == "COMPLETED" for n in done["nodes"])
     assert [n["step"] for n in done["nodes"]][-2:] == ["report.approval", "report.execute"]
     assert reports_received() == before + 1
+
+
+def test_approval_node_waits_for_a_human_then_continues(admin):
+    workflow = {
+        "workflowId": "approval-e2e",
+        "nodes": [
+            {"id": "start", "type": "START"},
+            {"id": "confirm", "type": "APPROVAL", "config": {"message": "Proceed with {task}?"}},
+            {
+                "id": "answer",
+                "type": "LLM",
+                "config": {"system": "You are a researcher.", "prompt": "{task}"},
+            },
+            {"id": "end", "type": "END"},
+        ],
+        "edges": [
+            {"source": "start", "target": "confirm"},
+            {"source": "confirm", "target": "answer"},
+            {"source": "answer", "target": "end"},
+        ],
+    }
+
+    execution = start_execution(workflow)
+    assert execution["status"] == "WAITING_APPROVAL"
+    approval = admin.get(f"/api/v1/approvals/{execution['waiting_approval_id']}").json()
+    assert approval["reason"] == "Proceed with e2e?"
+    assert approval["action"] == "HUMAN_APPROVAL"
+
+    admin.post(f"/api/v1/approvals/{approval['id']}/approve", json={}).raise_for_status()
+
+    finished = wait_for(execution["execution_id"], "COMPLETED")
+    assert finished["state"]["confirm"] == "APPROVED"
+    assert finished["state"]["answer"]

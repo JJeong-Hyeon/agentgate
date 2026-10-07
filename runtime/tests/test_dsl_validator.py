@@ -211,3 +211,15 @@ def test_http_tool_payload_keys_must_exist():
     data["nodes"][4]["config"]["payloadKeys"].append("secret")
 
     assert "report: Unknown state key 'secret'" in messages(data)
+
+
+def test_approval_message_variables_are_checked():
+    data = minimal({"id": "ok", "type": "APPROVAL", "config": {"message": "About {ghost}"}})
+
+    assert "ok: Unknown variable '{ghost}'" in messages(data)
+
+
+def test_approval_output_can_be_referenced():
+    data = minimal({"id": "ok", "type": "APPROVAL"}, llm("after", "Decision: {ok}"))
+
+    assert messages(data) == []

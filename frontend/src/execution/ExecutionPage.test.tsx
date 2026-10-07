@@ -83,6 +83,7 @@ function renderPage() {
         labels: ["PII"],
         riskLevel: "HIGH",
         status: "PENDING",
+        reason: "Send the report about runtimes?",
       });
     }
     if (url === "/api/v1/approvals/7/approve") return Response.json({ id: 7, status: "APPROVED" });
@@ -106,6 +107,7 @@ describe("ExecutionPage", () => {
 
     const panel = await screen.findByLabelText("승인 요청");
     await waitFor(() => expect(panel).toHaveTextContent("SEND_REPORT"));
+    expect(screen.getByText("Send the report about runtimes?")).toBeInTheDocument();
     expect(screen.getAllByText("승인 대기").length).toBeGreaterThan(0);
     expect(screen.getByText("Compare runtimes")).toBeInTheDocument();
     expect(screen.getByText(/완료 · 2.0s/)).toBeInTheDocument();

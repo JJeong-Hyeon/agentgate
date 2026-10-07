@@ -41,6 +41,8 @@ class AgentGateClient:
         target: str | None = None,
         labels: list[str] | None = None,
         execution_id: str | None = None,
+        require_approval: bool = False,
+        reason: str | None = None,
     ) -> Decision:
         body = {
             "agentId": self._agent_id,
@@ -49,6 +51,10 @@ class AgentGateClient:
             "labels": labels or [],
             "executionId": execution_id,
         }
+        if require_approval:
+            body["requireApproval"] = True
+        if reason:
+            body["reason"] = reason
         try:
             response = self._client.post("/api/v1/actions", json=body)
         except httpx.HTTPError as e:

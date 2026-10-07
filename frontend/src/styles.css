@@ -542,3 +542,10 @@ h3 {
   max-height: 240px;
   overflow: auto;
 }
+.approval-reason {
+  margin: 6px 0 0;
+  padding: 6px 10px;
+  border-left: 3px solid var(--warn);
+  background: var(--bg);
+  white-space: pre-wrap;
+}

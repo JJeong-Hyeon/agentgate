@@ -164,7 +164,7 @@ class _Checker:
         available = {"task"} | {n.id for n in self.nodes.values() if n.type in OUTPUT_TYPES}
         for node in self.nodes.values():
             config = getattr(node, "config", None)
-            for field in ("prompt", "system"):
+            for field in ("prompt", "system", "message"):
                 text = getattr(config, field, None)
                 if not text:
                     continue

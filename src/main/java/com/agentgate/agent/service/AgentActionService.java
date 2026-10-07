@@ -35,12 +35,15 @@ public class AgentActionService {
         }
 
         RiskEvaluationResult result = applyAgentCap(agent, riskEvaluationService.evaluate(request.action(), request.labels()));
+        if (request.approvalRequested() && result.status() == ActionStatus.ALLOWED) {
+            result = new RiskEvaluationResult(result.riskLevel(), ActionStatus.APPROVAL_REQUIRED);
+        }
 
         Long approvalId = null;
         if (result.status() == ActionStatus.APPROVAL_REQUIRED) {
             ApprovalRequest approvalRequest = approvalService.createRequest(
                     request.agentId(), request.action(), request.target(), request.labels(), result.riskLevel(),
-                    request.executionId());
+                    request.executionId(), request.reason());
             approvalId = approvalRequest.getId();
         }
 

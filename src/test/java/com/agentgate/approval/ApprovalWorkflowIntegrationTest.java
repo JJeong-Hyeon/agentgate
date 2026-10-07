@@ -204,4 +204,39 @@ class ApprovalWorkflowIntegrationTest {
 
         verify(runtimeClient, never()).resume(any(), any(), any());
     }
+
+    @Test
+    void requireApprovalAsksHumanEvenForAllowedActions() throws Exception {
+        policyRepository.save(new Policy("VIEW_DATA", null, RiskLevel.LOW));
+        cacheManager.getCache("policies").clear();
+
+        MvcResult result = mockMvc.perform(post("/api/v1/actions").header("X-API-Key", API_KEY)
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                                {"agentId":"mail-agent","action":"VIEW_DATA","requireApproval":true,
+                                 "reason":"Confirm before reading the report","executionId":"exec-9"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("APPROVAL_REQUIRED"))
+                .andExpect(jsonPath("$.riskLevel").value("LOW"))
+                .andReturn();
+        long approvalId = objectMapper.readTree(result.getResponse().getContentAsString()).get("approvalId").asLong();
+
+        mockMvc.perform(get("/api/v1/approvals/" + approvalId).with(httpBasic("test-admin", "test-password")))
+                .andExpect(jsonPath("$.reason").value("Confirm before reading the report"))
+                .andExpect(jsonPath("$.executionId").value("exec-9"));
+    }
+
+    @Test
+    void requireApprovalDoesNotOverrideBlockedPolicy() throws Exception {
+        policyRepository.save(new Policy("DELETE_DATA", null, RiskLevel.BLOCKED));
+        cacheManager.getCache("policies").clear();
+
+        mockMvc.perform(post("/api/v1/actions").header("X-API-Key", API_KEY)
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                                {"agentId":"mail-agent","action":"DELETE_DATA","requireApproval":true}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("BLOCKED"))
+                .andExpect(jsonPath("$.approvalId").doesNotExist());
+    }
 }

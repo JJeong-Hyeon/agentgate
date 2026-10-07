@@ -3,6 +3,7 @@ package com.agentgate.approval.domain;
 import com.agentgate.common.exception.IllegalApprovalStateException;
 import com.agentgate.risk.RiskLevel;
 import jakarta.persistence.CollectionTable;
+import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -59,13 +60,22 @@ public class ApprovalRequest {
 
     private Instant runtimeNotifiedAt;
 
+    @Column(length = 1000)
+    private String reason;
+
     public ApprovalRequest(String agentId, String action, String target, List<String> labels, RiskLevel riskLevel) {
         this(agentId, action, target, labels, riskLevel, null);
     }
 
     public ApprovalRequest(String agentId, String action, String target, List<String> labels, RiskLevel riskLevel,
                            String executionId) {
+        this(agentId, action, target, labels, riskLevel, executionId, null);
+    }
+
+    public ApprovalRequest(String agentId, String action, String target, List<String> labels, RiskLevel riskLevel,
+                           String executionId, String reason) {
         this.executionId = executionId;
+        this.reason = reason;
         this.agentId = agentId;
         this.action = action;
         this.target = target;

@@ -38,7 +38,7 @@ class ApprovalControllerTest {
     void approveReturnsOk() throws Exception {
         when(approvalService.approve(eq(1L), any()))
                 .thenReturn(new ApprovalResponse(1L, "mail-agent", "SEND_EMAIL", null, List.of("PII"),
-                        RiskLevel.HIGH, ApprovalStatus.APPROVED, Instant.now(), Instant.now(), "alice", null));
+                        RiskLevel.HIGH, ApprovalStatus.APPROVED, Instant.now(), Instant.now(), "alice", null, null));
 
         mockMvc.perform(post("/api/v1/approvals/1/approve").contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isOk())
@@ -67,7 +67,7 @@ class ApprovalControllerTest {
     void listReturnsApprovals() throws Exception {
         when(approvalService.list(null, null)).thenReturn(List.of(
                 new ApprovalResponse(1L, "mail-agent", "SEND_EMAIL", null, List.of("PII"),
-                        RiskLevel.HIGH, ApprovalStatus.PENDING, Instant.now(), null, null, null)));
+                        RiskLevel.HIGH, ApprovalStatus.PENDING, Instant.now(), null, null, null, null)));
 
         mockMvc.perform(get("/api/v1/approvals"))
                 .andExpect(status().isOk())
