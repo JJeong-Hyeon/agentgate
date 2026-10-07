@@ -201,7 +201,6 @@ Grafana + Prometheus (도입 완료) — `/actuator/prometheus`로 메트릭 노
 
 ## Development
 - IntelliJ IDEA
-- Claude Code
 - GitHub
 
 ---
