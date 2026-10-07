@@ -15,7 +15,7 @@ import com.agentgate.agent.domain.Agent;
 import com.agentgate.agent.repository.AgentRepository;
 import com.agentgate.approval.domain.ApprovalStatus;
 import com.agentgate.approval.repository.ApprovalRequestRepository;
-import com.agentgate.approval.runtime.RuntimeClient;
+import com.agentgate.runtime.RuntimeClient;
 import com.agentgate.common.security.ApiKeyGenerator;
 import com.agentgate.policy.domain.Policy;
 import com.agentgate.policy.repository.PolicyRepository;

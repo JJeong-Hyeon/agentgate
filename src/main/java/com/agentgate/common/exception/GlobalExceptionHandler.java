@@ -1,6 +1,7 @@
 package com.agentgate.common.exception;
 
 import com.agentgate.common.response.ErrorResponse;
+import com.agentgate.runtime.RuntimeUnavailableException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
 import java.util.stream.Collectors;
@@ -42,6 +43,28 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalApprovalStateException.class)
     public ResponseEntity<ErrorResponse> handleIllegalApprovalState(IllegalApprovalStateException ex, HttpServletRequest request) {
         return build(HttpStatus.CONFLICT, "INVALID_APPROVAL_STATE", ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(WorkflowNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleWorkflowNotFound(WorkflowNotFoundException ex, HttpServletRequest request) {
+        return build(HttpStatus.NOT_FOUND, "WORKFLOW_NOT_FOUND", ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(DuplicateWorkflowException.class)
+    public ResponseEntity<ErrorResponse> handleDuplicateWorkflow(DuplicateWorkflowException ex, HttpServletRequest request) {
+        return build(HttpStatus.CONFLICT, "WORKFLOW_ALREADY_EXISTS", ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(InvalidWorkflowException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidWorkflow(InvalidWorkflowException ex, HttpServletRequest request) {
+        HttpStatus status = HttpStatus.UNPROCESSABLE_CONTENT;
+        return ResponseEntity.status(status).body(new ErrorResponse(Instant.now(), status.value(),
+                status.getReasonPhrase(), "INVALID_WORKFLOW", ex.getMessage(), request.getRequestURI(), ex.getErrors()));
+    }
+
+    @ExceptionHandler(RuntimeUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handleRuntimeUnavailable(RuntimeUnavailableException ex, HttpServletRequest request) {
+        return build(HttpStatus.SERVICE_UNAVAILABLE, "RUNTIME_UNAVAILABLE", ex.getMessage(), request);
     }
 
     @ExceptionHandler(InvalidApiKeyException.class)

@@ -101,3 +101,29 @@ curl -X POST http://<host>/api/v1/actions \
   -H "Content-Type: application/json" \
   -d '{"agentId":"hr-agent","action":"DELETE_USER","target":"employee_1024","labels":["PII"]}'
 ```
+
+## 6. Workflow (관리자 인증 필요)
+
+GUI에서 만든 Workflow DSL(`docs/ARCHITECTURE.md` 7장)을 버전 단위로 저장한다. 저장 전 Runtime(`AGENTGATE_RUNTIME_BASE_URL`)이 DSL을 검증하며, Runtime이 설정되지 않았거나 응답하지 않으면 503 `RUNTIME_UNAVAILABLE`.
+
+```
+POST /api/v1/workflows                              {"workflowId": "research", "name": "선택", "dsl": {...}}  → 201, 버전 1
+GET  /api/v1/workflows                              목록 (dsl 제외)
+GET  /api/v1/workflows/{workflowId}                 최신 버전 dsl 포함
+POST /api/v1/workflows/{workflowId}/versions        {"dsl": {...}}  → 201, 다음 버전
+GET  /api/v1/workflows/{workflowId}/versions        버전 목록 (dsl 제외)
+GET  /api/v1/workflows/{workflowId}/versions/{n}    해당 버전 dsl
+```
+
+- 버전은 불변이며, 저장 시 DSL의 `workflowId` / `version`은 서버가 덮어쓴다.
+- `workflowId`는 소문자/숫자/`-` (최대 64자). 중복 생성 시 409 `WORKFLOW_ALREADY_EXISTS`.
+- 검증 실패 시 422 `INVALID_WORKFLOW`, `errors`에 노드별 문제 목록:
+
+```json
+{
+  "status": 422,
+  "code": "INVALID_WORKFLOW",
+  "message": "Workflow DSL is invalid",
+  "errors": [{"path": "config.prompt", "message": "Unknown variable '{ghost}'", "nodeId": "a"}]
+}
+```
