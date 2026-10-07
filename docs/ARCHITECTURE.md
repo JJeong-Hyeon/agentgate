@@ -99,18 +99,21 @@ Parallel / Retry는 LangGraph 그래프로 컴파일해 처리한다. 장시간 
 
 ## 5. GUI Node 구성
 
-초기에는 Node 종류를 최소화한다.
+초기에는 Node 종류를 최소화한다. 스키마는 `runtime/app/dsl/schema.py`가 기준이다.
 
-| 분류 | Node |
-|---|---|
-| Workflow | `START`, `END`, `CONDITION`, `PARALLEL`, `LOOP` |
-| Agent | `LLM`, `AGENT`, `ROUTER`, `REVIEWER` |
-| Tool | `MCP_TOOL`, `HTTP_TOOL` |
-| Governance | `APPROVAL` (명시적 승인 단계) |
+| 분류 | Node | 설명 |
+|---|---|---|
+| Workflow | `START`, `END` | 시작(1개) / 종료(1개 이상) |
+| Workflow | `CONDITION` | 상태 값(`key`)에 따라 분기. 출력 edge label = `cases`의 label + `default` |
+| Agent | `LLM`, `AGENT` | LLM 호출. `AGENT`는 이후 Tool Calling이 추가될 노드 |
+| Agent | `ROUTER` | LLM이 `routes` 중 하나를 선택. 출력 edge label = route |
+| Agent | `REVIEWER` | LLM 판정. 출력 edge label = `APPROVE` / `REVISE`, 재시도 횟수는 `maxRevisions` |
+| Tool | `HTTP_TOOL` | AgentGate 검사를 거치는 HTTP 호출 (`MCP_TOOL`은 Phase 6) |
+| Governance | `APPROVAL` | 위험도와 무관하게 사람의 승인을 강제 |
 
-Policy/Risk 검사는 Node로 배치하지 않는다. 모든 Tool Node 실행 시 Runtime이
-자동으로 AgentGate를 호출하므로 사용자가 빠뜨릴 수 없다. `APPROVAL` Node는
-위험도와 무관하게 사람의 확인을 강제하고 싶을 때만 사용한다.
+- **병렬**: 일반 노드에서 label 없는 edge를 여러 개 내보내면 병렬 실행된다 (별도 `PARALLEL` 노드 없음).
+- **반복**: `REVIEWER`를 거치는 cycle로 표현한다. `REVIEWER`가 없는 cycle은 무한 루프가 되므로 검증에서 거부한다 (별도 `LOOP` 노드 없음).
+- Policy/Risk 검사는 Node로 배치하지 않는다. 모든 Tool Node 실행 시 Runtime이 자동으로 AgentGate를 호출하므로 사용자가 빠뜨릴 수 없다.
 
 ---
 
@@ -146,38 +149,47 @@ React Flow JSON과 LangGraph 코드를 직접 연결하지 않는다.
 React Flow JSON → Workflow DSL → Validation → Compiler → LangGraph StateGraph
 ```
 
-예:
+예제: [`runtime/examples/research.json`](../runtime/examples/research.json) (Planner → Researcher → Reviewer → Report)
 
 ```json
 {
-  "workflowId": "research-agent",
+  "schemaVersion": 1,
+  "workflowId": "research",
   "version": 1,
   "nodes": [
-    {
-      "id": "planner",
-      "type": "AGENT",
-      "config": { "model": "qwen3", "prompt": "Analyze the task" }
-    },
-    {
-      "id": "send_report",
-      "type": "HTTP_TOOL",
-      "config": {
-        "action": "SEND_EMAIL",
-        "method": "POST",
-        "url": "https://mail.internal/send",
-        "labels": ["PII"]
-      }
-    }
+    { "id": "start", "type": "START" },
+    { "id": "plan", "type": "AGENT", "config": { "prompt": "Task: {task}" } },
+    { "id": "report", "type": "HTTP_TOOL",
+      "config": { "action": "SEND_REPORT", "url": "https://hook.internal/report", "payloadKeys": ["task", "plan"] } },
+    { "id": "end", "type": "END" }
   ],
   "edges": [
-    { "source": "planner", "target": "send_report" }
+    { "source": "start", "target": "plan" },
+    { "source": "plan", "target": "report" },
+    { "source": "report", "target": "end" }
   ]
 }
 ```
 
-- Tool Node의 `action`, `labels`는 그대로 AgentGate `POST /api/v1/actions` 요청에 사용된다.
+규칙:
+
+- JSON 키는 camelCase. `position`은 GUI 배치용이며 Runtime은 무시한다.
+- 출력이 있는 노드(`LLM`, `AGENT`, `ROUTER`, `REVIEWER`, `HTTP_TOOL`)는 결과를 상태의 `노드 id` 키에 저장한다.
+- 프롬프트에서 `{task}`(입력)와 `{노드id}`(앞선 노드 출력)를 참조한다. 아직 실행되지 않은 노드는 빈 문자열이다. 중괄호 문자 자체는 `{{`, `}}`로 쓴다.
+- `HTTP_TOOL`의 `action`, `labels`는 그대로 AgentGate `POST /api/v1/actions` 요청에 사용되고, `payloadKeys`의 상태 값이 요청 body가 된다.
 - DSL은 GUI보다 먼저 확정한다. Runtime은 DSL만 알면 되고, GUI는 DSL을 생성하는 도구다.
-- DSL 스키마 버전을 두어 Workflow Versioning과 하위 호환을 관리한다.
+
+검증 (`POST /runtime/workflows/validate`, 오류를 모두 모아 `{valid, errors[{path, message, node_id}]}`로 반환):
+
+- 스키마 (노드 타입별 config, 알 수 없는 필드 금지, id 형식, 예약어 `task` 등)
+- 노드 id 중복, edge가 존재하는 노드를 참조하는지
+- `START` 1개(나가는 edge 1개, 들어오는 edge 없음), `END` 1개 이상
+- 분기 노드의 출력 edge label이 기대값과 정확히 일치하는지, 일반 노드 edge에는 label이 없는지
+- 모든 노드가 `START`에서 도달 가능하고 `END`에 도달 가능한지
+- `REVIEWER`를 거치지 않는 cycle 금지
+- 프롬프트 변수, `payloadKeys`, `CONDITION.key`가 존재하는 상태 키인지
+
+JSON Schema는 `GET /runtime/workflows/schema`로 제공한다 (프론트엔드 폼/검증용).
 
 ---
 
