@@ -16,7 +16,8 @@ public record ApprovalResponse(
         ApprovalStatus status,
         Instant createdAt,
         Instant decidedAt,
-        String decidedBy
+        String decidedBy,
+        String executionId
 ) {
     public static ApprovalResponse from(ApprovalRequest approvalRequest) {
         return new ApprovalResponse(
@@ -29,7 +30,8 @@ public record ApprovalResponse(
                 approvalRequest.getStatus(),
                 approvalRequest.getCreatedAt(),
                 approvalRequest.getDecidedAt(),
-                approvalRequest.getDecidedBy()
+                approvalRequest.getDecidedBy(),
+                approvalRequest.getExecutionId()
         );
     }
 }

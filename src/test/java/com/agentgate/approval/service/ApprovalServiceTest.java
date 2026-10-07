@@ -38,10 +38,11 @@ class ApprovalServiceTest {
         when(approvalRequestRepository.save(org.mockito.ArgumentMatchers.any(ApprovalRequest.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        ApprovalRequest result = service.createRequest("mail-agent", "SEND_EMAIL", null, List.of("PII"), RiskLevel.HIGH);
+        ApprovalRequest result = service.createRequest("mail-agent", "SEND_EMAIL", null, List.of("PII"), RiskLevel.HIGH, "exec-1");
 
         assertThat(result.getAgentId()).isEqualTo("mail-agent");
         assertThat(result.getStatus()).isEqualTo(ApprovalStatus.PENDING);
+        assertThat(result.getExecutionId()).isEqualTo("exec-1");
     }
 
     @Test
@@ -76,7 +77,7 @@ class ApprovalServiceTest {
         when(approvalRequestRepository.findByStatus(ApprovalStatus.PENDING))
                 .thenReturn(List.of(withId(new ApprovalRequest("mail-agent", "SEND_EMAIL", null, List.of(), RiskLevel.HIGH), 1L)));
 
-        List<ApprovalResponse> result = service.list(ApprovalStatus.PENDING);
+        List<ApprovalResponse> result = service.list(ApprovalStatus.PENDING, null);
 
         assertThat(result).hasSize(1);
     }
@@ -86,7 +87,7 @@ class ApprovalServiceTest {
         when(approvalRequestRepository.findAll())
                 .thenReturn(List.of(withId(new ApprovalRequest("mail-agent", "SEND_EMAIL", null, List.of(), RiskLevel.HIGH), 1L)));
 
-        List<ApprovalResponse> result = service.list(null);
+        List<ApprovalResponse> result = service.list(null, null);
 
         assertThat(result).hasSize(1);
     }

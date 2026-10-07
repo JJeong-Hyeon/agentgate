@@ -35,8 +35,9 @@ public class ApprovalController {
     }
 
     @GetMapping
-    public ResponseEntity<List<ApprovalResponse>> list(@RequestParam(required = false) ApprovalStatus status) {
-        return ResponseEntity.ok(approvalService.list(status));
+    public ResponseEntity<List<ApprovalResponse>> list(@RequestParam(required = false) ApprovalStatus status,
+                                                       @RequestParam(required = false) String executionId) {
+        return ResponseEntity.ok(approvalService.list(status, executionId));
     }
 
     @GetMapping("/{id}")

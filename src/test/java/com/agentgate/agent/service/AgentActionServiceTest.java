@@ -91,7 +91,7 @@ class AgentActionServiceTest {
         assertThat(response.status()).isEqualTo(ActionStatus.ALLOWED);
         assertThat(response.riskLevel()).isEqualTo(RiskLevel.LOW);
         assertThat(response.approvalId()).isNull();
-        verify(approvalService, never()).createRequest(anyString(), anyString(), any(), any(), any());
+        verify(approvalService, never()).createRequest(anyString(), anyString(), any(), any(), any(), any());
     }
 
     @Test
@@ -102,7 +102,7 @@ class AgentActionServiceTest {
                 .thenReturn(new RiskEvaluationResult(RiskLevel.HIGH, ActionStatus.APPROVAL_REQUIRED));
         ApprovalRequest created = new ApprovalRequest("mail-agent", "SEND_EMAIL", null, List.of("PII"), RiskLevel.HIGH);
         setId(created, 42L);
-        when(approvalService.createRequest(eq("mail-agent"), eq("SEND_EMAIL"), any(), eq(List.of("PII")), eq(RiskLevel.HIGH)))
+        when(approvalService.createRequest(eq("mail-agent"), eq("SEND_EMAIL"), any(), eq(List.of("PII")), eq(RiskLevel.HIGH), any()))
                 .thenReturn(created);
 
         ActionRequest request = new ActionRequest("mail-agent", "SEND_EMAIL", null, List.of("PII"));
@@ -128,7 +128,7 @@ class AgentActionServiceTest {
         assertThat(response.status()).isEqualTo(ActionStatus.BLOCKED);
         assertThat(response.riskLevel()).isEqualTo(RiskLevel.BLOCKED);
         assertThat(response.approvalId()).isNull();
-        verify(approvalService, never()).createRequest(anyString(), anyString(), any(), any(), any());
+        verify(approvalService, never()).createRequest(anyString(), anyString(), any(), any(), any(), any());
     }
 
     @Test

@@ -8,4 +8,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequest, Long> {
 
     List<ApprovalRequest> findByStatus(ApprovalStatus status);
+
+    List<ApprovalRequest> findByExecutionId(String executionId);
+
+    List<ApprovalRequest> findByStatusAndExecutionId(ApprovalStatus status, String executionId);
 }

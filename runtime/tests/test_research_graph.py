@@ -119,6 +119,16 @@ def test_report_waits_when_agentgate_requires_approval():
     assert target.requests == []
 
 
+def test_report_sends_execution_id_to_agentgate():
+    gate = FakeAgentGate()
+
+    _, config, _ = run(
+        ["1. step", "findings", "VERDICT: APPROVE"], report_tool=report_tool(gate, FakeTarget())
+    )
+
+    assert gate.bodies[0]["executionId"] == config["configurable"]["thread_id"]
+
+
 def test_unapproved_findings_are_not_reported():
     gate = FakeAgentGate()
 
