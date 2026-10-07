@@ -56,7 +56,7 @@ echo "==> Runtime"
 (cd "$ROOT/runtime" && \
   AGENTGATE_BASE_URL=http://localhost:8080 AGENTGATE_API_KEY="$API_KEY" \
   LLM_BASE_URL=http://localhost:18081/v1 LLM_MODEL=fake-model \
-  REPORT_URL=http://localhost:18081/report RUNTIME_TOKEN="$TOKEN" \
+  RUNTIME_TOKEN="$TOKEN" \
   "$PYTHON" -m uvicorn app.main:app --port 8000 > "$WORK/runtime.log" 2>&1) &
 PIDS+=($!)
 wait_for http://localhost:8000/health Runtime "$WORK/runtime.log"

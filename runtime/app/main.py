@@ -9,10 +9,8 @@ from app.dsl.compiler import WorkflowCompiler
 from app.events import EventReporter
 from app.governance.agentgate_client import AgentGateClient
 from app.graph.checkpointer import open_checkpointer
-from app.graph.research import build_research_graph
 from app.llm import LlmHealth, check_llm_health, create_chat_model
 from app.runner import WorkflowRunner
-from app.tools.http import HttpTool, HttpToolSpec
 
 
 def build_gate(settings: Settings) -> AgentGateClient:
@@ -21,35 +19,17 @@ def build_gate(settings: Settings) -> AgentGateClient:
     )
 
 
-def build_report_tool(settings: Settings) -> HttpTool | None:
-    if not settings.report_url:
-        return None
-    spec = HttpToolSpec(
-        name="report",
-        action=settings.report_action,
-        url=settings.report_url,
-        labels=settings.report_labels,
-    )
-    return HttpTool(spec, build_gate(settings))
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
     with open_checkpointer(settings.runtime_database_url) as checkpointer:
-        default_graph = build_research_graph(
-            create_chat_model(settings),
-            checkpointer,
-            settings.max_review_revisions,
-            build_report_tool(settings),
-        )
         compiler = WorkflowCompiler(
             lambda model, temperature: create_chat_model(
                 settings, model=model, temperature=temperature
             ),
             build_gate(settings),
         )
-        app.state.runner = WorkflowRunner(default_graph, compiler, checkpointer)
+        app.state.runner = WorkflowRunner(compiler, checkpointer)
         app.state.reporter = EventReporter(settings.agentgate_base_url, settings.runtime_token)
         yield
 

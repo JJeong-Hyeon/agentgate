@@ -23,7 +23,7 @@ from app.config import Settings, get_settings
 from app.dsl import validate_workflow
 from app.dsl.compiler import CompileError
 from app.events import EventReporter, run_graph
-from app.runner import WorkflowRunner
+from app.runner import UnknownExecution, WorkflowRunner
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/runtime/executions", tags=["executions"])
@@ -34,8 +34,8 @@ class ExecutionRequest(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     task: str = Field(min_length=1)
-    # Workflow DSL; omitted → the built-in research graph.
-    workflow: dict[str, Any] | None = None
+    # Workflow DSL to run (see app/dsl/schema.py).
+    workflow: dict[str, Any]
     # Caller-chosen id (AgentGate creates the execution record first); generated if omitted.
     execution_id: str | None = Field(default=None, pattern=r"^[A-Za-z0-9-]{1,64}$")
     # Return 202 immediately and run in the background; progress is reported as events.
@@ -87,6 +87,15 @@ def _config(execution_id: str) -> dict:
     return {"configurable": {"thread_id": execution_id}}
 
 
+def _graph_for(runner: WorkflowRunner, execution_id: str) -> CompiledStateGraph:
+    try:
+        return runner.graph_for_execution(execution_id)
+    except UnknownExecution as e:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND, f"Execution '{execution_id}' not found"
+        ) from e
+
+
 def _describe(graph: CompiledStateGraph, execution_id: str) -> ExecutionResponse:
     snapshot = graph.get_state(_config(execution_id))
     if not snapshot.values:
@@ -113,21 +122,18 @@ def create_execution(
     background: BackgroundTasks,
     response: Response,
 ) -> ExecutionResponse:
-    if body.workflow is None:
-        graph, initial = runner.default_graph, {"task": body.task, "revisions": 0}
-    else:
-        workflow, issues = validate_workflow(body.workflow)
-        if issues:
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_CONTENT,
-                {"message": "Invalid workflow", "errors": [i.model_dump() for i in issues]},
-            )
-        try:
-            graph = runner.graph_for_workflow(workflow)
-        except CompileError as e:
-            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e)) from e
-        dsl = workflow.model_dump(mode="json", by_alias=True)
-        initial = {"task": body.task, "workflow": dsl, "revisions": {}}
+    workflow, issues = validate_workflow(body.workflow)
+    if issues:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            {"message": "Invalid workflow", "errors": [i.model_dump() for i in issues]},
+        )
+    try:
+        graph = runner.graph_for_workflow(workflow)
+    except CompileError as e:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e)) from e
+    dsl = workflow.model_dump(mode="json", by_alias=True)
+    initial = {"task": body.task, "workflow": dsl, "revisions": {}}
 
     execution_id = body.execution_id or str(uuid.uuid4())
     if runner.exists(execution_id):
@@ -145,7 +151,7 @@ def create_execution(
 
 @router.get("/{execution_id}")
 def get_execution(execution_id: str, runner: Runner) -> ExecutionResponse:
-    return _describe(runner.graph_for_execution(execution_id), execution_id)
+    return _describe(_graph_for(runner, execution_id), execution_id)
 
 
 @router.post(
@@ -160,7 +166,7 @@ def resume_execution(
     reporter: Reporter,
     background: BackgroundTasks,
 ) -> ExecutionResponse:
-    graph = runner.graph_for_execution(execution_id)
+    graph = _graph_for(runner, execution_id)
     with _resuming_lock:
         current = _describe(graph, execution_id)
         if execution_id in _resuming or current.status != "WAITING_APPROVAL":

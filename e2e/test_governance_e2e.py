@@ -1,7 +1,7 @@
 """End-to-end: Runtime tool calls governed by a real AgentGate (Spring).
 
 Run via scripts/e2e.sh, which starts AgentGate, the runtime and fake services.
-Each test sets the risk of SEND_REPORT (the research graph's report action) through
+Each test sets the risk of SEND_REPORT (the research workflow's report action) through
 the policy API, then runs the graph and checks what reached the tool target.
 """
 
@@ -55,7 +55,7 @@ def research_workflow() -> dict:
 
 
 def start_execution(workflow: dict | None = None) -> dict:
-    body = {"task": "e2e", "workflow": workflow} if workflow else {"task": "e2e"}
+    body = {"task": "e2e", "workflow": workflow or research_workflow()}
     response = httpx.post(f"{RUNTIME}/runtime/executions", json=body, timeout=60)
     response.raise_for_status()
     return response.json()
@@ -98,21 +98,16 @@ def test_blocked_tool_never_runs(report_risk):
 
 
 @pytest.mark.parametrize(
-    ("decision", "expected_tool_status", "expected_reports", "use_dsl"),
-    [
-        ("approve", "EXECUTED", 1, False),
-        ("reject", "REJECTED", 0, False),
-        ("approve", "EXECUTED", 1, True),
-    ],
-    ids=["approve", "reject", "approve-dsl-workflow"],
+    ("decision", "expected_tool_status", "expected_reports"),
+    [("approve", "EXECUTED", 1), ("reject", "REJECTED", 0)],
 )
 def test_high_risk_tool_waits_for_human_decision(
-    admin, report_risk, decision, expected_tool_status, expected_reports, use_dsl
+    admin, report_risk, decision, expected_tool_status, expected_reports
 ):
     report_risk("HIGH")
     before = reports_received()
 
-    execution = start_execution(research_workflow() if use_dsl else None)
+    execution = start_execution()
     assert execution["status"] == "WAITING_APPROVAL"
     assert reports_received() == before
 
