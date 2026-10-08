@@ -4,6 +4,7 @@ import com.agentgate.risk.ActionStatus;
 import com.agentgate.risk.DecisionBasis;
 import com.agentgate.risk.RiskLevel;
 import jakarta.persistence.CollectionTable;
+import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -53,10 +54,20 @@ public class AuditLog {
     @Enumerated(EnumType.STRING)
     private DecisionBasis basis;
 
+    // Agents that delegated this action, outermost first; null when the agent acted on its own.
+    @Column(length = 500)
+    private String delegatedBy;
+
     private Instant createdAt;
 
     public AuditLog(String agentId, String action, String target, List<String> labels,
                      RiskLevel riskLevel, ActionStatus status, Long approvalId, DecisionBasis basis) {
+        this(agentId, action, target, labels, riskLevel, status, approvalId, basis, null);
+    }
+
+    public AuditLog(String agentId, String action, String target, List<String> labels,
+                    RiskLevel riskLevel, ActionStatus status, Long approvalId, DecisionBasis basis, String delegatedBy) {
+        this.delegatedBy = delegatedBy;
         this.agentId = agentId;
         this.action = action;
         this.target = target;

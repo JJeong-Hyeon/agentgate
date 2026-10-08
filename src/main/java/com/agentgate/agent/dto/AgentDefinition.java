@@ -27,7 +27,9 @@ public record AgentDefinition(
         // JSON Schema the final answer must match; null → free text.
         JsonNode outputSchema,
         // Null → the runtime's default (LLM_TOOL_CALLING).
-        ToolCallingMode toolCalling
+        ToolCallingMode toolCalling,
+        // Agents this one may delegate to; null or empty → none.
+        @Size(max = 10) List<@Valid @NotNull AgentDelegateDefinition> delegates
 ) {
     public static final int DEFAULT_MAX_STEPS = 8;
 
@@ -38,6 +40,7 @@ public record AgentDefinition(
                         t.labels() == null ? List.of() : t.labels()))
                 .toList();
         return new AgentDefinition(description, model, temperature, systemPrompt, normalizedTools,
-                maxSteps == null ? DEFAULT_MAX_STEPS : maxSteps, outputSchema, toolCalling);
+                maxSteps == null ? DEFAULT_MAX_STEPS : maxSteps, outputSchema, toolCalling,
+                delegates == null ? List.of() : delegates);
     }
 }

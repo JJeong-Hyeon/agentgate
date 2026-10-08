@@ -37,7 +37,7 @@ class AuditLogServiceTest {
 
     @Test
     void recordSavesAuditLog() {
-        service.record("mail-agent", "VIEW_DATA", null, List.of(), RiskLevel.LOW, ActionStatus.ALLOWED, null, DecisionBasis.POLICY);
+        service.record("mail-agent", "VIEW_DATA", null, List.of(), RiskLevel.LOW, ActionStatus.ALLOWED, null, DecisionBasis.POLICY, null);
 
         verify(auditLogRepository).save(any(AuditLog.class));
     }
