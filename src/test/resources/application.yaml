@@ -6,6 +6,9 @@ spring:
     driver-class-name: org.h2.Driver
     username: sa
     password:
+  flyway:
+    # Migrations are PostgreSQL SQL; they are tested against PostgreSQL in FlywayMigrationTest.
+    enabled: false
   jpa:
     hibernate:
       ddl-auto: create-drop
