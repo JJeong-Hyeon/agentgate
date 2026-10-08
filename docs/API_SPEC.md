@@ -99,6 +99,25 @@ GET  /api/v1/agents/{id}/definition/versions/{version}  해당 버전
 - 같은 Tool 중복, 형식 오류는 400 `VALIDATION_FAILED`
 - Agent 응답(`GET /api/v1/agents`)에 `description`, `latestDefinitionVersion`(정의 없으면 0) 포함
 
+### MCP 서버 (관리자 인증 필요)
+
+Runtime이 호출할 Streamable HTTP MCP 서버를 AgentGate에 등록한다. stdio 서버는 Runtime 호스트에서 명령을 실행하므로 화면/API로 등록할 수 없고 Runtime 설정 파일(`MCP_CONFIG_PATH`)로만 등록한다.
+
+```
+POST   /api/v1/mcp-servers         {"name": "crm", "url": "https://crm.internal/mcp", "description": "...", "enabled": true,
+                                    "headers": {"Authorization": "Bearer ..."}}  → 201
+GET    /api/v1/mcp-servers         목록
+GET    /api/v1/mcp-servers/{id}
+PUT    /api/v1/mcp-servers/{id}    url / description / enabled 수정. headers는 주면 전체 교체, 생략하면 유지. name은 바뀌지 않음
+DELETE /api/v1/mcp-servers/{id}    → 204
+```
+
+- `name`: 영문/숫자/`_`/`-` 최대 64자, 중복 시 409 `MCP_SERVER_ALREADY_EXISTS`. Agent 정의의 Tool과 정책의 `MCP:<name>:<tool>`이 이 이름을 참조한다
+- `url`: `http(s)://`만 허용
+- `headers`: AES-256-GCM으로 암호화 저장(`AGENTGATE_SECRET_KEY`). 응답에는 `headerNames`(이름)만 포함되고 값은 다시 조회할 수 없다
+
+Runtime 전용: `GET /api/v1/runtime/mcp-servers` (`X-Runtime-Token`) — 사용 중인 서버와 복호화된 헤더 (`Cache-Control: no-store`).
+
 ### Tool 목록 (관리자 인증 필요)
 
 ```

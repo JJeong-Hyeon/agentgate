@@ -66,6 +66,7 @@ AGENTGATE_ADMIN_USERNAME=admin
 AGENTGATE_ADMIN_PASSWORD=<AgentGate 관리자 비밀번호>
 AGENTGATE_RUNTIME_BASE_URL=http://<runtime_private_ip>:8000
 AGENTGATE_RUNTIME_TOKEN=<임의의 긴 문자열, Runtime의 RUNTIME_TOKEN과 동일>
+AGENTGATE_SECRET_KEY=<openssl rand -base64 32 결과. DB에 저장하는 인증정보(MCP 서버 헤더 등) 암호화 키, 바꾸면 기존 값을 읽을 수 없음>
 EOF
 ```
 
@@ -137,4 +138,5 @@ scripts/deploy-runtime.sh <키페어.pem>
 
 - `agentgate.admin.password`가 개발용 기본값("changeme")이면 `prod` 프로파일에서 기동이 즉시 실패한다(`SecurityHardeningCheck`).
 - `AGENTGATE_RUNTIME_BASE_URL`을 설정했는데 `AGENTGATE_RUNTIME_TOKEN`이 비어 있으면 기동이 실패한다.
+- `AGENTGATE_SECRET_KEY`가 없으면 `prod` 프로파일에서 기동이 실패한다. 이 키로 MCP 서버 인증 헤더를 AES-256-GCM으로 암호화해 저장하며, 키를 잃거나 바꾸면 저장된 헤더를 다시 입력해야 한다. 안전한 곳(예: AWS Secrets Manager / SSM Parameter Store)에 백업할 것.
 - ALB는 현재 HTTP(80)만 연다. UI 로그인(Basic 인증)이 평문으로 전송되므로, 외부에 공개할 때는 도메인 + ACM 인증서로 HTTPS 리스너를 추가해야 한다.
