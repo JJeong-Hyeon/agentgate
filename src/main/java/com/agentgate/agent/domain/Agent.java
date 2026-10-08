@@ -14,6 +14,7 @@ import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.ColumnDefault;
 
 @Entity
 @Table(name = "agents")
@@ -41,7 +42,10 @@ public class Agent {
     @Column(length = 1000)
     private String description;
 
-    // 0 until the first definition is saved.
+    // 0 until the first definition is saved. The column default lets a schema update add the
+    // column to tables that already have agents.
+    @ColumnDefault("0")
+    @Column(nullable = false)
     private int latestDefinitionVersion;
 
     private Instant createdAt;
