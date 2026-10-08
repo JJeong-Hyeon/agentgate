@@ -88,6 +88,8 @@ export interface Approval {
   decidedBy: string | null;
   executionId: string | null;
   reason?: string | null;
+  // agents that delegated this work, outermost first, e.g. "lead>research"
+  delegatedBy?: string | null;
 }
 
 export type RiskLevel = "LOW" | "MEDIUM" | "HIGH" | "BLOCKED";
@@ -131,6 +133,11 @@ export interface AgentToolDefinition {
   labels?: string[];
 }
 
+export interface AgentDelegateDefinition {
+  agentId: string;
+  permission: ToolPermission;
+}
+
 export interface AgentDefinition {
   description?: string | null;
   model?: string | null;
@@ -140,6 +147,8 @@ export interface AgentDefinition {
   maxSteps?: number | null;
   outputSchema?: Record<string, unknown> | null;
   toolCalling?: ToolCallingMode | null;
+  // agents this one may hand work to
+  delegates?: AgentDelegateDefinition[];
 }
 
 export interface AgentDefinitionVersion {

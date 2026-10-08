@@ -4,6 +4,7 @@ import type { McpServerTools, McpToolInfo, RiskLevel, ToolPermission } from "../
 import { useClient } from "../auth/AuthContext";
 import { useAsync } from "../useAsync";
 import { ApiKeySection } from "./ApiKeySection";
+import { DelegatesSection } from "./DelegatesSection";
 import {
   defaultPermission,
   fromForm,
@@ -19,6 +20,7 @@ export function AgentEditorPage() {
   const client = useClient();
   const agent = useAsync(useCallback(() => client.getAgent(id), [client, id]));
   const versions = useAsync(useCallback(() => client.listAgentDefinitionVersions(id), [client, id]));
+  const allAgents = useAsync(useCallback(() => client.listAgents(), [client]));
   const [refresh, setRefresh] = useState(false);
   const catalog = useAsync(useCallback(() => client.listTools(refresh), [client, refresh]));
   // Policy risk per tool action, shown next to each tool; optional, so failures are ignored.
@@ -206,6 +208,13 @@ export function AgentEditorPage() {
               onChange={(tools) => update({ tools })}
             />
           </section>
+
+          <DelegatesSection
+            self={agent.data?.agentId}
+            agents={allAgents.data}
+            chosen={form.delegates}
+            onChange={(delegates) => update({ delegates })}
+          />
 
           {agent.data && <ApiKeySection agent={agent.data} onReissued={agent.reload} />}
 

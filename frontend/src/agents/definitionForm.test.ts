@@ -11,6 +11,7 @@ describe("definition form", () => {
       maxSteps: 5,
       outputSchema: { type: "object" },
       tools: [{ server: "notes", tool: "save_note", permission: "APPROVAL" as const, labels: ["PII", "EXT"] }],
+      delegates: [{ agentId: "research", permission: "AUTO" as const }],
     };
 
     const form = toForm(definition);
@@ -31,6 +32,7 @@ describe("definition form", () => {
         maxSteps: 8,
         outputSchema: null,
         tools: [],
+        delegates: [],
       },
     });
   });

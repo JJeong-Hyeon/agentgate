@@ -42,6 +42,9 @@ export function ApprovalsPage() {
                 {a.target && ` → ${a.target}`}
                 {a.labels.length > 0 && ` · ${a.labels.join(", ")}`}
               </div>
+              {a.delegatedBy && (
+                <div className="muted">위임 경로: {[...a.delegatedBy.split(">"), a.agentId].join(" → ")}</div>
+              )}
               {a.reason && <div className="approval-reason">{a.reason}</div>}
               {a.executionId && <div className="muted mono">실행 {a.executionId}</div>}
             </div>

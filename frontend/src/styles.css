@@ -719,3 +719,7 @@ fieldset.mode {
   color: var(--muted);
   font-size: 12px;
 }
+.agent-step-who {
+  font-size: 12px;
+  margin-top: 4px;
+}
