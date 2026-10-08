@@ -100,13 +100,25 @@ LLM_MODEL=qwen2.5:3b
 EOF
 ```
 
+**외부 LLM 서버를 쓰는 경우** (예: NVIDIA DGX Spark의 vLLM): `.env`에 다음을 추가한다. `LLM_BASE_URL`이 있으면 배포 스크립트가 Ollama를 띄우지 않고 모델도 받지 않는다. Runtime EC2에서 그 서버에 네트워크로 닿아야 한다(사설망 / VPN / 보안그룹).
+
+```bash
+LLM_BASE_URL=http://<llm 서버>:8000/v1
+LLM_MODEL=<서빙 중인 모델 이름>
+LLM_API_KEY=<vLLM을 --api-key로 띄운 경우>
+# vLLM을 --enable-auto-tool-choice --tool-call-parser <parser>(Qwen 계열은 hermes)로 띄웠으면 native, 아니면 json
+LLM_TOOL_CALLING=native
+```
+
+연결 확인: App EC2에서 `curl http://<runtime_private_ip>:8000/llm/health` — `model_available: true`면 정상.
+
 이후 배포는 로컬에서:
 
 ```bash
 scripts/deploy-runtime.sh <키페어.pem>
 ```
 
-`runtime/` 소스와 [`deploy/runtime/compose.yaml`](../deploy/runtime/compose.yaml)을 rsync로 올리고, 컨테이너를 빌드·기동한 뒤 `LLM_MODEL`을 Ollama에 받아둔다(최초 1회는 모델 다운로드로 수 분 소요). AgentGate가 Runtime에 닿는지는 UI에서 워크플로를 저장해보면 된다(검증을 Runtime이 수행).
+`runtime/` 소스와 [`deploy/runtime/compose.yaml`](../deploy/runtime/compose.yaml)을 rsync로 올리고, 컨테이너를 빌드·기동한 뒤 (외부 LLM이 아니면) `LLM_MODEL`을 Ollama에 받아둔다(최초 1회는 모델 다운로드로 수 분 소요). AgentGate가 Runtime에 닿는지는 UI에서 워크플로를 저장해보면 된다(검증을 Runtime이 수행).
 
 ### MCP 서버 (선택)
 
