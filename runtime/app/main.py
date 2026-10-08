@@ -36,6 +36,7 @@ async def lifespan(app: FastAPI):
             ),
             build_gate(settings),
             mcp_servers=mcp_servers,
+            tool_calling=settings.llm_tool_calling.upper(),
         )
         app.state.runner = WorkflowRunner(compiler, checkpointer)
         app.state.reporter = EventReporter(settings.agentgate_base_url, settings.runtime_token)

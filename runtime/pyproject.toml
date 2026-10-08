@@ -13,6 +13,7 @@ dependencies = [
     "langgraph-checkpoint-postgres>=2.0",
     "psycopg[binary,pool]>=3.2",
     "mcp>=2.3,<3",
+    "jsonschema>=4.23",
 ]
 
 [project.optional-dependencies]
