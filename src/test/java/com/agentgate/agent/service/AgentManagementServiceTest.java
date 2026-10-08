@@ -10,6 +10,7 @@ import com.agentgate.agent.dto.AgentCreateRequest;
 import com.agentgate.agent.dto.AgentCreateResponse;
 import com.agentgate.agent.repository.AgentRepository;
 import com.agentgate.common.exception.AgentNotFoundException;
+import com.agentgate.common.exception.DuplicateAgentException;
 import com.agentgate.agent.dto.AgentResponse;
 import com.agentgate.risk.RiskLevel;
 import java.util.List;
@@ -18,6 +19,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
@@ -35,12 +37,28 @@ class AgentManagementServiceTest {
 
     @Test
     void createGeneratesApiKeyAndReturnsItOnlyOnce() {
-        when(agentRepository.save(any(Agent.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(agentRepository.saveAndFlush(any(Agent.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         AgentCreateResponse response = service.create(new AgentCreateRequest("new-agent", "New Agent"));
 
         assertThat(response.agentId()).isEqualTo("new-agent");
         assertThat(response.apiKey()).isNotBlank();
+    }
+
+    @Test
+    void createRejectsAnExistingAgentId() {
+        when(agentRepository.findByAgentId("mail-agent")).thenReturn(Optional.of(new Agent("mail-agent", "Mail", "h")));
+
+        assertThatThrownBy(() -> service.create(new AgentCreateRequest("mail-agent", "Mail")))
+                .isInstanceOf(DuplicateAgentException.class);
+    }
+
+    @Test
+    void createTurnsAConcurrentDuplicateIntoAConflict() {
+        when(agentRepository.saveAndFlush(any(Agent.class))).thenThrow(new DataIntegrityViolationException("unique"));
+
+        assertThatThrownBy(() -> service.create(new AgentCreateRequest("mail-agent", "Mail")))
+                .isInstanceOf(DuplicateAgentException.class);
     }
 
     @Test

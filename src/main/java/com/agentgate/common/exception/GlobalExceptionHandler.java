@@ -25,6 +25,11 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.NOT_FOUND, "AGENT_NOT_FOUND", ex.getMessage(), request);
     }
 
+    @ExceptionHandler(DuplicateAgentException.class)
+    public ResponseEntity<ErrorResponse> handleDuplicateAgent(DuplicateAgentException ex, HttpServletRequest request) {
+        return build(HttpStatus.CONFLICT, "AGENT_ALREADY_EXISTS", ex.getMessage(), request);
+    }
+
     @ExceptionHandler(AgentDefinitionNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleAgentDefinitionNotFound(AgentDefinitionNotFoundException ex,
                                                                        HttpServletRequest request) {
