@@ -40,7 +40,7 @@ public class SecurityConfig {
                         // Bundled frontend: static files and client-side routes; the UI logs in against the API.
                         .requestMatchers(HttpMethod.GET, "/", "/index.html", "/assets/**", "/favicon.ico",
                                 "/workflows", "/workflows/**", "/executions", "/executions/**", "/approvals",
-                                "/agents", "/agents/**").permitAll()
+                                "/agents", "/agents/**", "/tools").permitAll()
                         .anyRequest().denyAll()
                 );
         return http.build();
