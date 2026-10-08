@@ -486,6 +486,7 @@ agents, policies, risk_assessments, approval_requests, audit_logs
 workflows
 workflow_versions          # DSL 전체를 JSONB 컬럼으로 저장
 agent_definition_versions  # Agent 정의, 버전별 불변 JSONB
+mcp_servers                # AgentGate에 등록한 MCP 서버, 인증 헤더는 AES-256-GCM 암호화
 executions                 # agent_versions: 실행에 쓴 Agent 정의 버전
 node_executions
 langgraph checkpoints      # Runtime이 관리
@@ -516,8 +517,11 @@ HTTP 보고 + SSE로 처리한다. 동시 실행 부하가 생기면 그때 도�
 | 5. React Flow Builder + Execution Studio | GUI → DSL 저장 → 실행 → 상태/승인 UI | **MVP 완료** (19장 시나리오) |
 | 6. MCP | MCP Client를 Tool Executor에 추가 | MCP Tool이 AgentGate를 거쳐 실행 |
 | 7. Agent Definition (P1) | 버전 관리되는 Agent 정의, Tool 권한, tool-calling Agent, Tool Catalog, JSON 방식 / 출력 스키마, Agent 화면, Studio trace | GUI에서 정의한 Agent가 Tool을 고르고 호출마다 권한 → 정책 → 위험도 판정을 거쳐 실행 (완료) |
+| 8. Tool Registry (P2) | MCP 서버 레지스트리(암호화된 인증정보), Runtime의 등록 서버 사용, Tool 위험도 레지스트리, Tools 화면 | 화면에서 MCP 서버를 등록하면 Runtime 재시작 없이 Agent가 쓸 수 있고, Tool별 위험도를 목록에서 지정 (완료) |
 
-이후 단계 : P2 Tool Registry(도구별 기본 위험도, MCP 서버 인증정보), P3 Multi-Agent, P4 Memory(pgvector), P5 Observability(Langfuse / OpenTelemetry), 운영 필수 항목(RBAC, 승인 알림·만료, Flyway 마이그레이션, HTTPS, 설치 패키지).
+같은 기간에 정리한 운영 항목: 중복 Agent 등록 409, API Key 재발급, 거절·차단된 Tool 노드의 실행 중단(`STOPPED`), 외부 LLM 서버 배포 지원.
+
+이후 단계 : P3 Multi-Agent, P4 Memory(pgvector), P5 Observability(Langfuse / OpenTelemetry), 운영 필수 항목(RBAC, 승인 알림·만료, Flyway 마이그레이션, HTTPS, 설치 패키지).
 
 ---
 
@@ -588,4 +592,4 @@ Visual Workflow + LangGraph Runtime + Local LLM + Tool/MCP + Policy/Risk/HITL + 
 
 ## 21. 현재 상태
 
-Phase 1~7 완료. GUI에서 Agent를 정의하고(Tool·권한), 워크플로에 넣어 Local LLM으로 실행하면, Agent의 모든 Tool 호출이 Agent 이름으로 권한 → 정책 → 위험도 판정을 거쳐 실행·승인 대기·차단되고, 그 과정이 Execution Studio와 Audit Log에 남는다. 다음 단계는 17장의 이후 단계를 따른다.
+Phase 1~8 완료. GUI에서 Agent를 정의하고(Tool·권한), 워크플로에 넣어 Local LLM으로 실행하면, Agent의 모든 Tool 호출이 Agent 이름으로 권한 → 정책 → 위험도 판정을 거쳐 실행·승인 대기·차단되고, 그 과정이 Execution Studio와 Audit Log에 남는다. 다음 단계는 17장의 이후 단계를 따른다.

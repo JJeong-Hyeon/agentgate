@@ -123,7 +123,9 @@ scripts/deploy-runtime.sh <키페어.pem>
 
 ### MCP 서버 (선택)
 
-`MCP_TOOL` 노드를 쓰려면 `~/agentgate-runtime/mcp.json`(`mcpServers` 형식, [ARCHITECTURE 9장](ARCHITECTURE.md#9-tool--mcp))을 만들고 `.env`에 `MCP_CONFIG_PATH=/app/mcp.json`을 추가한 뒤, `compose.yaml`의 runtime 서비스에 `volumes: ['./mcp.json:/app/mcp.json:ro']`를 넣어 재배포한다. Runtime 이미지는 Python만 포함하므로 `npx` 같은 명령이 필요한 stdio 서버보다 `url`(Streamable HTTP) 서버를 권장한다.
+Streamable HTTP MCP 서버는 **UI의 Tools 화면(또는 `POST /api/v1/mcp-servers`)에서 등록하는 것을 권장**한다. 인증 헤더가 `AGENTGATE_SECRET_KEY`로 암호화되어 RDS에 저장되고, Runtime이 재시작 없이 30초 안에 반영한다. Runtime EC2(보안그룹)에서 해당 서버로 나가는 연결이 허용되어야 한다.
+
+stdio 서버(Runtime 호스트에서 명령을 실행)는 보안상 화면에서 등록할 수 없고 설정 파일로만 등록한다. `~/agentgate-runtime/mcp.json`(`mcpServers` 형식, [ARCHITECTURE 9장](ARCHITECTURE.md#9-tool--mcp))을 만들고 `.env`에 `MCP_CONFIG_PATH=/app/mcp.json`을 추가한 뒤, `compose.yaml`의 runtime 서비스에 `volumes: ['./mcp.json:/app/mcp.json:ro']`를 넣어 재배포한다. Runtime 이미지는 Python만 포함하므로 `npx` 같은 명령이 필요한 stdio 서버보다 `url`(Streamable HTTP) 서버를 권장한다.
 
 ## 4. 껐다 켜기
 

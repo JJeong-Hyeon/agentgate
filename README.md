@@ -73,6 +73,11 @@ AGENTGATE_RUNTIME_BASE_URL=http://localhost:8000 AGENTGATE_RUNTIME_TOKEN=dev-run
 
 MCP 도구를 쓰려면 `mcpServers` 형식의 설정 파일을 만들고 `MCP_CONFIG_PATH`로 지정합니다 (형식은 [ARCHITECTURE 9장](docs/ARCHITECTURE.md#9-tool--mcp)).
 
+### Tool 준비 (Tools 화면)
+
+1. **Tools** 화면 하단에서 MCP 서버(Streamable HTTP)를 등록합니다. 인증 헤더(API 토큰 등)는 암호화해 저장되고, Runtime은 재시작 없이 30초 안에 반영합니다. stdio 서버는 Runtime 설정 파일(`MCP_CONFIG_PATH`)로만 등록합니다.
+2. Tool 목록에서 Tool별 위험도(LOW / MEDIUM / HIGH / BLOCKED)를 정합니다. 정하지 않은 Tool은 기본값 HIGH(승인 필요)입니다. 서버가 알린 읽기 전용 / 파괴적 여부로 계산한 추천값을 확인 후 일괄 적용할 수 있습니다.
+
 ### Agent 사용 흐름
 
 1. **Agents** 화면에서 Agent를 등록하고 정의(시스템 프롬프트, 모델, 최대 단계, 출력 스키마)를 저장합니다.
@@ -99,7 +104,8 @@ pytest
 |---|---|---|
 | 행동 평가 | `POST /api/v1/actions` | Agent API Key (`X-API-Key`) 또는 Runtime 토큰 (`X-Runtime-Token`) |
 | Agent 관리 / 정의 | `/api/v1/agents`, `/api/v1/agents/{id}/definition` | 관리자 Basic Auth |
-| Tool 목록 | `GET /api/v1/tools` | 관리자 Basic Auth |
+| Tool 목록 / 위험도 | `GET /api/v1/tools`, `/api/v1/tool-risks` | 관리자 Basic Auth |
+| MCP 서버 | `/api/v1/mcp-servers` | 관리자 Basic Auth |
 | Workflow / Execution | `/api/v1/workflows`, `/api/v1/executions` | 관리자 Basic Auth |
 | Policy 관리 | `/api/v1/policies` | 관리자 Basic Auth |
 | 승인 | `/api/v1/approvals` | 관리자 Basic Auth |
