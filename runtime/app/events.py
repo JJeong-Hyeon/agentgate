@@ -11,6 +11,8 @@ from typing import Any
 import httpx
 from langgraph.graph.state import CompiledStateGraph
 
+from app.nodes.agent import agent_trace
+
 log = logging.getLogger(__name__)
 
 _MAX_OUTPUT_CHARS = 4000
@@ -66,7 +68,12 @@ def task_event(task: dict[str, Any]) -> dict[str, Any]:
     if task.get("interrupts"):
         value = task["interrupts"][0]["value"]
         return {**event, "type": "NODE_WAITING", "approvalId": value.get("approval_id")}
-    output = json.dumps(task.get("result"), default=str, ensure_ascii=False)
+    result = task.get("result")
+    if isinstance(result, dict) and "agent_runs" in result:
+        # Agent steps report a summary instead of the whole conversation.
+        trace = agent_trace(name, result)
+        result = {"agent": trace} if trace else {}
+    output = json.dumps(result, default=str, ensure_ascii=False)
     return {**event, "type": "NODE_COMPLETED", "output": output[:_MAX_OUTPUT_CHARS]}
 
 

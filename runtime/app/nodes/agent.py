@@ -337,3 +337,79 @@ def repair_note(problem: str, schema: dict) -> str:
         "Reply again with only a JSON value matching this JSON Schema:\n"
         f"{json.dumps(schema, ensure_ascii=False)}"
     )
+
+
+_TRACE_TEXT_CHARS = 1500
+
+
+def _clip(text: Any) -> str:
+    text = str(text)
+    return text if len(text) <= _TRACE_TEXT_CHARS else text[: _TRACE_TEXT_CHARS - 1] + "…"
+
+
+def agent_trace(step: str, update: dict) -> dict | None:
+    """A compact, display-ready summary of what one agent sub-step did, from the state update
+    it wrote (the full conversation is too large to report on every step).
+
+    Kinds: start, tool_calls, answer, repair, decision, result. None when the step wrote
+    nothing worth showing (e.g. the gate handing back to the model).
+    """
+    node_id, _, sub = step.partition(".")
+    run = (update.get("agent_runs") or {}).get(node_id)
+    if run is None:
+        return None
+    messages = run.get("messages", [])
+    results = update.get("tool_results") or []
+
+    if sub == "":
+        prompt = next((m.content for m in messages if isinstance(m, HumanMessage)), "")
+        return {"kind": "start", "prompt": _clip(prompt)}
+
+    if sub == "think":
+        reply = next((m for m in reversed(messages) if isinstance(m, AIMessage)), None)
+        if reply is None:
+            return None
+        trace: dict[str, Any] = {"step": run.get("steps")}
+        if reply.usage_metadata:
+            trace["tokens"] = {
+                "input": reply.usage_metadata.get("input_tokens"),
+                "output": reply.usage_metadata.get("output_tokens"),
+            }
+        if run.get("repairing"):
+            note = messages[-1].content if isinstance(messages[-1], HumanMessage) else ""
+            problem = _clip(note)
+            return {**trace, "kind": "repair", "answer": _clip(reply.content), "problem": problem}
+        if node_id in update:
+            # The agent answered (on its last turn, any tool calls it still made are ignored).
+            return {**trace, "kind": "answer", "answer": _clip(update[node_id])}
+        calls = [{"tool": c["name"], "arguments": c["args"]} for c in reply.tool_calls]
+        return {**trace, "kind": "tool_calls", "calls": calls}
+
+    if results:
+        # A call that finished in this step: denied at the gate or by an approver, or run.
+        result = results[-1]
+        told = messages[-1].content if messages and isinstance(messages[-1], ToolMessage) else ""
+        kind = "result" if result["status"] in ("EXECUTED", "FAILED") else "decision"
+        return {
+            "kind": kind,
+            "tool": result["tool"],
+            "status": result["status"],
+            "risk_level": result.get("risk_level"),
+            "basis": result.get("basis"),
+            "approval_id": result.get("approval_id"),
+            "content": _clip(told),
+        }
+
+    pending = run.get("pending")
+    if sub == "gate" and pending:
+        result = pending["result"]
+        return {
+            "kind": "decision",
+            "tool": result["tool"],
+            "status": result["status"],
+            "risk_level": result.get("risk_level"),
+            "basis": result.get("basis"),
+            "approval_id": result.get("approval_id"),
+            "arguments": pending["call"]["args"],
+        }
+    return None

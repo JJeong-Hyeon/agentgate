@@ -451,3 +451,81 @@ def test_answer_still_not_matching_after_repair_fails_the_node():
     with pytest.raises(AgentOutputError, match="'total' is a required property"):
         graph.invoke(state, CONFIG)
     assert "not valid JSON" in llm.log[1]["messages"][-1].content
+
+
+# --- Step traces reported to AgentGate ---
+
+
+def agent_outputs(graph, state, resume=None) -> list[tuple[str, dict]]:
+    from app.events import EventReporter, run_graph
+    from tests.fakes import FakeAgentGateEvents
+
+    sink = FakeAgentGateEvents()
+    reporter = EventReporter("http://agentgate", "token", httpx.MockTransport(sink))
+    run_graph(graph, state, CONFIG, reporter)
+    if resume:
+        run_graph(graph, Command(resume={"decision": resume}), CONFIG, reporter)
+    return [
+        (e["step"], json.loads(e["output"]))
+        for e in sink.events
+        if e["type"] == "NODE_COMPLETED" and e["nodeId"] == "helper"
+    ]
+
+
+def test_agent_steps_report_compact_traces():
+    call = calls(("local__add", {"a": 2, "b": 3}))
+    call.usage_metadata = {"input_tokens": 120, "output_tokens": 15, "total_tokens": 135}
+    llm = ScriptedChatModel.of(call, "2+3=5", "done")
+    graph, state = build(agent_workflow(), llm, PolicyGate(add="APPROVAL_REQUIRED"))
+
+    outputs = agent_outputs(graph, state, resume="APPROVED")
+
+    traces = [(step, out.get("agent")) for step, out in outputs]
+    assert traces[0] == ("helper", {"kind": "start", "prompt": "Task: add things"})
+    assert traces[1] == (
+        "helper.think",
+        {
+            "step": 1,
+            "tokens": {"input": 120, "output": 15},
+            "kind": "tool_calls",
+            "calls": [{"tool": "local__add", "arguments": {"a": 2, "b": 3}}],
+        },
+    )
+    assert traces[2] == (
+        "helper.gate",
+        {
+            "kind": "decision",
+            "tool": "helper:local/add",
+            "status": "APPROVAL_REQUIRED",
+            "risk_level": "HIGH",
+            "basis": "POLICY",
+            "approval_id": 101,
+            "arguments": {"a": 2, "b": 3},
+        },
+    )
+    steps = [step for step, _ in traces]
+    executed = traces[steps.index("helper.execute")][1]
+    assert executed["kind"] == "result"
+    assert executed["status"] == "EXECUTED"
+    assert executed["content"] == "5"
+    assert traces[-1] == ("helper.think", {"step": 2, "kind": "answer", "answer": "2+3=5"})
+    # Nothing in the reports is the raw conversation.
+    assert all("agent_runs" not in out for _, out in outputs)
+
+
+def test_denied_and_repaired_steps_are_traced():
+    llm = ScriptedChatModel.of(
+        calls(("local__echo", {"text": "x"})), '{"total": "x"}', '{"total": 1}', "done"
+    )
+    graph, state = build(agent_workflow(outputSchema=SCHEMA), llm, PolicyGate(echo="BLOCKED"))
+
+    traces = [out.get("agent") for _, out in agent_outputs(graph, state)]
+
+    denied = next(t for t in traces if t and t["kind"] == "decision")
+    assert denied["status"] == "BLOCKED"
+    assert denied["basis"] == "TOOL_NOT_GRANTED"
+    assert denied["content"].startswith("Blocked by governance policy")
+    repair = next(t for t in traces if t and t["kind"] == "repair")
+    assert repair["answer"] == '{"total": "x"}'
+    assert "is not of type 'integer'" in repair["problem"]
+    assert traces[-1]["answer"] == '{"total":1}'

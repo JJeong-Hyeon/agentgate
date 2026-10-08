@@ -657,3 +657,30 @@ fieldset.mode {
   display: grid;
   gap: 4px;
 }
+
+/* Agent steps in the execution studio */
+.agent-step {
+  display: grid;
+  gap: 4px;
+  margin-top: 4px;
+}
+.agent-step pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.agent-step ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 4px;
+}
+.agent-step-kind {
+  font-size: 12px;
+}
+.agent-versions {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
