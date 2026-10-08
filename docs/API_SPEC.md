@@ -8,11 +8,13 @@ Agent Runtime(LangGraph `agentgate_client` 등) 또는 외부 Agent가 AgentGate
 POST /api/v1/actions
 ```
 
-**헤더**
+**헤더** (둘 중 하나)
 ```
 Content-Type: application/json
-X-API-Key: <agent api key>
+X-API-Key: <agent api key>          # Agent가 자기 이름으로 호출할 때
+X-Runtime-Token: <runtime token>    # Agent Runtime: 등록된 어느 Agent의 이름으로든 평가 요청 가능
 ```
+둘 다 없거나 맞지 않으면 401 `INVALID_API_KEY`.
 
 **요청 바디**
 ```json
@@ -31,18 +33,21 @@ X-API-Key: <agent api key>
 - `requireApproval` (선택, boolean): `true`면 정책상 허용(`LOW`/`MEDIUM`)이어도 `APPROVAL_REQUIRED`로 승인 요청을 만든다. 정책상 `BLOCKED`는 그대로 차단
 - `reason` (선택, 최대 1000자): 승인 요청에 저장되어 승인자에게 표시되는 설명
 - `executionId` (선택, 최대 64자): Runtime 실행 ID(LangGraph `thread_id`). 승인 요청이 생성되면 함께 저장되어 승인 후 어떤 실행을 재개할지 식별하는 데 쓰임
+- `agentVersion` (선택, 양의 정수): Agent 정의 버전. 지정하면 그 정의의 Tool 권한을 정책보다 먼저 적용한다 (`action`은 `MCP:<server>:<tool>`로 정의의 Tool과 대응). 정의에 없는 Tool → `BLOCKED`, 권한 `BLOCKED` → `BLOCKED`, 권한 `APPROVAL` → 정책이 허용해도 `APPROVAL_REQUIRED`. Tool에 지정한 라벨은 `labels`와 합쳐 정책 매칭에 쓰인다. 없는 버전이면 404 `AGENT_DEFINITION_NOT_FOUND`
 
 **응답**
 ```json
 {
   "status": "APPROVAL_REQUIRED",
   "riskLevel": "HIGH",
-  "approvalId": 12
+  "approvalId": 12,
+  "basis": "POLICY"
 }
 ```
 - `status`: `ALLOWED` | `APPROVAL_REQUIRED` | `BLOCKED`
 - `riskLevel`: `LOW` | `MEDIUM` | `HIGH` | `BLOCKED` (`LOW`/`MEDIUM` → `ALLOWED`, `HIGH` → `APPROVAL_REQUIRED`, `BLOCKED` → `BLOCKED`)
 - `approvalId`: `status`가 `APPROVAL_REQUIRED`일 때만 값이 있고, 그 외엔 `null`
+- `basis`: 판정 근거. `POLICY`(정책·위험도), `AGENT_RISK_CAP`(Agent `maxRiskLevel` 초과), `TOOL_NOT_GRANTED`(정의에 없는 Tool), `TOOL_BLOCKED`(권한 차단), `TOOL_REQUIRES_APPROVAL`(권한상 항상 승인), `APPROVAL_REQUESTED`(`requireApproval`). Audit Log에도 같은 값이 남는다
 
 **주의**: `decision`, `approvalRequired`(boolean) 같은 필드는 없음 — `status` 값 하나로 전부 표현됨.
 
@@ -57,6 +62,53 @@ Content-Type: application/json
 ```
 
 응답에 `apiKey`가 평문으로 **한 번만** 내려옴 — 이 값을 1번 엔드포인트의 `X-API-Key`로 사용. 저장해두지 않으면 다시 조회 불가(재발급은 새 에이전트 등록으로).
+
+### Agent 정의 (관리자 인증 필요)
+
+```
+PUT  /api/v1/agents/{id}/definition                     새 버전 저장 → 201
+GET  /api/v1/agents/{id}/definition                     최신 버전 (없으면 404 AGENT_DEFINITION_NOT_FOUND)
+GET  /api/v1/agents/{id}/definition/versions            버전 목록 (definition 제외)
+GET  /api/v1/agents/{id}/definition/versions/{version}  해당 버전
+```
+
+```json
+{
+  "description": "Keeps team notes",
+  "systemPrompt": "You manage team notes with the tools you have.",
+  "model": null,
+  "temperature": null,
+  "tools": [
+    {"server": "notes", "tool": "save_note", "permission": "APPROVAL", "labels": ["INTERNAL"]},
+    {"server": "notes", "tool": "list_notes", "permission": "AUTO"}
+  ],
+  "maxSteps": 8,
+  "outputSchema": {"type": "object", "required": ["summary"]},
+  "toolCalling": "NATIVE"
+}
+```
+
+- `systemPrompt`, `tools` 필수. `permission`: `AUTO`(정책에 따름) / `APPROVAL`(항상 승인) / `BLOCKED`(차단)
+- `maxSteps` 1~50 (생략 시 8), `temperature` 0~2, `toolCalling` `NATIVE` / `JSON` / 생략(Runtime 기본값), `outputSchema`는 JSON 객체
+- 같은 Tool 중복, 형식 오류는 400 `VALIDATION_FAILED`
+- Agent 응답(`GET /api/v1/agents`)에 `description`, `latestDefinitionVersion`(정의 없으면 0) 포함
+
+### Tool 목록 (관리자 인증 필요)
+
+```
+GET /api/v1/tools?refresh=false
+```
+
+Runtime에 설정된 MCP 서버별 Tool 목록. `refresh=true`면 Runtime 캐시(60초)를 무시한다.
+
+```json
+[{"server": "notes", "transport": "url", "error": null,
+  "tools": [{"name": "save_note", "title": null, "description": "Save a note.",
+             "inputSchema": {"type": "object", "required": ["title", "content"], "properties": {...}},
+             "annotations": {"destructiveHint": true}}]}]
+```
+
+연결되지 않은 서버는 `error`에 사유가 담기고 `tools`는 빈 배열이다. Runtime이 없거나 응답하지 않으면 503 `RUNTIME_UNAVAILABLE`.
 
 ## 3. 승인 처리 (status가 APPROVAL_REQUIRED일 때, 관리자 인증 필요)
 
@@ -130,6 +182,8 @@ GET  /api/v1/workflows/{workflowId}/versions/{n}    해당 버전 dsl
 }
 ```
 
+- `AGENT` 노드의 `config.agentId` / `config.agentVersion` 참조도 검사한다. 없는 Agent, 정의가 없는 Agent, 없는 버전, 같은 Agent를 서로 다른 버전으로 고정한 경우 422 (`path`: `config.agentId`).
+
 ## 7. Execution (관리자 인증 필요)
 
 저장된 Workflow 버전을 Runtime에서 실행하고 진행 상황을 기록한다.
@@ -142,6 +196,8 @@ GET  /api/v1/executions/{executionId}/stream SSE: snapshot 1회 → update(event
 ```
 
 - `status`: `RUNNING` | `WAITING_APPROVAL`(`waitingApprovalId`) | `COMPLETED` | `FAILED`(`error`)
+- `agentVersions`: 실행에 쓴 Agent 정의 버전 (`{"note-agent": 3}`). 실행 시작 시점에 고정되며, Agent 참조를 쓸 수 없으면 실행을 만들지 않고 422
+- Agent 단계의 `output`은 요약 trace다: `{"agent": {"kind": "tool_calls" | "decision" | "result" | "answer" | ..., ...}}` (`ARCHITECTURE.md` 12장)
 - `nodes[]`: `nodeId`, `step`(Tool 하위 단계는 `report.approval` 형식), `status`(`RUNNING`/`WAITING`/`COMPLETED`/`FAILED`), `output`, `error`, `approvalId`, `startedAt`, `finishedAt`
 - 승인 대기 중인 실행은 `/api/v1/approvals/{waitingApprovalId}/approve|reject`로 결정하면 자동으로 재개된다.
 - Runtime이 응답하지 않으면 503 `RUNTIME_UNAVAILABLE` (실행은 `FAILED`로 기록), Runtime이 실행할 수 없는 DSL이면 422 `INVALID_WORKFLOW`.
