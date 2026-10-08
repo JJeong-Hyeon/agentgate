@@ -105,10 +105,12 @@ Parallel / Retry는 LangGraph 그래프로 컴파일해 처리한다. 장시간 
 |---|---|---|
 | Workflow | `START`, `END` | 시작(1개) / 종료(1개 이상) |
 | Workflow | `CONDITION` | 상태 값(`key`)에 따라 분기. 출력 edge label = `cases`의 label + `default` |
-| Agent | `LLM`, `AGENT` | LLM 호출. `AGENT`는 이후 Tool Calling이 추가될 노드 |
+| Agent | `LLM` | LLM 단일 호출 |
+| Agent | `AGENT` | `agentId`가 있으면 등록된 Agent 정의로 실행하는 **tool-calling Agent** (9장). 없으면 역할을 가진 LLM 단일 호출 |
 | Agent | `ROUTER` | LLM이 `routes` 중 하나를 선택. 출력 edge label = route |
 | Agent | `REVIEWER` | LLM 판정. 출력 edge label = `APPROVE` / `REVISE`, 재시도 횟수는 `maxRevisions` |
-| Tool | `HTTP_TOOL` | AgentGate 검사를 거치는 HTTP 호출 (`MCP_TOOL`은 Phase 6) |
+| Tool | `HTTP_TOOL` | AgentGate 검사를 거치는 HTTP 호출 |
+| Tool | `MCP_TOOL` | AgentGate 검사를 거치는 MCP 서버 도구 호출 (인자 고정) |
 | Governance | `APPROVAL` | 위험도와 무관하게 사람의 승인을 강제 |
 
 - **병렬**: 일반 노드에서 label 없는 edge를 여러 개 내보내면 병렬 실행된다 (별도 `PARALLEL` 노드 없음).
@@ -197,6 +199,8 @@ JSON Schema는 `GET /runtime/workflows/schema`로 제공한다 (프론트엔드 
 - DSL은 실행 상태의 `workflow` 키에 함께 저장되어, 조회·재개 시 checkpoint만으로 같은 그래프를 복원한다 (Runtime 재시작 후에도).
 - `REVIEWER`가 `maxRevisions`를 다 쓰고도 `REVISE`면 실행을 종료한다 (승인되지 않은 결과로 다음 단계를 진행하지 않음).
 - `ROUTER`는 LLM 응답에서 route 이름을 찾고, 없으면 첫 번째 route로 간다.
+- `AGENT` 노드의 `config.agentId`는 등록된 Agent를, `config.agentVersion`(선택)은 정의 버전을 고정한다. 이때 `system` / `model` / `temperature`는 정의가 정하므로 노드에 쓸 수 없다. 저장 시 AgentGate가 참조를 검사한다 (없는 Agent, 정의 없는 Agent, 없는 버전, 같은 Agent의 서로 다른 고정 버전 → 422).
+- 실행을 시작할 때 AgentGate가 각 Agent의 정의 버전을 고정해 DSL `agents`(`agentId → 정의 스냅샷`)에 넣어 Runtime에 보내고, 실행 기록에 `agentVersions`로 남긴다. 저장된 DSL에는 `agents`가 없다.
 - `APPROVAL` 노드는 AgentGate에 `requireApproval: true`로 승인 요청을 만든다. 정책상 허용이어도 승인을 기다리고, 정책상 `BLOCKED`면 차단된다. 승인 시 다음 단계로, 거절·차단·AgentGate 실패 시 실행을 종료하며 결과를 `state[노드id]`에 기록한다.
 
 ---
@@ -206,10 +210,13 @@ JSON Schema는 `GET /runtime/workflows/schema`로 제공한다 (프론트엔드 
 | 환경 | 경로 |
 |---|---|
 | 개발 | `LangGraph → LLM Gateway → Ollama → Qwen / Llama / Gemma` |
-| 운영 | `LangGraph → LLM Gateway → vLLM → Local Model` |
+| 운영 | `LangGraph → LLM Gateway → vLLM → Local Model` (예: NVIDIA DGX Spark) |
 
-- Ollama와 vLLM 모두 OpenAI 호환 API를 제공하므로 LLM Gateway는 base URL만 교체하는 Adapter로 시작한다.
-- 초기에는 **7B~14B급 Tool Calling 지원 모델**을 사용한다. 0.5B급 모델은 Tool Calling 품질이 낮아 연결 테스트 용도로만 쓴다.
+- Ollama와 vLLM 모두 OpenAI 호환 API를 제공하므로 LLM Gateway는 base URL만 교체하는 Adapter다 (`LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`).
+- Agent의 Tool 호출 방식은 두 가지다 (`LLM_TOOL_CALLING`, Agent 정의의 `toolCalling`으로 Agent별 지정 가능).
+  - `native`: OpenAI function calling. vLLM은 `--enable-auto-tool-choice --tool-call-parser <모델에 맞는 parser>`(Qwen 계열은 `hermes`)로 띄워야 한다.
+  - `json`: Tool 목록과 응답 형식을 프롬프트로 안내하고 모델의 JSON 응답을 호출로 해석한다. function calling을 지원하지 않는 서버/모델용.
+- Tool 호출 품질은 모델 크기에 크게 좌우된다. 3B급은 불필요한 호출을 반복하기 쉬워(로컬 확인 결과) 운영에는 **14B 이상 Tool Calling 지원 모델**을 권장한다. 반복 호출은 `maxSteps`와 거버넌스(승인)로 제한된다.
 
 ---
 
@@ -244,6 +251,39 @@ MCP:
 - 호출마다 세션을 새로 연다. 도구 오류(`isError`)나 연결 실패는 `FAILED`로 기록하고, 결과 텍스트는 `state[노드id]`에 저장한다.
 - 등록되지 않은 서버를 쓰는 워크플로는 실행 시작 시 거부된다(Runtime 설정 의존이라 저장 시 검증에서는 확인하지 않음).
 
+Tool Catalog (`app/tools/catalog.py`):
+
+- Runtime은 설정된 MCP 서버마다 `tools/list`로 Tool 이름, 설명, 입력 JSON Schema, annotations(`readOnlyHint` 등)를 조회한다 (`GET /runtime/tools`, AgentGate `GET /api/v1/tools`).
+- 결과는 서버별로 60초 캐시하고, 연결 실패한 서버는 오류만 보고한다(다른 서버 목록은 정상 반환, 오류는 캐시하지 않음).
+
+### Agent Definition / tool-calling Agent
+
+Agent는 거버넌스 신원(API Key, 정책, `maxRiskLevel`, Audit)과 **버전 관리되는 실행 정의**를 함께 가진다 (`PUT /api/v1/agents/{id}/definition`, 저장할 때마다 새 불변 버전).
+
+```text
+Agent Definition (v3)
+├── systemPrompt, model, temperature
+├── tools[]        server / tool / permission(AUTO | APPROVAL | BLOCKED) / labels
+├── maxSteps       LLM 턴 상한 (기본 8)
+├── outputSchema   최종 답변 JSON Schema (선택)
+└── toolCalling    NATIVE | JSON (선택, 기본은 Runtime 설정)
+```
+
+`AGENT` 노드(`agentId`)는 LangGraph 루프로 실행된다 (`app/nodes/agent.py`).
+
+```text
+<id> → <id>.think ─(tool calls)→ <id>.gate ─ALLOWED→ <id>.execute ─┐
+                 └─(answer)→ 다음 노드   ├─APPROVAL_REQUIRED→ <id>.approval (interrupt)
+                                         ├─BLOCKED/FAILED→ 사유를 LLM에 전달
+                                         └─(남은 호출 없음)→ <id>.think
+```
+
+- LLM에는 `BLOCKED`가 아닌 Tool만 `server__tool` 이름과 입력 스키마로 제공한다.
+- 호출마다 AgentGate에 **그 Agent 이름과 정의 버전으로**(`agentId`, `agentVersion`) 평가를 요청하고, 승인자에게는 "어떤 Agent가 어떤 Tool을 어떤 인자로" 호출하려는지 보여준다(`reason`).
+- 거절·차단·실패·알 수 없는 Tool은 사유를 Tool 결과로 LLM에 돌려줘 계속 진행하게 한다. `maxSteps` 마지막 턴에는 Tool 없이 최종 답변을 요구한다.
+- `outputSchema`가 있으면 최종 답변을 JSON으로 파싱해 검증하고, 맞지 않으면 한 번 다시 요청한 뒤 그래도 맞지 않으면 노드를 실패시킨다. 결과는 정규화된 JSON 문자열로 저장한다.
+- 실행을 시작할 때 Tool Catalog의 설명·스키마를 정의 스냅샷에 붙여 실행 상태에 저장하므로, 승인 대기 중 MCP 서버가 내려가도 재개 시 그래프를 복원할 수 있다. 사용할 수 없는 Tool이 있으면 실행 시작을 거부한다.
+
 ---
 
 ## 10. AgentGate Governance
@@ -265,6 +305,24 @@ Risk Assessment
 
 Agent별 `maxRiskLevel` 상한도 그대로 적용된다. 이 부분이 일반적인 LangGraph GUI와의
 핵심 차별점이다.
+
+Agent 정의의 Tool 권한은 정책 앞 단계에서 적용된다 (요청에 `agentVersion`이 있을 때).
+
+```text
+Tool Request (agentId, agentVersion)
+ ↓
+Permission ── 정의에 없는 Tool → BLOCKED (TOOL_NOT_GRANTED)
+ │         └─ BLOCKED          → BLOCKED (TOOL_BLOCKED)
+ ↓
+Policy → Risk ── maxRiskLevel 초과 → BLOCKED (AGENT_RISK_CAP)
+ ↓
+ALLOWED 이고 권한이 APPROVAL → APPROVAL_REQUIRED (TOOL_REQUIRES_APPROVAL)
+```
+
+- Tool에 지정한 라벨은 요청 라벨과 합쳐 정책 매칭에 쓰인다.
+- 판정 근거 `basis`(`POLICY`, `AGENT_RISK_CAP`, `TOOL_NOT_GRANTED`, `TOOL_BLOCKED`, `TOOL_REQUIRES_APPROVAL`, `APPROVAL_REQUESTED`)는 응답과 Audit Log에 남는다.
+- 정책이 없는 행동의 기본 위험도는 `HIGH`(승인 필요)다.
+- Runtime은 공유 토큰(`X-Runtime-Token`)으로 인증하는 신뢰된 호출자로, 등록된 어느 Agent의 이름으로든 평가를 요청할 수 있다. 워크플로 수준의 Tool / 승인 노드는 `AGENTGATE_AGENT_ID`(기본 `runtime-agent`)로 평가된다.
 
 ---
 
@@ -326,6 +384,7 @@ Node별 확인 항목:
 - Runtime은 LangGraph `tasks` 스트림으로 `NODE_STARTED` / `NODE_COMPLETED` / `NODE_WAITING` / `NODE_FAILED`, `EXECUTION_WAITING` / `EXECUTION_COMPLETED` / `EXECUTION_FAILED`를 `POST /api/v1/executions/{id}/events`(`X-Runtime-Token`)로 보고한다. 보고는 best effort이며 실패해도 실행은 계속된다.
 - Spring은 `executions` / `node_executions`에 기록하고 `GET /api/v1/executions/{id}/stream`(SSE)으로 `snapshot` 1회 후 `update` 이벤트를 보낸다.
 - 승인 대기로 멈췄다 재개된 단계는 같은 task id로 다시 실행되므로 같은 노드 기록이 갱신된다.
+- Agent 단계는 대화 전체 대신 요약 trace(`{"agent": {...}}`)를 출력으로 보고한다: `start`(작업), `tool_calls`(Tool·인자, 토큰 사용량), `decision`(상태·위험도·`basis`·승인 번호), `result`(Tool 결과), `answer` / `repair`(최종 답변, 형식 재요청). Studio는 이를 단계별로 표시하고 헤더에 사용한 Agent 정의 버전과 총 토큰 사용량을 보여준다.
 - SSE 구독자는 인스턴스 메모리에 있으므로 다중 인스턴스 운영 시 Redis Pub/Sub 등으로 확장이 필요하다.
 
 ---
@@ -336,8 +395,8 @@ Node별 확인 항목:
 
 | Plane | 도메인 |
 |---|---|
-| Control Plane (신규) | Workflow, Workflow Version, Execution, Model, Tool |
-| Governance Plane (기존) | Agent, Policy, Risk, Approval, Audit |
+| Control Plane | Workflow, Workflow Version, Execution, Agent Definition, Tool 목록 |
+| Governance Plane | Agent, Policy, Risk(Tool 권한 포함), Approval, Audit |
 
 API:
 
@@ -355,6 +414,8 @@ API:
 /api/v1/executions
 /api/v1/executions/{id}/stream   (SSE, UI 구독)
 /api/v1/executions/{id}/events   (Runtime → AgentGate 진행 이벤트)
+/api/v1/agents/{id}/definition   (Agent 정의 버전)
+/api/v1/tools                    (Runtime MCP 서버의 Tool 목록)
 ```
 
 기존 API 상세는 [`API_SPEC.md`](API_SPEC.md) 참고.
@@ -366,28 +427,19 @@ API:
 ```text
 runtime/
 ├── app/
-│   ├── main.py                 # FastAPI: 실행 / resume 엔드포인트
-│   ├── dsl/
-│   │   ├── schema.py
-│   │   └── validator.py
-│   ├── graph/
-│   │   ├── compiler.py         # DSL → StateGraph
-│   │   ├── state.py
-│   │   └── executor.py
-│   ├── nodes/
-│   │   ├── agent.py
-│   │   ├── llm.py
-│   │   ├── condition.py
-│   │   ├── tool.py
-│   │   └── approval.py
-│   ├── llm/
-│   │   ├── base.py
-│   │   └── openai_compat.py    # Ollama / vLLM 공용
-│   ├── tools/
-│   │   ├── http.py
-│   │   └── mcp_client.py       # Phase 6
-│   └── governance/
-│       └── agentgate_client.py
+│   ├── main.py                 # FastAPI 앱 기동 (checkpointer, compiler, runner, catalog)
+│   ├── executions.py           # 실행 / 조회 / resume API
+│   ├── workflows.py            # DSL 검증 / JSON Schema API
+│   ├── tools_api.py            # Tool 목록 API
+│   ├── events.py               # tasks 스트림 → AgentGate 이벤트 보고 (Agent 단계는 요약 trace)
+│   ├── runner.py               # 실행별 그래프 복원
+│   ├── agents/resolve.py       # 실행 시작 시 Agent Tool 스키마 첨부
+│   ├── dsl/                    # schema.py · validator.py · compiler.py
+│   ├── nodes/                  # agent.py (tool-calling 루프) · tool.py · approval.py
+│   ├── tools/                  # base.py (GovernedTool) · http.py · mcp.py · catalog.py
+│   ├── governance/agentgate_client.py
+│   ├── llm/gateway.py          # Ollama / vLLM 공용 (OpenAI 호환)
+│   └── graph/checkpointer.py
 └── Dockerfile
 ```
 
@@ -428,12 +480,11 @@ agents, policies, risk_assessments, approval_requests, audit_logs
 
 # 신규
 workflows
-workflow_versions     # DSL 전체를 JSONB 컬럼으로 저장
-executions
+workflow_versions          # DSL 전체를 JSONB 컬럼으로 저장
+agent_definition_versions  # Agent 정의, 버전별 불변 JSONB
+executions                 # agent_versions: 실행에 쓴 Agent 정의 버전
 node_executions
-model_configs
-tool_configs
-langgraph checkpoints # Runtime이 관리
+langgraph checkpoints      # Runtime이 관리
 ```
 
 Node/Edge는 별도 테이블로 정규화하지 않고 `workflow_versions.dsl`(JSONB)에 저장한다.
@@ -460,10 +511,9 @@ HTTP 보고 + SSE로 처리한다. 동시 실행 부하가 생기면 그때 도�
 | 4. Workflow DSL | DSL 스키마, Validator, Compiler | JSON DSL로 Phase 3 그래프 재현 |
 | 5. React Flow Builder + Execution Studio | GUI → DSL 저장 → 실행 → 상태/승인 UI | **MVP 완료** (19장 시나리오) |
 | 6. MCP | MCP Client를 Tool Executor에 추가 | MCP Tool이 AgentGate를 거쳐 실행 |
-| 7. 고도화 | 필요 시 선택 | — |
+| 7. Agent Definition (P1) | 버전 관리되는 Agent 정의, Tool 권한, tool-calling Agent, Tool Catalog, JSON 방식 / 출력 스키마, Agent 화면, Studio trace | GUI에서 정의한 Agent가 Tool을 고르고 호출마다 권한 → 정책 → 위험도 판정을 거쳐 실행 (완료) |
 
-Phase 7 후보: RAG, pgvector, Memory, Retry/Timeout 고도화, Scheduler, Langfuse,
-OpenTelemetry, vLLM 운영 전환, A2A, Temporal.
+이후 단계 : P2 Tool Registry(도구별 기본 위험도, MCP 서버 인증정보), P3 Multi-Agent, P4 Memory(pgvector), P5 Observability(Langfuse / OpenTelemetry), 운영 필수 항목(RBAC, 승인 알림·만료, Flyway 마이그레이션, HTTPS, 설치 패키지).
 
 ---
 
@@ -532,17 +582,6 @@ Visual Workflow + LangGraph Runtime + Local LLM + Tool/MCP + Policy/Risk/HITL + 
 
 ---
 
-## 21. 지금 바로 할 일
+## 21. 현재 상태
 
-1. 기존 Spring Boot Governance 기능은 건드리지 않는다
-2. `runtime/` 생성 (Python + LangGraph + FastAPI)
-3. LLM Gateway(OpenAI 호환) + Ollama + Qwen 연결
-4. `Planner → Researcher → Reviewer` 그래프 실행
-5. HTTP Tool + `agentgate_client`로 `/api/v1/actions` 연동
-6. interrupt / resume 콜백 구현, `ALLOWED / APPROVAL_REQUIRED / BLOCKED` 확인
-7. Workflow DSL 스키마 / Compiler
-8. React Flow Builder + Execution Studio
-9. MCP 추가
-10. 이후 RAG / Memory / Observability 선택적 확장
-
-**가장 먼저 구현할 것은 GUI가 아니라 `LangGraph → Local LLM → AgentGate`의 실제 실행 경로다.**
+Phase 1~7 완료. GUI에서 Agent를 정의하고(Tool·권한), 워크플로에 넣어 Local LLM으로 실행하면, Agent의 모든 Tool 호출이 Agent 이름으로 권한 → 정책 → 위험도 판정을 거쳐 실행·승인 대기·차단되고, 그 과정이 Execution Studio와 Audit Log에 남는다. 다음 단계는 17장의 이후 단계를 따른다.

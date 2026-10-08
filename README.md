@@ -73,6 +73,15 @@ AGENTGATE_RUNTIME_BASE_URL=http://localhost:8000 AGENTGATE_RUNTIME_TOKEN=dev-run
 
 MCP 도구를 쓰려면 `mcpServers` 형식의 설정 파일을 만들고 `MCP_CONFIG_PATH`로 지정합니다 (형식은 [ARCHITECTURE 9장](docs/ARCHITECTURE.md#9-tool--mcp)).
 
+### Agent 사용 흐름
+
+1. **Agents** 화면에서 Agent를 등록하고 정의(시스템 프롬프트, 모델, 최대 단계, 출력 스키마)를 저장합니다.
+2. 같은 화면에서 Runtime의 MCP 서버가 제공하는 Tool을 고르고 Tool마다 권한(자동 / 항상 승인 / 차단)을 지정합니다.
+3. Builder에서 Agent 노드를 추가해 "등록된 Agent"를 고르고 작업 프롬프트를 적습니다 (정의 버전 고정 가능).
+4. 실행하면 Agent가 Tool을 골라 호출하고, 호출마다 AgentGate가 그 Agent 이름으로 **권한 → 정책 → 위험도**를 판정합니다. 승인이 필요하면 멈추고, 승인 후 이어서 실행합니다. 과정은 Execution Studio에 단계별로 표시됩니다.
+
+모델 서버가 function calling을 지원하지 않으면 `LLM_TOOL_CALLING=json`(또는 Agent 정의의 Tool 호출 방식 `JSON`)을 사용합니다.
+
 로컬에서 직접 실행할 때는 Python 3.12 이상이 필요합니다.
 
 ```bash
@@ -88,13 +97,15 @@ pytest
 
 | 영역 | 엔드포인트 | 인증 |
 |---|---|---|
-| 행동 평가 | `POST /api/v1/actions` | Agent API Key (`X-API-Key`) |
-| Agent 관리 | `/api/v1/agents` | 관리자 Basic Auth |
+| 행동 평가 | `POST /api/v1/actions` | Agent API Key (`X-API-Key`) 또는 Runtime 토큰 (`X-Runtime-Token`) |
+| Agent 관리 / 정의 | `/api/v1/agents`, `/api/v1/agents/{id}/definition` | 관리자 Basic Auth |
+| Tool 목록 | `GET /api/v1/tools` | 관리자 Basic Auth |
+| Workflow / Execution | `/api/v1/workflows`, `/api/v1/executions` | 관리자 Basic Auth |
 | Policy 관리 | `/api/v1/policies` | 관리자 Basic Auth |
 | 승인 | `/api/v1/approvals` | 관리자 Basic Auth |
 | 감사 로그 | `/api/v1/audit-logs` | 관리자 Basic Auth |
 
-자세한 요청/응답 형식은 [`docs/AGENTGATE_PLAN.md`](docs/AGENTGATE_PLAN.md)를 참고하세요.
+자세한 요청/응답 형식은 [`docs/API_SPEC.md`](docs/API_SPEC.md)를 참고하세요.
 
 ## 프로젝트 구조
 
