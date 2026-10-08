@@ -58,7 +58,7 @@ class AgentControllerTest {
     @Test
     void restrictReturnsUpdatedAgent() throws Exception {
         when(agentManagementService.restrict(eq(1L), eq(RiskLevel.MEDIUM)))
-                .thenReturn(new AgentResponse(1L, "mail-agent", "Mail Agent", null, RiskLevel.MEDIUM, 0, Instant.now()));
+                .thenReturn(new AgentResponse(1L, "mail-agent", "Mail Agent", null, RiskLevel.MEDIUM, 0, null, Instant.now()));
         String body = """
                 {"maxRiskLevel":"MEDIUM"}
                 """;

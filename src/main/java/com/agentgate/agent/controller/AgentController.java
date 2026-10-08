@@ -4,6 +4,7 @@ import com.agentgate.agent.dto.AgentCreateRequest;
 import com.agentgate.agent.dto.AgentCreateResponse;
 import com.agentgate.agent.dto.AgentRestrictionRequest;
 import com.agentgate.agent.dto.AgentResponse;
+import com.agentgate.agent.dto.ApiKeyResponse;
 import com.agentgate.agent.service.AgentManagementService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -38,6 +39,12 @@ public class AgentController {
     @GetMapping("/{id}")
     public ResponseEntity<AgentResponse> get(@PathVariable Long id) {
         return ResponseEntity.ok(agentManagementService.get(id));
+    }
+
+    /** Issues a new API key for the agent; the old one stops working. The new key is shown only in this response. */
+    @PostMapping("/{id}/api-key")
+    public ResponseEntity<ApiKeyResponse> reissueApiKey(@PathVariable Long id) {
+        return ResponseEntity.ok(agentManagementService.reissueApiKey(id));
     }
 
     @PutMapping("/{id}/max-risk-level")

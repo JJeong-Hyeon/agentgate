@@ -7,6 +7,7 @@ import type {
   Approval,
   CreatedAgent,
   Execution,
+  IssuedApiKey,
   McpServerTools,
   WorkflowDsl,
   WorkflowSummary,
@@ -134,6 +135,11 @@ export class AgentGateClient {
 
   createAgent(agentId: string, name: string): Promise<CreatedAgent> {
     return this.request("/api/v1/agents", { method: "POST", body: JSON.stringify({ agentId, name }) });
+  }
+
+  /** Issues a new API key; the old one stops working at once. */
+  reissueApiKey(id: number): Promise<IssuedApiKey> {
+    return this.request(`/api/v1/agents/${id}/api-key`, { method: "POST" });
   }
 
   /** The latest definition, or null when none has been saved yet. */

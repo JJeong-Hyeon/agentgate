@@ -50,6 +50,9 @@ public class Agent {
 
     private Instant createdAt;
 
+    // When the current API key was issued; null for keys issued before this was recorded.
+    private Instant apiKeyIssuedAt;
+
     public Agent(String agentId, String name, String apiKeyHash) {
         this.agentId = agentId;
         this.name = name;
@@ -59,6 +62,13 @@ public class Agent {
     @PrePersist
     void onCreate() {
         this.createdAt = Instant.now();
+        this.apiKeyIssuedAt = this.createdAt;
+    }
+
+    /** Replaces the API key; the previous one stops working at once. */
+    public void reissueApiKey(String apiKeyHash, Instant at) {
+        this.apiKeyHash = apiKeyHash;
+        this.apiKeyIssuedAt = at;
     }
 
     public void restrictTo(RiskLevel maxRiskLevel) {
