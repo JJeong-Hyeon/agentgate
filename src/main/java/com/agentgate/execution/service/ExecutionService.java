@@ -1,5 +1,7 @@
 package com.agentgate.execution.service;
 
+import com.agentgate.agent.service.AgentResolver;
+import com.agentgate.agent.service.AgentResolver.ResolvedAgents;
 import com.agentgate.common.exception.ExecutionNotFoundException;
 import com.agentgate.execution.domain.Execution;
 import com.agentgate.execution.domain.NodeExecution;
@@ -20,6 +22,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 @Service
 public class ExecutionService {
@@ -28,29 +32,41 @@ public class ExecutionService {
     private final NodeExecutionRepository nodeExecutionRepository;
     private final WorkflowService workflowService;
     private final RuntimeClient runtimeClient;
+    private final AgentResolver agentResolver;
+    private final ObjectMapper objectMapper;
     private final TransactionTemplate transactionTemplate;
 
     public ExecutionService(ExecutionRepository executionRepository, NodeExecutionRepository nodeExecutionRepository,
                             WorkflowService workflowService, RuntimeClient runtimeClient,
+                            AgentResolver agentResolver, ObjectMapper objectMapper,
                             PlatformTransactionManager transactionManager) {
         this.executionRepository = executionRepository;
         this.nodeExecutionRepository = nodeExecutionRepository;
         this.workflowService = workflowService;
         this.runtimeClient = runtimeClient;
+        this.agentResolver = agentResolver;
+        this.objectMapper = objectMapper;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
     /**
      * Records the execution, then asks the runtime to run it. The record is committed first so the runtime's
-     * progress events always find it.
+     * progress events always find it. The agent definitions the workflow's AGENT nodes refer to are pinned
+     * now: their snapshots go to the runtime with the workflow and their versions are recorded.
      */
     public ExecutionResponse start(ExecutionStartRequest request) {
         WorkflowVersionResponse workflow = workflowService.resolve(request.workflowId(), request.version());
+        ResolvedAgents agents = agentResolver.resolve(workflow.dsl());
+        ObjectNode dsl = ((ObjectNode) workflow.dsl()).deepCopy();
+        if (!agents.versions().isEmpty()) {
+            dsl.set("agents", agents.snapshots());
+        }
+        String agentVersions = agents.versions().isEmpty() ? null : objectMapper.writeValueAsString(agents.versions());
         String executionId = UUID.randomUUID().toString();
         transactionTemplate.executeWithoutResult(status -> executionRepository.save(
-                new Execution(executionId, workflow.workflowId(), workflow.version(), request.task())));
+                new Execution(executionId, workflow.workflowId(), workflow.version(), request.task(), agentVersions)));
         try {
-            runtimeClient.startExecution(executionId, request.task(), workflow.dsl());
+            runtimeClient.startExecution(executionId, request.task(), dsl);
         } catch (RuntimeException e) {
             transactionTemplate.executeWithoutResult(status ->
                     findOrThrow(executionId).failed(e.getMessage(), Instant.now()));

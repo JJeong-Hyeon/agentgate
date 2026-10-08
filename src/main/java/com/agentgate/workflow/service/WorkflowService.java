@@ -1,5 +1,6 @@
 package com.agentgate.workflow.service;
 
+import com.agentgate.agent.service.AgentResolver;
 import com.agentgate.common.exception.DuplicateWorkflowException;
 import com.agentgate.common.exception.InvalidWorkflowException;
 import com.agentgate.common.exception.WorkflowNotFoundException;
@@ -27,6 +28,7 @@ public class WorkflowService {
     private final WorkflowRepository workflowRepository;
     private final WorkflowVersionRepository workflowVersionRepository;
     private final RuntimeClient runtimeClient;
+    private final AgentResolver agentResolver;
     private final ObjectMapper objectMapper;
 
     @Transactional
@@ -98,6 +100,10 @@ public class WorkflowService {
         WorkflowValidation validation = runtimeClient.validateWorkflow(stamped);
         if (!validation.valid()) {
             throw new InvalidWorkflowException("Workflow DSL is invalid", validation.errors());
+        }
+        List<WorkflowValidation.Issue> agentIssues = agentResolver.check(stamped);
+        if (!agentIssues.isEmpty()) {
+            throw new InvalidWorkflowException("Workflow refers to agents that cannot run", agentIssues);
         }
         workflowVersionRepository.save(new WorkflowVersion(workflow, version, objectMapper.writeValueAsString(stamped)));
         return stamped;

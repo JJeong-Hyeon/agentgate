@@ -41,8 +41,12 @@ class Handler(BaseHTTPRequestHandler):
         body = self._body()
         if self.path == "/v1/chat/completions":
             system = next((m["content"] for m in body["messages"] if m["role"] == "system"), "")
+            model = body.get("model", "fake-model")
+            if "You are a tool agent" in system:
+                self._send(200, tool_agent_turn(model, body))
+                return
             role = next(r for r in REPLIES if f"You are a {r}" in system or f"strict {r}" in system)
-            self._send(200, completion(body.get("model", "fake-model"), REPLIES[role]))
+            self._send(200, completion(model, REPLIES[role]))
         elif self.path == "/report":
             reports.append(body)
             self._send(200, {"ok": True})
@@ -53,7 +57,26 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
 
-def completion(model: str, content: str) -> dict:
+def tool_agent_turn(model: str, body: dict) -> dict:
+    """Calls the offered `add` tool once, then answers with what the tool returned."""
+    last = body["messages"][-1]
+    if last["role"] == "tool":
+        return completion(model, f"Agent result: {last['content']}")
+    add = next(
+        t["function"]["name"] for t in body["tools"] if t["function"]["name"].endswith("add")
+    )
+    call = {
+        "id": "call-add",
+        "type": "function",
+        "function": {"name": add, "arguments": '{"a": 2, "b": 3}'},
+    }
+    reply = completion(model, None)
+    reply["choices"][0]["message"]["tool_calls"] = [call]
+    reply["choices"][0]["finish_reason"] = "tool_calls"
+    return reply
+
+
+def completion(model: str, content: str | None) -> dict:
     return {
         "id": "chatcmpl-e2e",
         "object": "chat.completion",
