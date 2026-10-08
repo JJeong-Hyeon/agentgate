@@ -63,6 +63,10 @@ public class ApprovalRequest {
     @Column(length = 1000)
     private String reason;
 
+    // Agents that delegated this work, outermost first; null when the agent acted on its own.
+    @Column(length = 500)
+    private String delegatedBy;
+
     public ApprovalRequest(String agentId, String action, String target, List<String> labels, RiskLevel riskLevel) {
         this(agentId, action, target, labels, riskLevel, null);
     }
@@ -70,6 +74,12 @@ public class ApprovalRequest {
     public ApprovalRequest(String agentId, String action, String target, List<String> labels, RiskLevel riskLevel,
                            String executionId) {
         this(agentId, action, target, labels, riskLevel, executionId, null);
+    }
+
+    public ApprovalRequest(String agentId, String action, String target, List<String> labels, RiskLevel riskLevel,
+                           String executionId, String reason, String delegatedBy) {
+        this(agentId, action, target, labels, riskLevel, executionId, reason);
+        this.delegatedBy = delegatedBy;
     }
 
     public ApprovalRequest(String agentId, String action, String target, List<String> labels, RiskLevel riskLevel,

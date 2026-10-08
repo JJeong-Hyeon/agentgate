@@ -98,7 +98,7 @@ class AgentActionServiceTest {
         assertThat(response.status()).isEqualTo(ActionStatus.ALLOWED);
         assertThat(response.riskLevel()).isEqualTo(RiskLevel.LOW);
         assertThat(response.approvalId()).isNull();
-        verify(approvalService, never()).createRequest(anyString(), anyString(), any(), any(), any(), any(), any());
+        verify(approvalService, never()).createRequest(anyString(), anyString(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -109,7 +109,7 @@ class AgentActionServiceTest {
                 .thenReturn(new RiskEvaluationResult(RiskLevel.HIGH, ActionStatus.APPROVAL_REQUIRED));
         ApprovalRequest created = new ApprovalRequest("mail-agent", "SEND_EMAIL", null, List.of("PII"), RiskLevel.HIGH);
         setId(created, 42L);
-        when(approvalService.createRequest(eq("mail-agent"), eq("SEND_EMAIL"), any(), eq(List.of("PII")), eq(RiskLevel.HIGH), any(), any()))
+        when(approvalService.createRequest(eq("mail-agent"), eq("SEND_EMAIL"), any(), eq(List.of("PII")), eq(RiskLevel.HIGH), any(), any(), any()))
                 .thenReturn(created);
 
         ActionRequest request = new ActionRequest("mail-agent", "SEND_EMAIL", null, List.of("PII"));
@@ -135,7 +135,7 @@ class AgentActionServiceTest {
         assertThat(response.status()).isEqualTo(ActionStatus.BLOCKED);
         assertThat(response.riskLevel()).isEqualTo(RiskLevel.BLOCKED);
         assertThat(response.approvalId()).isNull();
-        verify(approvalService, never()).createRequest(anyString(), anyString(), any(), any(), any(), any(), any());
+        verify(approvalService, never()).createRequest(anyString(), anyString(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -178,7 +178,7 @@ class AgentActionServiceTest {
         assertThat(response.basis()).isEqualTo(DecisionBasis.TOOL_NOT_GRANTED);
         verify(riskEvaluationService, never()).evaluate(anyString(), any());
         verify(auditLogService).record(eq("mail-agent"), eq("MCP:notes:delete_note"), any(), any(),
-                eq(RiskLevel.BLOCKED), eq(ActionStatus.BLOCKED), any(), eq(DecisionBasis.TOOL_NOT_GRANTED));
+                eq(RiskLevel.BLOCKED), eq(ActionStatus.BLOCKED), any(), eq(DecisionBasis.TOOL_NOT_GRANTED), any());
     }
 
     @Test
@@ -198,7 +198,7 @@ class AgentActionServiceTest {
                 .thenReturn(new RiskEvaluationResult(RiskLevel.LOW, ActionStatus.ALLOWED));
         ApprovalRequest created = new ApprovalRequest("mail-agent", "MCP:notes:save_note", null, List.of(), RiskLevel.LOW);
         setId(created, 7L);
-        when(approvalService.createRequest(any(), any(), any(), any(), any(), any(), any())).thenReturn(created);
+        when(approvalService.createRequest(any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(created);
 
         ActionResponse response = service.evaluate(toolCall(agent, "MCP:notes:save_note"), null, true);
 
@@ -214,7 +214,7 @@ class AgentActionServiceTest {
                 .thenReturn(new RiskEvaluationResult(RiskLevel.BLOCKED, ActionStatus.BLOCKED));
 
         ActionRequest request = new ActionRequest("mail-agent", "MCP:crm:export", null, List.of("EXTERNAL"),
-                null, null, null, 2);
+                null, null, null, 2, null);
         ActionResponse response = service.evaluate(request, null, true);
 
         assertThat(response.status()).isEqualTo(ActionStatus.BLOCKED);
@@ -238,12 +238,12 @@ class AgentActionServiceTest {
         Agent agent = new Agent("mail-agent", "Mail Agent", ApiKeyGenerator.hash(API_KEY));
         when(agentRepository.findByAgentId("mail-agent")).thenReturn(Optional.of(agent));
         when(agentDefinitionService.definition(agent, 2)).thenReturn(
-                new AgentDefinition(null, null, null, "prompt", List.of(tools), 8, null, null));
+                new AgentDefinition(null, null, null, "prompt", List.of(tools), 8, null, null, null));
         return agent;
     }
 
     private static ActionRequest toolCall(Agent agent, String action) {
-        return new ActionRequest(agent.getAgentId(), action, null, List.of(), "exec-1", null, null, 2);
+        return new ActionRequest(agent.getAgentId(), action, null, List.of(), "exec-1", null, null, 2, null);
     }
 
     private static void setId(ApprovalRequest approvalRequest, Long id) {

@@ -22,9 +22,9 @@ public class ApprovalService {
 
     @Transactional
     public ApprovalRequest createRequest(String agentId, String action, String target, List<String> labels, RiskLevel riskLevel,
-                                         String executionId, String reason) {
+                                         String executionId, String reason, String delegatedBy) {
         ApprovalRequest approvalRequest = new ApprovalRequest(agentId, action, target, labels, riskLevel, executionId,
-                reason);
+                reason, delegatedBy);
         return approvalRequestRepository.save(approvalRequest);
     }
 

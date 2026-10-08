@@ -17,6 +17,7 @@ public record AuditLogResponse(
         ActionStatus status,
         Long approvalId,
         DecisionBasis basis,
+        String delegatedBy,
         Instant createdAt
 ) {
     public static AuditLogResponse from(AuditLog auditLog) {
@@ -30,6 +31,7 @@ public record AuditLogResponse(
                 auditLog.getStatus(),
                 auditLog.getApprovalId(),
                 auditLog.getBasis(),
+                auditLog.getDelegatedBy(),
                 auditLog.getCreatedAt()
         );
     }

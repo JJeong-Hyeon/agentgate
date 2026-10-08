@@ -2,6 +2,7 @@ package com.agentgate.agent.service;
 
 import com.agentgate.agent.domain.Agent;
 import com.agentgate.agent.dto.AgentDefinition;
+import com.agentgate.agent.dto.AgentDelegateDefinition;
 import com.agentgate.agent.repository.AgentRepository;
 import com.agentgate.common.exception.AgentDefinitionNotFoundException;
 import com.agentgate.common.exception.InvalidWorkflowException;
@@ -56,6 +57,7 @@ public class AgentResolver {
         if (!issues.isEmpty()) {
             throw new InvalidWorkflowException("Workflow refers to agents that cannot run", issues);
         }
+        addDelegates(picked);
         ObjectNode snapshots = objectMapper.createObjectNode();
         Map<String, Integer> versions = new LinkedHashMap<>();
         picked.forEach((agentId, found) -> {
@@ -104,6 +106,37 @@ public class AgentResolver {
             }
         });
         return picked;
+    }
+
+    /**
+     * Adds the agents the picked ones may delegate to (their latest definitions), transitively.
+     * Delegation cycles and depth were checked when the definitions were saved; a guard stops
+     * here too in case definitions changed in a way that bypassed that.
+     */
+    private void addDelegates(Map<String, AgentDefinitionWithVersion> picked) {
+        List<String> pending = new ArrayList<>(picked.keySet());
+        int guard = 0;
+        while (!pending.isEmpty()) {
+            String agentId = pending.remove(0);
+            List<AgentDelegateDefinition> delegates = picked.get(agentId).definition().delegates();
+            for (AgentDelegateDefinition delegate : delegates == null ? List.<AgentDelegateDefinition>of() : delegates) {
+                if (picked.containsKey(delegate.agentId())) {
+                    continue;
+                }
+                Agent agent = agentRepository.findByAgentId(delegate.agentId())
+                        .filter(a -> a.getLatestDefinitionVersion() > 0)
+                        .orElseThrow(() -> new InvalidWorkflowException(
+                                "Agent '%s' delegates to '%s', which cannot run".formatted(agentId, delegate.agentId()),
+                                List.of()));
+                int version = agent.getLatestDefinitionVersion();
+                picked.put(delegate.agentId(),
+                        new AgentDefinitionWithVersion(version, agentDefinitionService.definition(agent, version)));
+                pending.add(delegate.agentId());
+                if (++guard > 100) {
+                    throw new InvalidWorkflowException("Agent delegation graph is too large", List.of());
+                }
+            }
+        }
     }
 
     private static List<Reference> references(JsonNode dsl) {

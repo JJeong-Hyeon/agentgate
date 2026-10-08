@@ -4,7 +4,7 @@ import com.agentgate.agent.domain.Agent;
 import com.agentgate.agent.domain.ToolPermission;
 import com.agentgate.agent.dto.ActionRequest;
 import com.agentgate.agent.dto.ActionResponse;
-import com.agentgate.agent.dto.AgentToolDefinition;
+import com.agentgate.agent.dto.AgentDefinition;
 import com.agentgate.agent.repository.AgentRepository;
 import com.agentgate.approval.domain.ApprovalRequest;
 import com.agentgate.approval.service.ApprovalService;
@@ -54,8 +54,8 @@ public class AgentActionService {
             throw new InvalidApiKeyException();
         }
 
-        Optional<AgentToolDefinition> tool = (request.agentVersion() == null) ? Optional.empty()
-                : findTool(agent, request.agentVersion(), request.action());
+        Optional<Grant> tool = (request.agentVersion() == null) ? Optional.empty()
+                : findGrant(agent, request.agentVersion(), request.action());
         List<String> labels = tool.map(t -> merge(request.labels(), t.labels())).orElse(request.labels());
         Decision decision = decide(agent, request, tool, labels);
 
@@ -63,17 +63,17 @@ public class AgentActionService {
         if (decision.status() == ActionStatus.APPROVAL_REQUIRED) {
             ApprovalRequest approvalRequest = approvalService.createRequest(
                     request.agentId(), request.action(), request.target(), labels, decision.riskLevel(),
-                    request.executionId(), request.reason());
+                    request.executionId(), request.reason(), request.delegatedBy());
             approvalId = approvalRequest.getId();
         }
 
         auditLogService.record(request.agentId(), request.action(), request.target(), labels,
-                decision.riskLevel(), decision.status(), approvalId, decision.basis());
+                decision.riskLevel(), decision.status(), approvalId, decision.basis(), request.delegatedBy());
 
         return new ActionResponse(decision.status(), decision.riskLevel(), approvalId, decision.basis());
     }
 
-    private Decision decide(Agent agent, ActionRequest request, Optional<AgentToolDefinition> tool,
+    private Decision decide(Agent agent, ActionRequest request, Optional<Grant> tool,
                             List<String> labels) {
         if (request.agentVersion() != null) {
             if (tool.isEmpty()) {
@@ -100,10 +100,23 @@ public class AgentActionService {
         return new Decision(policy.riskLevel(), policy.status(), DecisionBasis.POLICY);
     }
 
-    private Optional<AgentToolDefinition> findTool(Agent agent, int version, String action) {
-        return agentDefinitionService.definition(agent, version).tools().stream()
+    /** What the definition allows for the action: one of its tools, or a delegation to another agent. */
+    private Optional<Grant> findGrant(Agent agent, int version, String action) {
+        AgentDefinition definition = agentDefinitionService.definition(agent, version);
+        Optional<Grant> tool = definition.tools().stream()
                 .filter(t -> t.action().equals(action))
-                .findFirst();
+                .findFirst()
+                .map(t -> new Grant(t.permission(), t.labels() == null ? List.of() : t.labels()));
+        if (tool.isPresent() || definition.delegates() == null) {
+            return tool;
+        }
+        return definition.delegates().stream()
+                .filter(d -> d.action().equals(action))
+                .findFirst()
+                .map(d -> new Grant(d.permission(), List.of()));
+    }
+
+    private record Grant(ToolPermission permission, List<String> labels) {
     }
 
     private static List<String> merge(List<String> requested, List<String> fromTool) {

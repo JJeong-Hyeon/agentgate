@@ -16,14 +16,16 @@ public record ActionRequest(
         // Shown to the approver, e.g. why a workflow asks for approval.
         @Size(max = 1000) String reason,
         // Definition version the agent runs; its tool permissions then apply on top of policies.
-        @Positive Integer agentVersion
+        @Positive Integer agentVersion,
+        // Agents that delegated this work, outermost first, e.g. "supervisor>research-agent".
+        @Size(max = 500) String delegatedBy
 ) {
     public ActionRequest {
         labels = (labels == null) ? List.of() : List.copyOf(labels);
     }
 
     public ActionRequest(String agentId, String action, String target, List<String> labels) {
-        this(agentId, action, target, labels, null, null, null, null);
+        this(agentId, action, target, labels, null, null, null, null, null);
     }
 
     public boolean approvalRequested() {

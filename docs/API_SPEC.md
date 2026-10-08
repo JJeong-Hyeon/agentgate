@@ -33,6 +33,7 @@ X-Runtime-Token: <runtime token>    # Agent Runtime: 등록된 어느 Agent의 �
 - `requireApproval` (선택, boolean): `true`면 정책상 허용(`LOW`/`MEDIUM`)이어도 `APPROVAL_REQUIRED`로 승인 요청을 만든다. 정책상 `BLOCKED`는 그대로 차단
 - `reason` (선택, 최대 1000자): 승인 요청에 저장되어 승인자에게 표시되는 설명
 - `executionId` (선택, 최대 64자): Runtime 실행 ID(LangGraph `thread_id`). 승인 요청이 생성되면 함께 저장되어 승인 후 어떤 실행을 재개할지 식별하는 데 쓰임
+- `delegatedBy` (선택, 최대 500자): 이 행동을 위임한 Agent 경로(바깥부터, 예: `supervisor>research-agent`). Audit Log와 승인 요청에 기록된다
 - `agentVersion` (선택, 양의 정수): Agent 정의 버전. 지정하면 그 정의의 Tool 권한을 정책보다 먼저 적용한다 (`action`은 `MCP:<server>:<tool>`로 정의의 Tool과 대응). 정의에 없는 Tool → `BLOCKED`, 권한 `BLOCKED` → `BLOCKED`, 권한 `APPROVAL` → 정책이 허용해도 `APPROVAL_REQUIRED`. Tool에 지정한 라벨은 `labels`와 합쳐 정책 매칭에 쓰인다. 없는 버전이면 404 `AGENT_DEFINITION_NOT_FOUND`
 
 **응답**
@@ -90,13 +91,15 @@ GET  /api/v1/agents/{id}/definition/versions/{version}  해당 버전
   ],
   "maxSteps": 8,
   "outputSchema": {"type": "object", "required": ["summary"]},
-  "toolCalling": "NATIVE"
+  "toolCalling": "NATIVE",
+  "delegates": [{"agentId": "research-agent", "permission": "AUTO"}]
 }
 ```
 
 - `systemPrompt`, `tools` 필수. `permission`: `AUTO`(정책에 따름) / `APPROVAL`(항상 승인) / `BLOCKED`(차단)
 - `maxSteps` 1~50 (생략 시 8), `temperature` 0~2, `toolCalling` `NATIVE` / `JSON` / 생략(Runtime 기본값), `outputSchema`는 JSON 객체
 - 같은 Tool 중복, 형식 오류는 400 `VALIDATION_FAILED`
+- `delegates`(선택, 최대 10): 이 Agent가 일을 맡길 수 있는 Agent와 권한. 위임은 행동 `AGENT:<agentId>`로 평가되며(정책이 없으면 기본 HIGH), 맡은 Agent는 자기 정의·권한·이름으로 Tool을 실행한다. 자기 자신, 없는 Agent, 정의 없는 Agent, 중복, 위임 순환, 3단계를 넘는 위임 체인은 400
 - Agent 응답(`GET /api/v1/agents`)에 `description`, `latestDefinitionVersion`(정의 없으면 0) 포함
 
 ### MCP 서버 (관리자 인증 필요)

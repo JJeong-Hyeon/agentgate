@@ -25,8 +25,10 @@ public class AuditLogService {
 
     @Transactional
     public void record(String agentId, String action, String target, List<String> labels,
-                        RiskLevel riskLevel, ActionStatus status, Long approvalId, DecisionBasis basis) {
-        auditLogRepository.save(new AuditLog(agentId, action, target, labels, riskLevel, status, approvalId, basis));
+                        RiskLevel riskLevel, ActionStatus status, Long approvalId, DecisionBasis basis,
+                        String delegatedBy) {
+        auditLogRepository.save(new AuditLog(agentId, action, target, labels, riskLevel, status, approvalId, basis,
+                delegatedBy));
     }
 
     public AuditLogResponse get(Long id) {
