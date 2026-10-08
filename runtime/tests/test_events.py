@@ -123,7 +123,7 @@ def test_run_graph_reports_failure_and_reraises():
     with pytest.raises(RuntimeError):
         run_graph(graph, initial_state(SIMPLE), config("e2"), reporter(sink))
 
-    # LangGraph raises before emitting the failed task's result; AgentGate marks the
-    # still-running node as failed when it receives EXECUTION_FAILED.
-    assert sink.types == ["NODE_STARTED", "EXECUTION_FAILED"]
+    # The failed step is reported before the execution fails.
+    assert sink.types == ["NODE_STARTED", "NODE_FAILED", "EXECUTION_FAILED"]
+    assert "llm down" in sink.events[1]["error"]
     assert "llm down" in sink.events[-1]["error"]

@@ -65,20 +65,41 @@ _MAX_REASON_CHARS = 1000
 
 
 class AgentTool:
-    """A tool as the model sees it (function name and JSON Schema) and as AgentGate governs it."""
+    """A tool as the model sees it (function name and JSON Schema) and as AgentGate governs it:
+    an MCP tool, or another agent to delegate to."""
 
-    def __init__(self, function_name: str, spec: AgentToolSpec, tool: GovernedTool):
+    def __init__(
+        self,
+        function_name: str,
+        description: str,
+        parameters: dict[str, Any],
+        label: str,
+        tool: GovernedTool,
+    ):
         self.function_name = function_name
-        self.spec = spec
+        self.description = description
+        self.parameters = parameters
+        # Shown to approvers, e.g. "notes/save_note" or "agent research-agent".
+        self.label = label
         self.tool = tool
+
+    @classmethod
+    def mcp(cls, function_name: str, spec: AgentToolSpec, tool: GovernedTool) -> "AgentTool":
+        return cls(
+            function_name,
+            spec.description or f"{spec.server}/{spec.tool}",
+            spec.input_schema or {"type": "object", "properties": {}},
+            f"{spec.server}/{spec.tool}",
+            tool,
+        )
 
     def definition(self) -> dict[str, Any]:
         return {
             "type": "function",
             "function": {
                 "name": self.function_name,
-                "description": self.spec.description or f"{self.spec.server}/{self.spec.tool}",
-                "parameters": self.spec.input_schema or {"type": "object", "properties": {}},
+                "description": self.description,
+                "parameters": self.parameters,
             },
         }
 
@@ -104,7 +125,10 @@ def add_agent(
     tools: list[AgentTool],
     next_nodes: list[str],
     tool_calling: str = "NATIVE",
+    delegated_by: str | None = None,
 ) -> None:
+    """`delegated_by` is the chain of agents that handed this one its task (outermost first),
+    reported with each of its tool calls; None when it runs as a workflow node."""
     think_node = f"{name}.think"
     gate_node = f"{name}.gate"
     approval_node = f"{name}.approval"
@@ -123,10 +147,14 @@ def add_agent(
 
     def start(state: dict) -> Command:
         messages = [SystemMessage(system_prompt), HumanMessage(build_prompt(state))]
-        return Command(
-            update={"agent_runs": {name: {"messages": messages, "steps": 0, "pending": None}}},
-            goto=think_node,
-        )
+        run = {
+            "messages": messages,
+            "steps": 0,
+            "pending": None,
+            "agent_id": spec.agent_id,
+            "delegated_by": delegated_by,
+        }
+        return Command(update={"agent_runs": {name: run}}, goto=think_node)
 
     def think(state: dict) -> Command:
         run = run_of(state)
@@ -187,7 +215,8 @@ def add_agent(
             execution_id,
             agent_id=spec.agent_id,
             agent_version=spec.version,
-            reason=approval_reason(spec, tool.spec, call["args"]),
+            reason=approval_reason(spec, tool.label, call["args"], delegated_by),
+            delegated_by=delegated_by,
         )
         pending = {"call": call, "result": result.model_dump()}
         if result.status == "ALLOWED":
@@ -245,12 +274,14 @@ def denial(result: ToolResult) -> str:
     return f"The call could not be authorized: {result.error}. Continue without it."
 
 
-def approval_reason(spec: AgentSpec, tool: AgentToolSpec, args: dict[str, Any]) -> str:
-    """Shown to the approver: who wants to call what, with which arguments."""
+def approval_reason(
+    spec: AgentSpec, label: str, args: dict[str, Any], delegated_by: str | None = None
+) -> str:
+    """Shown to the approver: who wants to call what (and on whose behalf), with which arguments."""
     arguments = json.dumps(args, ensure_ascii=False, default=str)
+    via = f", delegated by {delegated_by}" if delegated_by else ""
     reason = (
-        f"Agent '{spec.agent_id}' (v{spec.version}) wants to call "
-        f"{tool.server}/{tool.tool} with {arguments}"
+        f"Agent '{spec.agent_id}' (v{spec.version}{via}) wants to call {label} with {arguments}"
     )
     if len(reason) > _MAX_REASON_CHARS:
         reason = reason[: _MAX_REASON_CHARS - 1] + "…"
@@ -358,6 +389,16 @@ def agent_trace(step: str, update: dict) -> dict | None:
     run = (update.get("agent_runs") or {}).get(node_id)
     if run is None:
         return None
+    trace = _agent_trace(sub, node_id, run, update)
+    if trace is None:
+        return None
+    who = {"agent": run.get("agent_id")}
+    if run.get("delegated_by"):
+        who["delegated_by"] = run["delegated_by"]
+    return {**trace, **who}
+
+
+def _agent_trace(sub: str, node_id: str, run: dict, update: dict) -> dict | None:
     messages = run.get("messages", [])
     results = update.get("tool_results") or []
 
@@ -413,3 +454,8 @@ def agent_trace(step: str, update: dict) -> dict | None:
             "arguments": pending["call"]["args"],
         }
     return None
+
+
+def delegate_function_name(agent_id: str) -> str:
+    """Function name the model calls to delegate to an agent."""
+    return re.sub(r"[^A-Za-z0-9_-]", "_", f"delegate__{agent_id}")[:64]

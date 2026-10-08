@@ -54,13 +54,16 @@ class EventReporter:
             )
 
 
-def task_event(task: dict[str, Any]) -> dict[str, Any]:
+def task_event(task: dict[str, Any], namespace: tuple[str, ...] = ()) -> dict[str, Any]:
     """Map a LangGraph `tasks` stream item to an execution event.
 
-    Sub-steps of a tool are named `<nodeId>.<step>`; events carry the DSL node id.
+    Sub-steps of a tool are named `<nodeId>.<step>`; events carry the DSL node id. Steps of a
+    delegated agent run in a subgraph (`namespace` = the calling tasks, outermost first) and
+    belong to the workflow node at the top of that chain.
     """
     name = task["name"]
-    event = {"nodeId": name.split(".")[0], "step": name, "taskId": task["id"]}
+    owner = namespace[0].split(":")[0] if namespace else name
+    event = {"nodeId": owner.split(".")[0], "step": name, "taskId": task["id"]}
     if "triggers" in task:
         return {**event, "type": "NODE_STARTED"}
     if task.get("error"):
@@ -83,8 +86,10 @@ def run_graph(
     """Run (or resume) until the graph finishes or pauses, reporting each step."""
     execution_id = config["configurable"]["thread_id"]
     try:
-        for task in graph.stream(graph_input, config, stream_mode="tasks"):
-            reporter.report(execution_id, task_event(task))
+        for namespace, task in graph.stream(
+            graph_input, config, stream_mode="tasks", subgraphs=True
+        ):
+            reporter.report(execution_id, task_event(task, namespace))
     except Exception as e:
         reporter.report(execution_id, {"type": "EXECUTION_FAILED", "error": str(e)})
         raise

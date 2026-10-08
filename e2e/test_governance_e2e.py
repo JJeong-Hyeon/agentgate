@@ -340,3 +340,67 @@ def test_rejected_tool_stops_the_execution_in_agentgate(admin, report_risk):
     stopped = wait_for_agentgate(admin, execution_id, "STOPPED")
     assert stopped["error"] == "report: rejected by an approver"
     assert stopped["finishedAt"]
+
+
+def test_supervisor_delegates_to_a_worker_governed_under_its_own_name(admin, action_risk):
+    action_risk("MCP:echo:add", "LOW")
+    suffix = uuid.uuid4().hex[:8]
+    worker_id, lead_id = f"e2e-worker-{suffix}", f"e2e-lead-{suffix}"
+    worker = admin.post("/api/v1/agents", json={"agentId": worker_id, "name": "Worker"}).json()
+    admin.put(
+        f"/api/v1/agents/{worker['id']}/definition",
+        json={
+            "systemPrompt": "You are a tool agent.",
+            "tools": [{"server": "echo", "tool": "add", "permission": "APPROVAL"}],
+        },
+    ).raise_for_status()
+    lead = admin.post("/api/v1/agents", json={"agentId": lead_id, "name": "Lead"}).json()
+    admin.put(
+        f"/api/v1/agents/{lead['id']}/definition",
+        json={
+            "systemPrompt": "You are a supervisor agent.",
+            "tools": [],
+            "delegates": [{"agentId": worker_id, "permission": "AUTO"}],
+        },
+    ).raise_for_status()
+    workflow_id = f"team-e2e-{suffix}"
+    admin.post(
+        "/api/v1/workflows",
+        json={
+            "workflowId": workflow_id,
+            "dsl": {
+                "nodes": [
+                    {"id": "start", "type": "START"},
+                    {
+                        "id": "lead",
+                        "type": "AGENT",
+                        "config": {"agentId": lead_id, "prompt": "{task}"},
+                    },
+                    {"id": "end", "type": "END"},
+                ],
+                "edges": [
+                    {"source": "start", "target": "lead"},
+                    {"source": "lead", "target": "end"},
+                ],
+            },
+        },
+    ).raise_for_status()
+
+    started = admin.post("/api/v1/executions", json={"workflowId": workflow_id, "task": "add"})
+    started.raise_for_status()
+    assert started.json()["agentVersions"] == {lead_id: 1, worker_id: 1}
+    execution_id = started.json()["executionId"]
+
+    waiting = wait_for_execution(admin, execution_id, "WAITING_APPROVAL", timeout=60)
+    approval = admin.get(f"/api/v1/approvals/{waiting['waitingApprovalId']}").json()
+    assert approval["agentId"] == worker_id
+    assert approval["delegatedBy"] == lead_id
+    assert approval["action"] == "MCP:echo:add"
+    admin.post(f"/api/v1/approvals/{approval['id']}/approve", json={}).raise_for_status()
+
+    finished = wait_for_execution(admin, execution_id, "COMPLETED", timeout=60)
+    outputs = " ".join(n.get("output") or "" for n in finished["nodes"])
+    assert "Supervisor result: Agent result: 5" in outputs
+    assert {n["nodeId"] for n in finished["nodes"]} == {"lead"}
+    delegation = admin.get("/api/v1/audit-logs", params={"agentId": lead_id}).json()
+    assert [a["action"] for a in delegation] == [f"AGENT:{worker_id}"]

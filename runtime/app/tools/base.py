@@ -45,6 +45,7 @@ class GovernedTool(ABC):
         agent_id: str | None = None,
         agent_version: int | None = None,
         reason: str | None = None,
+        delegated_by: str | None = None,
     ) -> ToolResult:
         """Ask AgentGate; with `agent_id` / `agent_version` it is asked on behalf of that agent,
         whose definition's tool permissions then apply."""
@@ -57,6 +58,7 @@ class GovernedTool(ABC):
                 reason=reason,
                 agent_id=agent_id,
                 agent_version=agent_version,
+                delegated_by=delegated_by,
             )
         except AgentGateError as e:
             return ToolResult(tool=self.name, status="FAILED", error=str(e))

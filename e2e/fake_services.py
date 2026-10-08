@@ -42,6 +42,9 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/v1/chat/completions":
             system = next((m["content"] for m in body["messages"] if m["role"] == "system"), "")
             model = body.get("model", "fake-model")
+            if "You are a supervisor agent" in system:
+                self._send(200, supervisor_turn(model, body))
+                return
             if "You are a tool agent" in system:
                 self._send(200, tool_agent_turn(model, body))
                 return
@@ -69,6 +72,27 @@ def tool_agent_turn(model: str, body: dict) -> dict:
         "id": "call-add",
         "type": "function",
         "function": {"name": add, "arguments": '{"a": 2, "b": 3}'},
+    }
+    reply = completion(model, None)
+    reply["choices"][0]["message"]["tool_calls"] = [call]
+    reply["choices"][0]["finish_reason"] = "tool_calls"
+    return reply
+
+
+def supervisor_turn(model: str, body: dict) -> dict:
+    """Delegates once to the offered agent, then answers with what it reported."""
+    last = body["messages"][-1]
+    if last["role"] == "tool":
+        return completion(model, f"Supervisor result: {last['content']}")
+    name = next(
+        t["function"]["name"]
+        for t in body["tools"]
+        if t["function"]["name"].startswith("delegate__")
+    )
+    call = {
+        "id": "call-delegate",
+        "type": "function",
+        "function": {"name": name, "arguments": '{"task": "add 2 and 3"}'},
     }
     reply = completion(model, None)
     reply["choices"][0]["message"]["tool_calls"] = [call]
