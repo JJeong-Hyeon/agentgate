@@ -80,7 +80,6 @@ class AgentDelegationIntegrationTest {
         for (String id : List.of("supervisor", "research", "data", "deep1", "deep2", "deep3", "blank")) {
             ids.put(id, agentRepository.save(new Agent(id, id, ApiKeyGenerator.hash("k"))).getId());
         }
-        // Without a policy a delegation is HIGH by default, like any unknown action.
         policyRepository.save(new Policy("AGENT:data", null, RiskLevel.LOW));
         policyRepository.save(new Policy("AGENT:research", null, RiskLevel.LOW));
     }
@@ -163,13 +162,13 @@ class AgentDelegationIntegrationTest {
     }
 
     @Test
-    void delegationWithoutAPolicyNeedsApprovalByDefault() throws Exception {
+    void delegationWithoutAPolicyIsAllowedByDefault() throws Exception {
         define("deep1", "[]");
         define("supervisor", "[%s]".formatted(to("deep1", "AUTO")));
 
         evaluate("supervisor", "AGENT:deep1", null)
-                .andExpect(jsonPath("$.status").value("APPROVAL_REQUIRED"))
-                .andExpect(jsonPath("$.basis").value("POLICY"));
+                .andExpect(jsonPath("$.status").value("ALLOWED"))
+                .andExpect(jsonPath("$.riskLevel").value("MEDIUM"));
     }
 
     @Test

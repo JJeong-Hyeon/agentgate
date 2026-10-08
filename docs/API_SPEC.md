@@ -99,7 +99,7 @@ GET  /api/v1/agents/{id}/definition/versions/{version}  해당 버전
 - `systemPrompt`, `tools` 필수. `permission`: `AUTO`(정책에 따름) / `APPROVAL`(항상 승인) / `BLOCKED`(차단)
 - `maxSteps` 1~50 (생략 시 8), `temperature` 0~2, `toolCalling` `NATIVE` / `JSON` / 생략(Runtime 기본값), `outputSchema`는 JSON 객체
 - 같은 Tool 중복, 형식 오류는 400 `VALIDATION_FAILED`
-- `delegates`(선택, 최대 10): 이 Agent가 일을 맡길 수 있는 Agent와 권한. 위임은 행동 `AGENT:<agentId>`로 평가되며(정책이 없으면 기본 HIGH), 맡은 Agent는 자기 정의·권한·이름으로 Tool을 실행한다. 자기 자신, 없는 Agent, 정의 없는 Agent, 중복, 위임 순환, 3단계를 넘는 위임 체인은 400
+- `delegates`(선택, 최대 10): 이 Agent가 일을 맡길 수 있는 Agent와 권한. 위임은 행동 `AGENT:<agentId>`로 평가되며(정책이 없으면 기본 MEDIUM·허용, 승인이 필요하면 위임 권한을 `APPROVAL`로), 맡은 Agent는 자기 정의·권한·이름으로 Tool을 실행한다. 자기 자신, 없는 Agent, 정의 없는 Agent, 중복, 위임 순환, 3단계를 넘는 위임 체인은 400
 - Agent 응답(`GET /api/v1/agents`)에 `description`, `latestDefinitionVersion`(정의 없으면 0) 포함
 
 ### MCP 서버 (관리자 인증 필요)
