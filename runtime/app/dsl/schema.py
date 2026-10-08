@@ -7,14 +7,14 @@ Parallelism is expressed by several unlabeled edges leaving one node, and repeti
 a cycle through a REVIEWER (bounded by its maxRevisions) — there are no PARALLEL/LOOP nodes.
 """
 
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.alias_generators import to_camel
 
 NODE_ID_PATTERN = r"^[A-Za-z][A-Za-z0-9_]{0,63}$"
 # State keys the runtime owns; node ids must not shadow them.
-RESERVED_IDS = {"task", "workflow", "tool_results", "pending_tool", "revisions"}
+RESERVED_IDS = {"task", "workflow", "tool_results", "pending_tool", "revisions", "agent_runs"}
 
 
 class DslModel(BaseModel):
@@ -55,11 +55,34 @@ class LlmNode(NodeBase):
     config: LlmConfig
 
 
+class AgentConfig(LlmConfig):
+    # Registered agent to run; its definition (model, system prompt, tools, permissions) is
+    # resolved into Workflow.agents when the execution starts. Without it the node is a single
+    # LLM call configured inline by system / model / temperature.
+    agent_id: str | None = Field(default=None, min_length=1, max_length=255)
+    # Pins a definition version; None → the latest when the execution starts.
+    agent_version: int | None = Field(default=None, ge=1)
+
+    @model_validator(mode="after")
+    def definition_owns_llm_settings(self) -> "AgentConfig":
+        if self.agent_id is None:
+            if self.agent_version is not None:
+                raise ValueError("agentVersion needs agentId")
+            return self
+        inline = [f for f in ("system", "model", "temperature") if getattr(self, f) is not None]
+        if inline:
+            raise ValueError(
+                f"{', '.join(inline)} come from the agent definition when agentId is set"
+            )
+        return self
+
+
 class AgentNode(NodeBase):
-    """LLM step with an agent role. Tool calling will be added to this node type."""
+    """With config.agentId: a tool-calling agent whose every tool call is governed by
+    AgentGate. Without it: an LLM step with an agent role."""
 
     type: Literal["AGENT"]
-    config: LlmConfig
+    config: AgentConfig
 
 
 class RouterConfig(LlmConfig):
@@ -165,6 +188,42 @@ Node = Annotated[
 OUTPUT_TYPES = {"LLM", "AGENT", "ROUTER", "REVIEWER", "HTTP_TOOL", "MCP_TOOL", "APPROVAL"}
 
 
+class SnapshotModel(BaseModel):
+    """Data AgentGate resolves at execution start; unknown fields are ignored so AgentGate
+    may add some before the runtime knows them."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True, extra="ignore")
+
+
+class AgentToolSpec(SnapshotModel):
+    server: str = Field(min_length=1)
+    tool: str = Field(min_length=1)
+    permission: Literal["AUTO", "APPROVAL", "BLOCKED"]
+    labels: list[str] = []
+    # Filled from the runtime's tool catalog when the execution starts, so a resumed
+    # execution does not depend on the MCP server being reachable to rebuild its graph.
+    description: str | None = None
+    input_schema: dict[str, Any] | None = None
+
+    @property
+    def action(self) -> str:
+        return f"MCP:{self.server}:{self.tool}"
+
+
+class AgentSpec(SnapshotModel):
+    """One version of an agent definition (see AgentGate's AgentDefinition)."""
+
+    agent_id: str
+    version: int = Field(ge=1)
+    description: str | None = None
+    model: str | None = None
+    temperature: float | None = Field(default=None, ge=0, le=2)
+    system_prompt: str = Field(min_length=1)
+    tools: list[AgentToolSpec] = []
+    max_steps: int = Field(default=8, ge=1, le=50)
+    output_schema: dict[str, Any] | None = None
+
+
 class Edge(DslModel):
     source: str
     target: str
@@ -178,3 +237,5 @@ class Workflow(DslModel):
     name: str | None = None
     nodes: list[Node] = Field(min_length=2)
     edges: list[Edge]
+    # agentId → the definition AGENT nodes with that agentId run; set when an execution starts.
+    agents: dict[str, AgentSpec] = {}

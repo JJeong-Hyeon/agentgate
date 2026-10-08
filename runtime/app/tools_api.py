@@ -8,7 +8,7 @@ router = APIRouter(prefix="/runtime/tools", tags=["tools"])
 
 
 def get_catalog(request: Request) -> ToolCatalog:
-    return request.app.state.catalog
+    return getattr(request.app.state, "catalog", None) or ToolCatalog({})
 
 
 Catalog = Annotated[ToolCatalog, Depends(get_catalog)]
