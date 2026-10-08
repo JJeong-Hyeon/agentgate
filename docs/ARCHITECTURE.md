@@ -493,6 +493,14 @@ node_executions
 langgraph checkpoints      # Runtime이 관리
 ```
 
+스키마는 **Flyway**(`src/main/resources/db/migration`)가 관리하고, Hibernate는 기동 시 엔티티와 스키마가 일치하는지만 검사한다(`ddl-auto: validate`, 불일치 시 기동 실패).
+
+- 스키마를 바꾸려면 새 마이그레이션 `V<n>__<설명>.sql`을 추가한다. 이미 배포된 마이그레이션 파일은 수정하지 않는다.
+- enum 컬럼에 값을 추가하면 해당 CHECK 제약을 다시 만드는 마이그레이션도 추가한다(예: V2).
+- NOT NULL 컬럼을 추가할 때는 기존 행을 위한 기본값을 함께 둔다.
+- 마이그레이션은 `FreshDatabaseMigrationTest`(빈 DB), `ExistingDatabaseMigrationTest`(Flyway 도입 전 DB)로 실제 PostgreSQL(Testcontainers)에서 검증한다.
+- Flyway 도입 전 DB(테이블은 있고 이력은 없음)는 첫 기동 때 버전 0으로 baseline된 뒤 V1(이미 있는 것은 건너뜀)부터 적용된다.
+
 Node/Edge는 별도 테이블로 정규화하지 않고 `workflow_versions.dsl`(JSONB)에 저장한다.
 버전 단위로 불변(immutable) 저장하므로 이 편이 단순하다.
 

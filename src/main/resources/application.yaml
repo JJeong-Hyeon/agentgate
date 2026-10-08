@@ -3,8 +3,13 @@ spring:
     name: agentgate
   jpa:
     hibernate:
-      ddl-auto: update
+      # The schema is owned by Flyway (db/migration); Hibernate only checks that it matches the entities.
+      ddl-auto: validate
     open-in-view: false
+  flyway:
+    # Databases created before Flyway (by ddl-auto) have tables but no history; V1 is written to run on them.
+    baseline-on-migrate: true
+    baseline-version: 0
 
 management:
   endpoints:

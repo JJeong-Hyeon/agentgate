@@ -136,6 +136,14 @@ stdio 서버(Runtime 호스트에서 명령을 실행)는 보안상 화면에서
 
 컨테이너(Redis, Runtime, Ollama)는 `restart: unless-stopped` / systemd로 자동 기동되고, 받아둔 모델은 볼륨에 남는다. RDS는 정지 후 7일이 지나면 AWS가 자동으로 재시작시킨다(AWS 정책) — 장기간 안 쓸 거면 `terraform destroy` 전체를 고려할 것.
 
+## DB 스키마 (Flyway)
+
+App이 기동할 때 Flyway가 RDS 스키마를 마이그레이션한다(`db/migration`). 별도 작업은 없다.
+
+- Flyway 도입 전부터 쓰던 RDS는 첫 기동 때 자동으로 baseline된 뒤 V1(이미 있는 테이블은 건너뜀), V2(enum CHECK 제약 갱신, `STOPPED` 상태 허용)가 적용된다.
+- 엔티티와 스키마가 다르면 App이 기동하지 않는다(`ddl-auto: validate`). 로그의 Hibernate 스키마 검증 오류를 확인한다.
+- 배포 전 RDS 스냅샷을 만들어 두는 것을 권장한다.
+
 ## 보안 참고
 
 - `agentgate.admin.password`가 개발용 기본값("changeme")이면 `prod` 프로파일에서 기동이 즉시 실패한다(`SecurityHardeningCheck`).
