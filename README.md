@@ -82,8 +82,9 @@ MCP 도구를 쓰려면 `mcpServers` 형식의 설정 파일을 만들고 `MCP_C
 
 1. **Agents** 화면에서 Agent를 등록하고 정의(시스템 프롬프트, 모델, 최대 단계, 출력 스키마)를 저장합니다.
 2. 같은 화면에서 Runtime의 MCP 서버가 제공하는 Tool을 고르고 Tool마다 권한(자동 / 항상 승인 / 차단)을 지정합니다.
-3. Builder에서 Agent 노드를 추가해 "등록된 Agent"를 고르고 작업 프롬프트를 적습니다 (정의 버전 고정 가능).
-4. 실행하면 Agent가 Tool을 골라 호출하고, 호출마다 AgentGate가 그 Agent 이름으로 **권한 → 정책 → 위험도**를 판정합니다. 승인이 필요하면 멈추고, 승인 후 이어서 실행합니다. 과정은 Execution Studio에 단계별로 표시됩니다.
+3. (선택, Multi-Agent) 같은 화면의 "위임할 수 있는 Agent"에서 이 Agent가 일을 맡길 다른 Agent와 위임 권한을 고릅니다. 맡은 Agent는 자기 정의·권한·이름으로 Tool을 실행하고, 기록과 승인 요청에 위임 경로(예: `lead → research`)가 남습니다.
+4. Builder에서 Agent 노드를 추가해 "등록된 Agent"를 고르고 작업 프롬프트를 적습니다 (정의 버전 고정 가능).
+5. 실행하면 Agent가 Tool을 골라 호출(또는 다른 Agent에게 위임)하고, 호출마다 AgentGate가 그 Agent 이름으로 **권한 → 정책 → 위험도**를 판정합니다. 승인이 필요하면 멈추고, 승인 후 이어서 실행합니다(위임받은 Agent 안의 승인도 같음). 과정은 Execution Studio에 단계별로 표시됩니다.
 
 모델 서버가 function calling을 지원하지 않으면 `LLM_TOOL_CALLING=json`(또는 Agent 정의의 Tool 호출 방식 `JSON`)을 사용합니다.
 

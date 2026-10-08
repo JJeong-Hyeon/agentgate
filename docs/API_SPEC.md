@@ -171,6 +171,8 @@ GET /api/v1/approvals?status=PENDING&executionId=<실행 ID>
 Authorization: Basic <admin 계정>
 ```
 
+승인 요청과 Audit Log 응답의 `delegatedBy`는 이 행동을 위임한 Agent 경로다(바깥부터, 예: `lead>research`; 직접 실행이면 `null`). 승인 요청의 `agentId`는 실제로 행동한(위임받은) Agent다.
+
 ## 4. 에러 응답 공통 형식
 
 ```json
