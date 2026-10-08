@@ -1,5 +1,5 @@
 import type { Execution } from "../api/types";
-import { applyUpdate, duration, nodeStatuses } from "./state";
+import { applyUpdate, isFinished, duration, nodeStatuses } from "./state";
 
 const base: Execution = {
   executionId: "e1",
@@ -44,6 +44,11 @@ describe("execution state", () => {
     ]);
 
     expect(statuses.get("report")).toBe("WAITING");
+  });
+
+  it("treats stopped executions as finished", () => {
+    expect(isFinished("STOPPED")).toBe(true);
+    expect(isFinished("WAITING_APPROVAL")).toBe(false);
   });
 
   it("formats durations", () => {

@@ -14,7 +14,15 @@ from pydantic.alias_generators import to_camel
 
 NODE_ID_PATTERN = r"^[A-Za-z][A-Za-z0-9_]{0,63}$"
 # State keys the runtime owns; node ids must not shadow them.
-RESERVED_IDS = {"task", "workflow", "tool_results", "pending_tool", "revisions", "agent_runs"}
+RESERVED_IDS = {
+    "task",
+    "workflow",
+    "tool_results",
+    "pending_tool",
+    "revisions",
+    "agent_runs",
+    "stopped",
+}
 
 
 class DslModel(BaseModel):
@@ -128,6 +136,9 @@ class HttpToolConfig(DslModel):
     labels: list[str] = []
     # State keys sent as the JSON body.
     payload_keys: list[str] = []
+    # When AgentGate blocks the call or an approver rejects it: STOP ends the execution as
+    # STOPPED; CONTINUE records the result and goes on to the next node.
+    on_denied: Literal["STOP", "CONTINUE"] = "STOP"
 
 
 class HttpToolNode(NodeBase):
@@ -146,6 +157,8 @@ class McpToolConfig(DslModel):
     # Action name AgentGate evaluates; default "MCP:<server>:<tool>" lets a policy target one tool.
     action: str | None = None
     labels: list[str] = []
+    # See HttpToolConfig.on_denied.
+    on_denied: Literal["STOP", "CONTINUE"] = "STOP"
 
 
 class McpToolNode(NodeBase):
@@ -164,7 +177,7 @@ class ApprovalConfig(DslModel):
 
 
 class ApprovalNode(NodeBase):
-    """Explicit human approval step, regardless of risk. Rejection ends the execution."""
+    """Explicit human approval step, regardless of risk. Rejection stops the execution."""
 
     type: Literal["APPROVAL"]
     config: ApprovalConfig = ApprovalConfig()

@@ -108,6 +108,7 @@ public class ExecutionService {
             case NODE_FAILED -> node.failed(event.error(), at);
             case EXECUTION_WAITING -> execution.waitingForApproval(event.approvalId());
             case EXECUTION_COMPLETED -> execution.completed(at);
+            case EXECUTION_STOPPED -> execution.stopped(event.error(), at);
             case EXECUTION_FAILED -> {
                 execution.failed(event.error(), at);
                 // The runtime stops before reporting the failed step itself.

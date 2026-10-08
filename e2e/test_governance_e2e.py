@@ -93,17 +93,18 @@ def test_blocked_tool_never_runs(report_risk):
 
     execution = start_execution()
 
-    assert execution["status"] == "COMPLETED"
+    assert execution["status"] == "STOPPED"
+    assert execution["state"]["stopped"]["reason"].startswith("report: blocked by AgentGate")
     assert tool_statuses(execution) == ["BLOCKED"]
     assert reports_received() == before
 
 
 @pytest.mark.parametrize(
-    ("decision", "expected_tool_status", "expected_reports"),
-    [("approve", "EXECUTED", 1), ("reject", "REJECTED", 0)],
+    ("decision", "expected_tool_status", "expected_reports", "final_status"),
+    [("approve", "EXECUTED", 1, "COMPLETED"), ("reject", "REJECTED", 0, "STOPPED")],
 )
 def test_high_risk_tool_waits_for_human_decision(
-    admin, report_risk, decision, expected_tool_status, expected_reports
+    admin, report_risk, decision, expected_tool_status, expected_reports, final_status
 ):
     report_risk("HIGH")
     before = reports_received()
@@ -120,7 +121,7 @@ def test_high_risk_tool_waits_for_human_decision(
     ).raise_for_status()
 
     # AgentGate resumes the runtime on its own; nothing else calls the runtime here.
-    finished = wait_for(execution["execution_id"], "COMPLETED")
+    finished = wait_for(execution["execution_id"], final_status)
     assert tool_statuses(finished) == [expected_tool_status]
     assert reports_received() == before + expected_reports
 
@@ -225,13 +226,16 @@ MCP_WORKFLOW = {
 }
 
 
-@pytest.mark.parametrize(("level", "expected"), [("LOW", "echo: e2e"), ("BLOCKED", "BLOCKED")])
-def test_mcp_tool_is_governed_by_agentgate(action_risk, level, expected):
+@pytest.mark.parametrize(
+    ("level", "expected", "status"),
+    [("LOW", "echo: e2e", "COMPLETED"), ("BLOCKED", "BLOCKED", "STOPPED")],
+)
+def test_mcp_tool_is_governed_by_agentgate(action_risk, level, expected, status):
     action_risk("MCP:echo:echo", level)
 
     execution = start_execution(MCP_WORKFLOW)
 
-    assert execution["status"] == "COMPLETED"
+    assert execution["status"] == status
     assert execution["state"]["say"] == expected
 
 
@@ -316,3 +320,23 @@ def test_registered_agent_calls_tools_under_its_own_permissions(admin, action_ri
     finished = wait_for_execution(admin, execution_id, "COMPLETED", timeout=60)
     outputs = " ".join(n.get("output") or "" for n in finished["nodes"])
     assert "Agent result: 5" in outputs
+
+
+def test_rejected_tool_stops_the_execution_in_agentgate(admin, report_risk):
+    report_risk("HIGH")
+    workflow_id = f"research-stop-{int(time.time() * 1000)}"
+    admin.post(
+        "/api/v1/workflows", json={"workflowId": workflow_id, "dsl": research_workflow()}
+    ).raise_for_status()
+    started = admin.post("/api/v1/executions", json={"workflowId": workflow_id, "task": "e2e"})
+    started.raise_for_status()
+    execution_id = started.json()["executionId"]
+
+    waiting = wait_for_agentgate(admin, execution_id, "WAITING_APPROVAL")
+    admin.post(
+        f"/api/v1/approvals/{waiting['waitingApprovalId']}/reject", json={}
+    ).raise_for_status()
+
+    stopped = wait_for_agentgate(admin, execution_id, "STOPPED")
+    assert stopped["error"] == "report: rejected by an approver"
+    assert stopped["finishedAt"]

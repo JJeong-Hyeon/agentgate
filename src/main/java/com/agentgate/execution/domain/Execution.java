@@ -96,6 +96,14 @@ public class Execution {
         this.finishedAt = at;
     }
 
+    /** Ended because a tool or approval was denied; {@code reason} says which and why. */
+    public void stopped(String reason, Instant at) {
+        this.status = ExecutionStatus.STOPPED;
+        this.waitingApprovalId = null;
+        this.error = truncate(reason);
+        this.finishedAt = at;
+    }
+
     public void failed(String error, Instant at) {
         this.status = ExecutionStatus.FAILED;
         this.error = truncate(error);

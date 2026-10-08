@@ -94,4 +94,8 @@ def run_graph(
         approval_id = snapshot.interrupts[0].value.get("approval_id")
         reporter.report(execution_id, {"type": "EXECUTION_WAITING", "approvalId": approval_id})
     elif not snapshot.next:
-        reporter.report(execution_id, {"type": "EXECUTION_COMPLETED"})
+        stopped = snapshot.values.get("stopped")
+        if stopped:
+            reporter.report(execution_id, {"type": "EXECUTION_STOPPED", "error": stopped["reason"]})
+        else:
+            reporter.report(execution_id, {"type": "EXECUTION_COMPLETED"})

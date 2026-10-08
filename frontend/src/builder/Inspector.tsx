@@ -171,6 +171,7 @@ export function NodeInspector({ node, nodes, error, onChange, onRename, onDelete
             전송할 상태 키 (쉼표로 구분)
             <CommitInput value={list("payloadKeys")} onCommit={(v) => set("payloadKeys", splitList(v))} />
           </label>
+          <OnDeniedField value={config.onDenied} onChange={(v) => set("onDenied", v)} />
         </>
       )}
       {node.type === "MCP_TOOL" && (
@@ -205,6 +206,7 @@ export function NodeInspector({ node, nodes, error, onChange, onRename, onDelete
             위험 라벨 (쉼표로 구분)
             <CommitInput value={list("labels")} onCommit={(v) => set("labels", splitList(v))} />
           </label>
+          <OnDeniedField value={config.onDenied} onChange={(v) => set("onDenied", v)} />
         </>
       )}
       {node.type === "APPROVAL" && (
@@ -225,11 +227,31 @@ export function NodeInspector({ node, nodes, error, onChange, onRename, onDelete
             <CommitInput value={list("labels")} onCommit={(v) => set("labels", splitList(v))} />
           </label>
           <p className="hint">
-            위험도와 관계없이 승인을 받습니다. 거절되거나 정책상 차단되면 실행이 끝나고, 결과(APPROVED / REJECTED
-            …)는 {`{${node.id}}`}로 참조할 수 있습니다.
+            위험도와 관계없이 승인을 받습니다. 거절되거나 정책상 차단되면 실행이 중단(STOPPED)되고, 승인되면 결과
+            APPROVED를 {`{${node.id}}`}로 참조할 수 있습니다.
           </p>
         </>
       )}
+    </div>
+  );
+}
+
+/** Whether a denied tool call stops the run (default) or lets it go on. */
+function OnDeniedField({ value, onChange }: { value: unknown; onChange: (value: string | undefined) => void }) {
+  return (
+    <div className="field">
+      <label className="inline">
+        <input
+          type="checkbox"
+          checked={value === "CONTINUE"}
+          onChange={(e) => onChange(e.target.checked ? "CONTINUE" : undefined)}
+        />
+        거절·차단돼도 다음 단계로 계속
+      </label>
+      <span className="hint">
+        끄면(기본) 승인 거절이나 정책 차단 시 실행을 중단(STOPPED)합니다. 켜면 결과(REJECTED / BLOCKED)를 {"{노드id}"}에
+        남기고 계속합니다.
+      </span>
     </div>
   );
 }

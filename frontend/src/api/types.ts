@@ -45,7 +45,7 @@ export interface WorkflowSummary {
   dsl?: WorkflowDsl;
 }
 
-export type ExecutionStatus = "RUNNING" | "WAITING_APPROVAL" | "COMPLETED" | "FAILED";
+export type ExecutionStatus = "RUNNING" | "WAITING_APPROVAL" | "COMPLETED" | "STOPPED" | "FAILED";
 
 export interface NodeExecution {
   taskId: string;

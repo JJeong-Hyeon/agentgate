@@ -226,6 +226,23 @@ class ExecutionIntegrationTest {
     }
 
     @Test
+    void stoppedExecutionRecordsWhyAndEndsTheStream() throws Exception {
+        String id = start();
+        MvcResult stream = admin(get("/api/v1/executions/" + id + "/stream"))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+
+        event(id, "{\"type\":\"EXECUTION_STOPPED\",\"error\":\"report: rejected by an approver\"}");
+
+        admin(get("/api/v1/executions/" + id))
+                .andExpect(jsonPath("$.status").value("STOPPED"))
+                .andExpect(jsonPath("$.error").value("report: rejected by an approver"))
+                .andExpect(jsonPath("$.finishedAt").exists());
+        assertThat(stream.getResponse().getContentAsString()).contains("\"status\":\"STOPPED\"");
+        assertThat(stream.getAsyncResult(1000)).isNull();
+    }
+
+    @Test
     void streamRequiresAuthentication() throws Exception {
         mockMvc.perform(get("/api/v1/executions/x/stream")).andExpect(status().isUnauthorized());
     }

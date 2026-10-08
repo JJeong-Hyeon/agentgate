@@ -14,6 +14,7 @@ const STATUS_TEXT: Record<string, string> = {
   WAITING_APPROVAL: "승인 대기",
   WAITING: "승인 대기",
   COMPLETED: "완료",
+  STOPPED: "중단됨",
   FAILED: "실패",
 };
 
@@ -43,6 +44,11 @@ export function ExecutionPage() {
         <span className="muted">{new Date(execution.createdAt).toLocaleString()}</span>
       </header>
       {execution.status === "FAILED" && execution.error && <p className="card error">{execution.error}</p>}
+      {execution.status === "STOPPED" && (
+        <p className="card stopped-reason">
+          거절되거나 차단된 단계가 있어 실행을 중단했습니다{execution.error && `: ${execution.error}`}
+        </p>
+      )}
       {execution.waitingApprovalId && <ApprovalPanel approvalId={execution.waitingApprovalId} />}
       <section className="card">
         <ExecutionGraph execution={execution} />
