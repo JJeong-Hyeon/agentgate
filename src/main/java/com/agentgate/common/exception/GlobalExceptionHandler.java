@@ -25,6 +25,18 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.NOT_FOUND, "AGENT_NOT_FOUND", ex.getMessage(), request);
     }
 
+    @ExceptionHandler(AgentDefinitionNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleAgentDefinitionNotFound(AgentDefinitionNotFoundException ex,
+                                                                       HttpServletRequest request) {
+        return build(HttpStatus.NOT_FOUND, "AGENT_DEFINITION_NOT_FOUND", ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(InvalidAgentDefinitionException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidAgentDefinition(InvalidAgentDefinitionException ex,
+                                                                      HttpServletRequest request) {
+        return build(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", ex.getMessage(), request);
+    }
+
     @ExceptionHandler(PolicyNotFoundException.class)
     public ResponseEntity<ErrorResponse> handlePolicyNotFound(PolicyNotFoundException ex, HttpServletRequest request) {
         return build(HttpStatus.NOT_FOUND, "POLICY_NOT_FOUND", ex.getMessage(), request);
