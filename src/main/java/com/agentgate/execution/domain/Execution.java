@@ -14,6 +14,8 @@ import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /** One run of a workflow version on the agent runtime; its id is the runtime's execution (thread) id. */
 @Entity
@@ -41,6 +43,10 @@ public class Execution {
 
     private Long waitingApprovalId;
 
+    // agentId → definition version the run uses, as JSON; null when it runs no agents.
+    @JdbcTypeCode(SqlTypes.JSON)
+    private String agentVersions;
+
     @Column(length = 4000)
     private String error;
 
@@ -51,10 +57,15 @@ public class Execution {
     private Instant finishedAt;
 
     public Execution(String executionId, String workflowId, int workflowVersion, String task) {
+        this(executionId, workflowId, workflowVersion, task, null);
+    }
+
+    public Execution(String executionId, String workflowId, int workflowVersion, String task, String agentVersions) {
         this.executionId = executionId;
         this.workflowId = workflowId;
         this.workflowVersion = workflowVersion;
         this.task = task;
+        this.agentVersions = agentVersions;
         this.status = ExecutionStatus.RUNNING;
     }
 

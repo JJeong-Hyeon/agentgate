@@ -8,6 +8,7 @@ the policy API, then runs the graph and checks what reached the tool target.
 import json
 import os
 import time
+import uuid
 from pathlib import Path
 
 import httpx
@@ -243,3 +244,75 @@ def test_tools_of_configured_mcp_servers_are_listed(admin):
     tools = {t["name"]: t for t in echo["tools"]}
     assert {"echo", "add", "fail"} <= set(tools)
     assert tools["add"]["inputSchema"]["required"] == ["a", "b"]
+
+
+def wait_for_execution(admin, execution_id: str, status: str, timeout: float = 30) -> dict:
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        execution = admin.get(f"/api/v1/executions/{execution_id}").json()
+        if execution["status"] == status:
+            return execution
+        time.sleep(0.5)
+    raise AssertionError(f"execution {execution_id} never reached {status}: {execution}")
+
+
+def test_registered_agent_calls_tools_under_its_own_permissions(admin, action_risk):
+    # Policies alone would allow `add`; the agent's definition requires approval for it.
+    action_risk("MCP:echo:add", "LOW")
+    suffix = uuid.uuid4().hex[:8]
+    agent_id = f"e2e-agent-{suffix}"
+    agent = admin.post("/api/v1/agents", json={"agentId": agent_id, "name": "E2E Agent"}).json()
+    admin.put(
+        f"/api/v1/agents/{agent['id']}/definition",
+        json={
+            "systemPrompt": "You are a tool agent.",
+            "tools": [
+                {"server": "echo", "tool": "add", "permission": "APPROVAL"},
+                {"server": "echo", "tool": "echo", "permission": "AUTO"},
+            ],
+        },
+    ).raise_for_status()
+    workflow_id = f"agent-e2e-{suffix}"
+    admin.post(
+        "/api/v1/workflows",
+        json={
+            "workflowId": workflow_id,
+            "dsl": {
+                "nodes": [
+                    {"id": "start", "type": "START"},
+                    {
+                        "id": "helper",
+                        "type": "AGENT",
+                        "config": {"agentId": agent_id, "prompt": "{task}"},
+                    },
+                    {"id": "end", "type": "END"},
+                ],
+                "edges": [
+                    {"source": "start", "target": "helper"},
+                    {"source": "helper", "target": "end"},
+                ],
+            },
+        },
+    ).raise_for_status()
+
+    started = admin.post("/api/v1/executions", json={"workflowId": workflow_id, "task": "add"})
+    started.raise_for_status()
+    assert started.json()["agentVersions"] == {agent_id: 1}
+    execution_id = started.json()["executionId"]
+
+    waiting = wait_for_execution(admin, execution_id, "WAITING_APPROVAL", timeout=60)
+    approval = admin.get(f"/api/v1/approvals/{waiting['waitingApprovalId']}").json()
+    assert approval["agentId"] == agent_id
+    assert approval["action"] == "MCP:echo:add"
+    assert (
+        approval["reason"]
+        == f'Agent \'{agent_id}\' (v1) wants to call echo/add with {{"a": 2, "b": 3}}'
+    )
+    [audit] = admin.get("/api/v1/audit-logs", params={"agentId": agent_id}).json()
+    assert audit["basis"] == "TOOL_REQUIRES_APPROVAL"
+
+    admin.post(f"/api/v1/approvals/{approval['id']}/approve", json={}).raise_for_status()
+
+    finished = wait_for_execution(admin, execution_id, "COMPLETED", timeout=60)
+    outputs = " ".join(n.get("output") or "" for n in finished["nodes"])
+    assert "Agent result: 5" in outputs
