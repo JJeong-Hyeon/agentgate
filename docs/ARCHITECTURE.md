@@ -325,7 +325,7 @@ ALLOWED 이고 권한이 APPROVAL → APPROVAL_REQUIRED (TOOL_REQUIRES_APPROVAL)
 
 - Tool에 지정한 라벨은 요청 라벨과 합쳐 정책 매칭에 쓰인다.
 - 판정 근거 `basis`(`POLICY`, `AGENT_RISK_CAP`, `TOOL_NOT_GRANTED`, `TOOL_BLOCKED`, `TOOL_REQUIRES_APPROVAL`, `APPROVAL_REQUESTED`)는 응답과 Audit Log에 남는다.
-- 정책이 없는 행동의 기본 위험도는 `HIGH`(승인 필요)다.
+- 정책이 없는 행동의 기본 위험도는 `HIGH`(승인 필요)다. MCP Tool별 위험도는 Tool 위험도 레지스트리(`/api/v1/tool-risks`)에서 Tool 목록을 보며 지정한다 (정책 `MCP:<server>:<tool>`로 저장, annotations 기반 추천값 제공).
 - Runtime은 공유 토큰(`X-Runtime-Token`)으로 인증하는 신뢰된 호출자로, 등록된 어느 Agent의 이름으로든 평가를 요청할 수 있다. 워크플로 수준의 Tool / 승인 노드는 `AGENTGATE_AGENT_ID`(기본 `runtime-agent`)로 평가된다.
 
 ---

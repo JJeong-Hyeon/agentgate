@@ -11,7 +11,8 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class RiskEvaluationService {
 
-    private static final RiskLevel DEFAULT_RISK_LEVEL = RiskLevel.HIGH;
+    // For actions no policy matches: unknown actions need approval.
+    public static final RiskLevel DEFAULT_RISK_LEVEL = RiskLevel.HIGH;
 
     private final PolicyRepository policyRepository;
 

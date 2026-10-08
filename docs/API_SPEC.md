@@ -135,6 +135,21 @@ Runtime에 설정된 MCP 서버별 Tool 목록. `refresh=true`면 Runtime 캐시
 
 `source`는 서버가 등록된 곳(`agentgate` / `runtime` 설정 파일)이다. 연결되지 않은 서버는 `error`에 사유가 담기고 `tools`는 빈 배열이다. Runtime이 없거나 응답하지 않으면 503 `RUNTIME_UNAVAILABLE`.
 
+### Tool 위험도 (관리자 인증 필요)
+
+MCP Tool별 위험도. 정책 `MCP:<server>:<tool>`(라벨 없음)로 저장되므로 판정·캐시·Audit은 일반 정책과 같다.
+
+```
+GET    /api/v1/tool-risks?refresh=false            서버별 Tool과 위험도
+PUT    /api/v1/tool-risks                          {"server": "notes", "tool": "list_notes", "riskLevel": "LOW"}
+DELETE /api/v1/tool-risks?server=notes&tool=list_notes   지정 해제 → 204
+POST   /api/v1/tool-risks/apply-suggestions        지정 안 된 Tool에 추천값 적용 → {"applied": 3}
+```
+
+- 각 Tool: `action`, `riskLevel`(지정값, 없으면 null), `policyId`, `effectiveRiskLevel`(라벨 없는 호출에 적용되는 값: 지정값 또는 기본 `HIGH`), `suggestedRiskLevel`
+- 추천: `readOnlyHint` → `LOW`, `destructiveHint: false` → `MEDIUM`, 그 외 `HIGH`. annotations는 서버가 스스로 보고하는 값이라 자동 적용하지 않는다
+- 라벨 정책(예: `PII` → `HIGH`)보다 Tool 위험도(행동 지정)가 우선한다. 라벨과 함께 더 엄격하게 하려면 행동+라벨 정책을 추가한다
+
 ## 3. 승인 처리 (status가 APPROVAL_REQUIRED일 때, 관리자 인증 필요)
 
 ```
