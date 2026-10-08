@@ -62,6 +62,8 @@ def _state_schema(workflow: Workflow) -> type:
         "revisions": Annotated[dict[str, int], _merge],
         # agent node id → its conversation and tool-call bookkeeping
         "agent_runs": Annotated[dict[str, dict], _merge],
+        # set when a denied tool or approval stopped the execution: {node, status, reason}
+        "stopped": dict | None,
     }
     for node in workflow.nodes:
         if node.type in OUTPUT_TYPES:
@@ -151,6 +153,7 @@ class WorkflowCompiler:
                         lambda s, keys=node.config.payload_keys: {k: s.get(k) for k in keys},
                         next_node=targets(node.id),
                         output_key=node.id,
+                        on_denied=node.config.on_denied,
                     )
                 case McpToolNode():
                     add_tool(
@@ -162,6 +165,7 @@ class WorkflowCompiler:
                         },
                         next_node=targets(node.id),
                         output_key=node.id,
+                        on_denied=node.config.on_denied,
                     )
                 case ApprovalNode():
                     if self._gate is None:

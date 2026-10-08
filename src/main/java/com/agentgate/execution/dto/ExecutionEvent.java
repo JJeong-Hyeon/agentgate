@@ -21,6 +21,7 @@ public record ExecutionEvent(
         NODE_FAILED,
         EXECUTION_WAITING,
         EXECUTION_COMPLETED,
+        EXECUTION_STOPPED,
         EXECUTION_FAILED
     }
 

@@ -684,3 +684,11 @@ fieldset.mode {
   gap: 6px;
   align-items: center;
 }
+
+/* Stopped executions: a denied tool or approval ended the run */
+.status-stopped {
+  color: var(--warn);
+}
+.stopped-reason {
+  border-color: var(--warn);
+}

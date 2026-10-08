@@ -200,4 +200,27 @@ describe("ExecutionPage", () => {
     // The empty hand-off step is not listed.
     expect(screen.getAllByText("plan.gate")).toHaveLength(1);
   });
+
+  it("explains why a stopped execution ended", async () => {
+    const stopped: Execution = { ...running, status: "STOPPED", error: "report: rejected by an approver", nodes: [] };
+    sessionStorage.setItem("agentgate.credentials", JSON.stringify({ username: "admin", password: "pw" }));
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/stream")) return streamResponse([sse("snapshot", stopped)]);
+      if (url.includes("/versions/2")) return Response.json({ version: 2, dsl: DSL });
+      return new Response("{}", { status: 404 });
+    });
+    render(
+      <AuthProvider fetchImpl={fetchImpl as unknown as typeof fetch}>
+        <MemoryRouter initialEntries={["/executions/e1"]}>
+          <Routes>
+            <Route path="/executions/:executionId" element={<ExecutionPage />} />
+          </Routes>
+        </MemoryRouter>
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByText("중단됨")).toBeInTheDocument();
+    expect(screen.getByText(/실행을 중단했습니다: report: rejected by an approver/)).toBeInTheDocument();
+  });
 });

@@ -201,7 +201,7 @@ GET  /api/v1/executions/{executionId}        노드별 기록(nodes) 포함
 GET  /api/v1/executions/{executionId}/stream SSE: snapshot 1회 → update(event, execution) 반복, 종료 상태면 스트림 종료
 ```
 
-- `status`: `RUNNING` | `WAITING_APPROVAL`(`waitingApprovalId`) | `COMPLETED` | `FAILED`(`error`)
+- `status`: `RUNNING` | `WAITING_APPROVAL`(`waitingApprovalId`) | `COMPLETED` | `STOPPED`(`error`에 사유: 거절·차단된 Tool / 승인 노드) | `FAILED`(`error`)
 - `agentVersions`: 실행에 쓴 Agent 정의 버전 (`{"note-agent": 3}`). 실행 시작 시점에 고정되며, Agent 참조를 쓸 수 없으면 실행을 만들지 않고 422
 - Agent 단계의 `output`은 요약 trace다: `{"agent": {"kind": "tool_calls" | "decision" | "result" | "answer" | ..., ...}}` (`ARCHITECTURE.md` 12장)
 - `nodes[]`: `nodeId`, `step`(Tool 하위 단계는 `report.approval` 형식), `status`(`RUNNING`/`WAITING`/`COMPLETED`/`FAILED`), `output`, `error`, `approvalId`, `startedAt`, `finishedAt`

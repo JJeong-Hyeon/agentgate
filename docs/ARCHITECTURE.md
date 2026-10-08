@@ -201,7 +201,8 @@ JSON Schema는 `GET /runtime/workflows/schema`로 제공한다 (프론트엔드 
 - `ROUTER`는 LLM 응답에서 route 이름을 찾고, 없으면 첫 번째 route로 간다.
 - `AGENT` 노드의 `config.agentId`는 등록된 Agent를, `config.agentVersion`(선택)은 정의 버전을 고정한다. 이때 `system` / `model` / `temperature`는 정의가 정하므로 노드에 쓸 수 없다. 저장 시 AgentGate가 참조를 검사한다 (없는 Agent, 정의 없는 Agent, 없는 버전, 같은 Agent의 서로 다른 고정 버전 → 422).
 - 실행을 시작할 때 AgentGate가 각 Agent의 정의 버전을 고정해 DSL `agents`(`agentId → 정의 스냅샷`)에 넣어 Runtime에 보내고, 실행 기록에 `agentVersions`로 남긴다. 저장된 DSL에는 `agents`가 없다.
-- `APPROVAL` 노드는 AgentGate에 `requireApproval: true`로 승인 요청을 만든다. 정책상 허용이어도 승인을 기다리고, 정책상 `BLOCKED`면 차단된다. 승인 시 다음 단계로, 거절·차단·AgentGate 실패 시 실행을 종료하며 결과를 `state[노드id]`에 기록한다.
+- `APPROVAL` 노드는 AgentGate에 `requireApproval: true`로 승인 요청을 만든다. 정책상 허용이어도 승인을 기다리고, 정책상 `BLOCKED`면 차단된다. 승인 시 다음 단계로, 거절·차단·AgentGate 실패 시 실행을 `STOPPED`로 중단하며 결과를 `state[노드id]`에 기록한다.
+- Tool 노드(`HTTP_TOOL` / `MCP_TOOL`)가 정책상 차단되거나 승인자가 거절하면(또는 AgentGate 판정 실패) 기본적으로 실행을 `STOPPED`로 중단한다. 실행 상태의 `stopped`(`node`, `status`, `reason`)와 이벤트 `EXECUTION_STOPPED`로 사유를 남긴다. 노드 설정 `onDenied: CONTINUE`면 결과(`REJECTED` / `BLOCKED`)를 `state[노드id]`에 기록하고 다음 노드로 진행한다. Agent 내부의 Tool 호출은 중단하지 않고 사유를 LLM에 돌려준다(9장).
 
 ---
 

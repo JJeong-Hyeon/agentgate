@@ -31,7 +31,8 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 @RequiredArgsConstructor
 public class ExecutionController {
 
-    private static final Set<ExecutionStatus> FINISHED = Set.of(ExecutionStatus.COMPLETED, ExecutionStatus.FAILED);
+    private static final Set<ExecutionStatus> FINISHED = Set.of(ExecutionStatus.COMPLETED, ExecutionStatus.STOPPED,
+            ExecutionStatus.FAILED);
 
     private final ExecutionService executionService;
     private final ExecutionStreamBroadcaster broadcaster;

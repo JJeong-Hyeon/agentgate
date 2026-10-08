@@ -76,6 +76,21 @@ describe("BuilderPage", () => {
     expect(post.body.dsl.nodes[2].config.url).toBe("https://hook/report");
   });
 
+  it("lets a tool node continue when its call is denied", async () => {
+    const fetchImpl = renderBuilder("/workflows/new", () => Response.json({}));
+
+    fireEvent.click(await screen.findByRole("button", { name: "MCP Tool" }));
+    const toggle = screen.getByRole("checkbox", { name: "거절·차단돼도 다음 단계로 계속" });
+    expect(toggle).not.toBeChecked();
+    fireEvent.click(toggle);
+    fireEvent.change(screen.getByLabelText("워크플로 id"), { target: { value: "lenient" } });
+    fireEvent.click(screen.getByRole("button", { name: "만들기" }));
+
+    await waitFor(() => expect(sentBodies(fetchImpl)).toHaveLength(1));
+    const tool = sentBodies(fetchImpl)[0].body.dsl.nodes.find((n: { type: string }) => n.type === "MCP_TOOL");
+    expect(tool.config.onDenied).toBe("CONTINUE");
+  });
+
   it("rejects an invalid workflow id before calling the API", async () => {
     const fetchImpl = renderBuilder("/workflows/new", () => Response.json({}));
 

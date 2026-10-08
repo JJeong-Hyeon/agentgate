@@ -3,9 +3,9 @@
     <name>            ask AgentGate for an approval (requireApproval)
       ├─ APPROVAL_REQUIRED → <name>.approval  (interrupt until resumed)
       │                         ├─ APPROVED → next nodes
-      │                         └─ REJECTED → end of execution
+      │                         └─ REJECTED → execution stopped
       ├─ ALLOWED           → next nodes
-      └─ BLOCKED / FAILED  → end of execution
+      └─ BLOCKED / FAILED  → execution stopped
 
 The decision is written to state[<name>] and recorded in tool_results.
 """
@@ -32,7 +32,16 @@ def add_approval(
 
     def record(status: str, approval_id: int | None = None, error: str | None = None) -> dict:
         result = {"tool": name, "status": status, "approval_id": approval_id, "error": error}
-        return {name: status, "pending_tool": None, "tool_results": [result]}
+        update = {name: status, "pending_tool": None, "tool_results": [result]}
+        if status != "APPROVED":
+            reason = {"REJECTED": "rejected by an approver", "BLOCKED": "blocked by AgentGate"}
+            text = f"{name}: {reason.get(status, 'could not be authorized')}"
+            update["stopped"] = {
+                "node": name,
+                "status": status,
+                "reason": f"{text}: {error}" if error else text,
+            }
+        return update
 
     def request(state: dict, config: RunnableConfig) -> Command:
         execution_id = config.get("configurable", {}).get("thread_id")

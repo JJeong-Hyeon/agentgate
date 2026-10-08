@@ -46,7 +46,7 @@ class ExecutionRequest(BaseModel):
 
 class ExecutionResponse(BaseModel):
     execution_id: str
-    status: Literal["RUNNING", "WAITING_APPROVAL", "COMPLETED", "RESUMING"]
+    status: Literal["RUNNING", "WAITING_APPROVAL", "COMPLETED", "STOPPED", "RESUMING"]
     waiting_approval_id: int | None = None
     state: dict | None = None
 
@@ -109,11 +109,11 @@ def _describe(graph: CompiledStateGraph, execution_id: str) -> ExecutionResponse
             waiting_approval_id=snapshot.interrupts[0].value.get("approval_id"),
             state=snapshot.values,
         )
-    return ExecutionResponse(
-        execution_id=execution_id,
-        status="RUNNING" if snapshot.next else "COMPLETED",
-        state=snapshot.values,
-    )
+    if snapshot.next:
+        status_ = "RUNNING"
+    else:
+        status_ = "STOPPED" if snapshot.values.get("stopped") else "COMPLETED"
+    return ExecutionResponse(execution_id=execution_id, status=status_, state=snapshot.values)
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)

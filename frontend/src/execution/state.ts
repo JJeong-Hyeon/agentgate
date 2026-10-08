@@ -7,7 +7,7 @@ export interface ExecutionUpdate {
 }
 
 export function isFinished(status: ExecutionStatus): boolean {
-  return status === "COMPLETED" || status === "FAILED";
+  return status === "COMPLETED" || status === "STOPPED" || status === "FAILED";
 }
 
 /** Merges a live update into the current execution, upserting the touched node by task id. */
