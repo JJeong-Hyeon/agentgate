@@ -145,6 +145,20 @@ class AgentExecutionIntegrationTest {
     }
 
     @Test
+    void passesTheToolCallingModeAndOutputSchema() throws Exception {
+        admin(put("/api/v1/agents/{id}/definition", agentId).contentType(MediaType.APPLICATION_JSON).content("""
+                {"systemPrompt":"x","tools":[],"toolCalling":"JSON",
+                 "outputSchema":{"type":"object","required":["total"]}}
+                """)).andExpect(status().isCreated());
+        createWorkflow("{\"agentId\":\"note-agent\",\"prompt\":\"{task}\"}").andExpect(status().isCreated());
+
+        JsonNode agent = startAndCaptureDsl().get("agents").get("note-agent");
+
+        assertThat(agent.get("toolCalling").asString()).isEqualTo("JSON");
+        assertThat(agent.get("outputSchema").get("required").get(0).asString()).isEqualTo("total");
+    }
+
+    @Test
     void runsAPinnedVersion() throws Exception {
         createWorkflow("{\"agentId\":\"note-agent\",\"agentVersion\":1,\"prompt\":\"{task}\"}")
                 .andExpect(status().isCreated());

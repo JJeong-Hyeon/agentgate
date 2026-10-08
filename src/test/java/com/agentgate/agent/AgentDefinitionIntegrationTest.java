@@ -161,7 +161,7 @@ class AgentDefinitionIntegrationTest {
     @Test
     void concurrentSavesGetDistinctVersions() throws Exception {
         AgentDefinition definition = new AgentDefinition(null, null, null, "prompt",
-                List.of(new AgentToolDefinition("notes", "list_notes", ToolPermission.AUTO, null)), null, null);
+                List.of(new AgentToolDefinition("notes", "list_notes", ToolPermission.AUTO, null)), null, null, null);
         List<Callable<AgentDefinitionResponse>> tasks = IntStream.range(0, 8)
                 .<Callable<AgentDefinitionResponse>>mapToObj(i -> () -> agentDefinitionService.save(agentId, definition))
                 .toList();

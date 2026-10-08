@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -16,6 +17,9 @@ class Settings(BaseSettings):
     llm_model: str = "qwen2.5:7b"
     llm_temperature: float = 0.0
     llm_timeout_seconds: float = 60.0
+    # How agents call tools unless their definition says: "native" (OpenAI function calling)
+    # or "json" (tools described in the prompt, calls read from the model's JSON reply).
+    llm_tool_calling: Literal["native", "json"] = "native"
     # Empty → in-memory checkpoints (lost on restart).
     runtime_database_url: str = ""
     # Shared secret with AgentGate (X-Runtime-Token both ways): it authenticates resume requests

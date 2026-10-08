@@ -238,7 +238,7 @@ class AgentActionServiceTest {
         Agent agent = new Agent("mail-agent", "Mail Agent", ApiKeyGenerator.hash(API_KEY));
         when(agentRepository.findByAgentId("mail-agent")).thenReturn(Optional.of(agent));
         when(agentDefinitionService.definition(agent, 2)).thenReturn(
-                new AgentDefinition(null, null, null, "prompt", List.of(tools), 8, null));
+                new AgentDefinition(null, null, null, "prompt", List.of(tools), 8, null, null));
         return agent;
     }
 

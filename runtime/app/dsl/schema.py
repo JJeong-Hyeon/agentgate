@@ -221,7 +221,10 @@ class AgentSpec(SnapshotModel):
     system_prompt: str = Field(min_length=1)
     tools: list[AgentToolSpec] = []
     max_steps: int = Field(default=8, ge=1, le=50)
+    # JSON Schema the final answer must match; None → free text.
     output_schema: dict[str, Any] | None = None
+    # NATIVE (function calling) or JSON (prompted); None → the runtime's default.
+    tool_calling: Literal["NATIVE", "JSON"] | None = None
 
 
 class Edge(DslModel):

@@ -96,7 +96,9 @@ class WorkflowCompiler:
         gate: AgentGateClient | None = None,
         tool_transport: httpx.BaseTransport | None = None,
         mcp_servers: dict[str, McpServerConfig] | None = None,
+        tool_calling: str = "NATIVE",
     ):
+        self._tool_calling = tool_calling
         self._llm_factory = llm_factory
         self._gate = gate
         self._tool_transport = tool_transport
@@ -280,6 +282,7 @@ class WorkflowCompiler:
             self._llm_factory,
             tools,
             next_nodes,
+            spec.tool_calling or self._tool_calling,
         )
 
     def _http_tool(self, node: HttpToolNode) -> HttpTool:

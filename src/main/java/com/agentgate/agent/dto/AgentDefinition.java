@@ -1,5 +1,6 @@
 package com.agentgate.agent.dto;
 
+import com.agentgate.agent.domain.ToolCallingMode;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
@@ -24,7 +25,9 @@ public record AgentDefinition(
         @NotNull @Size(max = 50) List<@Valid @NotNull AgentToolDefinition> tools,
         @Min(1) @Max(50) Integer maxSteps,
         // JSON Schema the final answer must match; null → free text.
-        JsonNode outputSchema
+        JsonNode outputSchema,
+        // Null → the runtime's default (LLM_TOOL_CALLING).
+        ToolCallingMode toolCalling
 ) {
     public static final int DEFAULT_MAX_STEPS = 8;
 
@@ -35,6 +38,6 @@ public record AgentDefinition(
                         t.labels() == null ? List.of() : t.labels()))
                 .toList();
         return new AgentDefinition(description, model, temperature, systemPrompt, normalizedTools,
-                maxSteps == null ? DEFAULT_MAX_STEPS : maxSteps, outputSchema);
+                maxSteps == null ? DEFAULT_MAX_STEPS : maxSteps, outputSchema, toolCalling);
     }
 }

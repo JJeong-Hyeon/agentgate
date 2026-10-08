@@ -340,3 +340,114 @@ def test_execution_with_an_unavailable_agent_tool_is_rejected():
 
     assert response.status_code == 422
     assert "tool local/echo is not available" in response.json()["detail"]
+
+
+# --- JSON tool calling (models without function calling) ---
+
+
+def test_json_mode_reads_calls_from_the_reply_and_sends_results_as_text():
+    llm = ScriptedChatModel.of(
+        '```json\n{"tool": "local__echo", "arguments": {"text": "hi"}}\n```', "It said hi.", "done"
+    )
+    gate = PolicyGate()
+    graph, state = build(agent_workflow(toolCalling="JSON"), llm, gate)
+
+    result = graph.invoke(state, CONFIG)
+
+    assert result["helper"] == "It said hi."
+    first, second = llm.log[0], llm.log[1]
+    assert first["tools"] is None  # nothing bound
+    system = first["messages"][0].content
+    assert "- local__echo: Return the text prefixed with 'echo: '." in system
+    assert '{"tool": "<tool name>"' in system
+    # The model sees its own JSON and the result as plain messages, never tool messages.
+    assert not any(isinstance(m, ToolMessage) for m in second["messages"])
+    assert second["messages"][-1] == HumanMessage("Result of local__echo:\necho: hi")
+    assert gate.bodies[0]["action"] == "MCP:local:echo"
+    assert result["tool_results"][0]["status"] == "EXECUTED"
+
+
+def test_json_mode_calls_are_governed_like_native_ones():
+    llm = ScriptedChatModel.of('{"tool": "local__add", "arguments": {"a": 1, "b": 2}}', "3", "done")
+    graph, state = build(
+        agent_workflow(toolCalling="JSON"), llm, PolicyGate(add="APPROVAL_REQUIRED")
+    )
+
+    graph.invoke(state, CONFIG)
+    assert graph.get_state(CONFIG).interrupts[0].value["approval_id"] == 101
+    result = graph.invoke(Command(resume={"decision": "APPROVED"}), CONFIG)
+
+    assert result["helper"] == "3"
+    assert llm.log[1]["messages"][-1].content == "Result of local__add:\n3"
+
+
+def test_json_mode_reply_that_is_not_a_call_is_the_answer():
+    llm = ScriptedChatModel.of('The result is {"total": 3}, no tool needed.', "done")
+    graph, state = build(agent_workflow(toolCalling="JSON"), llm, PolicyGate())
+
+    result = graph.invoke(state, CONFIG)
+
+    assert result["helper"] == 'The result is {"total": 3}, no tool needed.'
+    assert "tool_results" not in result or result["tool_results"] == []
+
+
+def test_runtime_default_mode_applies_when_the_definition_has_none():
+    llm = ScriptedChatModel.of('{"tool": "local__echo", "arguments": {"text": "x"}}', "ok", "done")
+    workflow = attach_tool_schemas(Workflow.model_validate(agent_workflow()), CATALOG)
+    client = AgentGateClient(
+        "http://agentgate", "runtime-agent", transport=httpx.MockTransport(PolicyGate())
+    )
+    compiler = WorkflowCompiler(
+        lambda m, t: llm, client, mcp_servers={"local": ECHO_SERVER}, tool_calling="JSON"
+    )
+    graph = compiler.compile(workflow, InMemorySaver())
+    state = {"task": "t", "workflow": workflow.model_dump(mode="json", by_alias=True)}
+
+    result = graph.invoke(state, CONFIG)
+
+    assert result["helper"] == "ok"
+    assert llm.log[0]["tools"] is None
+
+
+# --- Output schema ---
+
+SCHEMA = {
+    "type": "object",
+    "properties": {"total": {"type": "integer"}, "note": {"type": "string"}},
+    "required": ["total"],
+}
+
+
+def test_answer_matching_the_schema_is_stored_as_compact_json():
+    llm = ScriptedChatModel.of('Here:\n```json\n{"total": 5, "note": "ok"}\n```', "done")
+    graph, state = build(agent_workflow(tools=[], outputSchema=SCHEMA), llm, PolicyGate())
+
+    result = graph.invoke(state, CONFIG)
+
+    assert result["helper"] == '{"total":5,"note":"ok"}'
+    assert '"required": ["total"]' in llm.log[0]["messages"][0].content
+
+
+def test_non_matching_answer_gets_one_repair_turn():
+    llm = ScriptedChatModel.of('{"total": "five"}', '{"total": 5}', "done")
+    graph, state = build(agent_workflow(outputSchema=SCHEMA), llm, PolicyGate())
+
+    result = graph.invoke(state, CONFIG)
+
+    assert result["helper"] == '{"total":5}'
+    repair = llm.log[1]
+    assert repair["tools"] is None  # answer turn, no tools
+    assert repair["messages"][-1].content.startswith(
+        "Your answer does not match the required format: total: 'five' is not of type 'integer'"
+    )
+
+
+def test_answer_still_not_matching_after_repair_fails_the_node():
+    from app.nodes.agent import AgentOutputError
+
+    llm = ScriptedChatModel.of("no json here", '{"note": "missing total"}')
+    graph, state = build(agent_workflow(tools=[], outputSchema=SCHEMA), llm, PolicyGate())
+
+    with pytest.raises(AgentOutputError, match="'total' is a required property"):
+        graph.invoke(state, CONFIG)
+    assert "not valid JSON" in llm.log[1]["messages"][-1].content
