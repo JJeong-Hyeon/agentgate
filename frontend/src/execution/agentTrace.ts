@@ -6,7 +6,14 @@ export interface Tokens {
   output?: number | null;
 }
 
-export type AgentTrace =
+// Which agent ran the step, and who delegated to it (outermost first, ">"-separated).
+export interface TraceAgent {
+  agent?: string | null;
+  delegated_by?: string | null;
+}
+
+export type AgentTrace = TraceAgent &
+  (
   | { kind: "start"; prompt: string }
   | { kind: "tool_calls"; step?: number; tokens?: Tokens; calls: { tool: string; arguments: unknown }[] }
   | { kind: "answer"; step?: number; tokens?: Tokens; answer: string }
@@ -20,7 +27,8 @@ export type AgentTrace =
       approval_id?: number | null;
       arguments?: unknown;
       content?: string;
-    };
+    }
+  );
 
 export function agentTrace(node: NodeExecution): AgentTrace | null {
   if (!node.output) return null;
@@ -71,5 +79,19 @@ export function totalTokens(nodes: NodeExecution[] = []): { input: number; outpu
   return seen ? { input, output } : null;
 }
 
-/** "server/tool" from a recorded tool name like "helper:notes/save_note". */
-export const toolLabel = (tool: string) => tool.slice(tool.indexOf(":") + 1);
+/** "server/tool" from a recorded tool name like "helper:notes/save_note"; delegations read "→ agent". */
+export function toolLabel(tool: string): string {
+  const name = tool.slice(tool.indexOf(":") + 1);
+  return name.startsWith("agent/") ? `→ ${name.slice("agent/".length)}에게 위임` : name;
+}
+
+/** The model's function name as people read it: delegate__research → "→ research에게 위임". */
+export function callLabel(functionName: string): string {
+  return functionName.startsWith("delegate__") ? `→ ${functionName.slice("delegate__".length)}에게 위임` : functionName;
+}
+
+/** "lead → research" for a delegated step, or null when the agent ran as a workflow node. */
+export function delegationPath(trace: TraceAgent): string | null {
+  if (!trace.delegated_by) return null;
+  return [...trace.delegated_by.split(">"), trace.agent ?? "?"].join(" → ");
+}

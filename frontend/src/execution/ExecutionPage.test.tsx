@@ -223,4 +223,60 @@ describe("ExecutionPage", () => {
     expect(await screen.findByText("중단됨")).toBeInTheDocument();
     expect(screen.getByText(/실행을 중단했습니다: report: rejected by an approver/)).toBeInTheDocument();
   });
+
+  it("shows which agent ran a delegated step and who delegated it", async () => {
+    const team: Execution = {
+      ...running,
+      status: "COMPLETED",
+      agentVersions: { lead: 1, research: 2 },
+      nodes: [
+        {
+          taskId: "d1",
+          nodeId: "plan",
+          step: "plan.think",
+          status: "COMPLETED",
+          output: JSON.stringify({
+            agent: { kind: "tool_calls", step: 1, agent: "lead", calls: [{ tool: "delegate__research", arguments: { task: "find" } }] },
+          }),
+        },
+        {
+          taskId: "d2",
+          nodeId: "plan",
+          step: "research.execute",
+          status: "COMPLETED",
+          output: JSON.stringify({
+            agent: {
+              kind: "result",
+              agent: "research",
+              delegated_by: "lead",
+              tool: "research:notes/save_note",
+              status: "EXECUTED",
+              content: "saved",
+            },
+          }),
+        },
+      ],
+    };
+    sessionStorage.setItem("agentgate.credentials", JSON.stringify({ username: "admin", password: "pw" }));
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/stream")) return streamResponse([sse("snapshot", team)]);
+      if (url.includes("/versions/2")) return Response.json({ version: 2, dsl: DSL });
+      return new Response("{}", { status: 404 });
+    });
+    render(
+      <AuthProvider fetchImpl={fetchImpl as unknown as typeof fetch}>
+        <MemoryRouter initialEntries={["/executions/e1"]}>
+          <Routes>
+            <Route path="/executions/:executionId" element={<ExecutionPage />} />
+          </Routes>
+        </MemoryRouter>
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByText("→ research에게 위임")).toBeInTheDocument();
+    expect(screen.getByText("위임 경로 lead → research")).toBeInTheDocument();
+    expect(screen.getByText("research v2")).toBeInTheDocument();
+    expect(screen.getByText("saved")).toBeInTheDocument();
+  });
 });

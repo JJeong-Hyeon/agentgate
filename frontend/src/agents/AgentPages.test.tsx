@@ -105,6 +105,13 @@ describe("AgentEditorPage", () => {
     }
     if (init?.method === "PUT") return Response.json({ agentId: "note-agent", version: 3, createdAt: "" });
     if (url === "/api/v1/agents/7") return Response.json(AGENT);
+    if (url === "/api/v1/agents") {
+      return Response.json([
+        AGENT,
+        { ...AGENT, id: 8, agentId: "research", name: "Research", description: "Finds things out" },
+        { ...AGENT, id: 9, agentId: "blank", name: "Blank", latestDefinitionVersion: 0 },
+      ]);
+    }
     if (url === "/api/v1/agents/7/definition") return Response.json(DEFINITION);
     if (url === "/api/v1/agents/7/definition/versions") {
       return Response.json([
@@ -139,6 +146,22 @@ describe("AgentEditorPage", () => {
       { server: "notes", tool: "save_note", permission: "BLOCKED", labels: ["PII"] },
       { server: "notes", tool: "list_notes", permission: "AUTO", labels: [] },
     ]);
+  });
+
+  it("chooses agents to delegate to and how", async () => {
+    const fetchImpl = renderAt("/agents/7", editorHandler);
+
+    await screen.findByDisplayValue("Be careful.");
+    const research = await screen.findByRole("checkbox", { name: "research 위임" });
+    expect(screen.queryByRole("checkbox", { name: "note-agent 위임" })).not.toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "blank 위임" })).toBeDisabled();
+    fireEvent.click(research);
+    expect(screen.getByLabelText("research 위임 권한")).toHaveValue("AUTO");
+    fireEvent.change(screen.getByLabelText("research 위임 권한"), { target: { value: "APPROVAL" } });
+    fireEvent.click(screen.getByRole("button", { name: "새 버전 저장" }));
+
+    await screen.findByText("v3 저장됨");
+    expect(sent(fetchImpl, "PUT")[0].body.delegates).toEqual([{ agentId: "research", permission: "APPROVAL" }]);
   });
 
   it("loads an earlier version into the form", async () => {

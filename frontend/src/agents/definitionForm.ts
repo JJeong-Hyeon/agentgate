@@ -20,6 +20,8 @@ export interface DefinitionForm {
   outputSchema: string;
   // keyed by toolKey(server, tool), in the order they were chosen
   tools: Record<string, ToolChoice>;
+  // agentId → permission for delegating to that agent
+  delegates: Record<string, ToolPermission>;
 }
 
 export const toolKey = (server: string, tool: string) => `${server}/${tool}`;
@@ -34,6 +36,7 @@ export function emptyForm(): DefinitionForm {
     maxSteps: "8",
     outputSchema: "",
     tools: {},
+    delegates: {},
   };
 }
 
@@ -57,6 +60,7 @@ export function toForm(definition: AgentDefinition | null | undefined): Definiti
     maxSteps: definition.maxSteps == null ? "8" : String(definition.maxSteps),
     outputSchema: definition.outputSchema ? JSON.stringify(definition.outputSchema, null, 2) : "",
     tools,
+    delegates: Object.fromEntries((definition.delegates ?? []).map((d) => [d.agentId, d.permission])),
   };
 }
 
@@ -108,6 +112,7 @@ export function fromForm(form: DefinitionForm): { definition: AgentDefinition } 
       maxSteps,
       outputSchema,
       tools,
+      delegates: Object.entries(form.delegates).map(([agentId, permission]) => ({ agentId, permission })),
     },
   };
 }

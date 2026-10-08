@@ -1,4 +1,12 @@
-import { BASIS_TEXT, CALL_STATUS_TEXT, toolLabel, type AgentTrace, type Tokens } from "./agentTrace";
+import {
+  BASIS_TEXT,
+  CALL_STATUS_TEXT,
+  callLabel,
+  delegationPath,
+  toolLabel,
+  type AgentTrace,
+  type Tokens,
+} from "./agentTrace";
 
 const json = (value: unknown) => JSON.stringify(value, null, 2);
 
@@ -20,6 +28,20 @@ function statusClass(status: string): string {
 
 /** One agent sub-step: what the model asked for, how AgentGate decided, what came back. */
 export function AgentStep({ trace }: { trace: AgentTrace }) {
+  const path = delegationPath(trace);
+  return (
+    <>
+      {path && (
+        <div className="agent-step-who">
+          <span className="badge">{trace.agent}</span> <span className="muted">위임 경로 {path}</span>
+        </div>
+      )}
+      <StepBody trace={trace} />
+    </>
+  );
+}
+
+function StepBody({ trace }: { trace: AgentTrace }) {
   switch (trace.kind) {
     case "start":
       return (
@@ -38,7 +60,7 @@ export function AgentStep({ trace }: { trace: AgentTrace }) {
           <ul>
             {trace.calls.map((call, i) => (
               <li key={i}>
-                <span className="mono">{call.tool}</span>
+                <span className="mono">{callLabel(call.tool)}</span>
                 <pre>{json(call.arguments)}</pre>
               </li>
             ))}

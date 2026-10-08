@@ -112,6 +112,12 @@ export function AgentNodeFields({ config, onConfig }: AgentNodeFieldsProps) {
                 {agent && <Link to={`/agents/${agent.id}`}>정의 편집 →</Link>}
               </div>
               {definition.data.definition.tools.length === 0 && <p className="muted">Tool 없음</p>}
+              {(definition.data.definition.delegates ?? []).length > 0 && (
+                <p className="muted">
+                  위임:{" "}
+                  {definition.data.definition.delegates!.map((d) => `${d.agentId} (${PERMISSION_LABELS[d.permission]})`).join(", ")}
+                </p>
+              )}
               <ul>
                 {definition.data.definition.tools.map((t) => (
                   <li key={`${t.server}/${t.tool}`}>

@@ -1,5 +1,5 @@
 import type { NodeExecution } from "../api/types";
-import { agentTrace, isQuietAgentStep, toolLabel, totalTokens } from "./agentTrace";
+import { agentTrace, callLabel, delegationPath, isQuietAgentStep, toolLabel, totalTokens } from "./agentTrace";
 
 const step = (stepName: string, output: unknown, status: NodeExecution["status"] = "COMPLETED"): NodeExecution => ({
   taskId: stepName,
@@ -37,5 +37,13 @@ describe("agent traces", () => {
 
   it("labels tools without the node prefix", () => {
     expect(toolLabel("helper:notes/save_note")).toBe("notes/save_note");
+  });
+
+  it("reads delegations as people would", () => {
+    expect(toolLabel("lead:agent/research")).toBe("→ research에게 위임");
+    expect(callLabel("delegate__research")).toBe("→ research에게 위임");
+    expect(callLabel("notes__save_note")).toBe("notes__save_note");
+    expect(delegationPath({ agent: "deep", delegated_by: "lead>research" })).toBe("lead → research → deep");
+    expect(delegationPath({ agent: "lead" })).toBeNull();
   });
 });
