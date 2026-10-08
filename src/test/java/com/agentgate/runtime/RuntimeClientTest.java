@@ -103,7 +103,7 @@ class RuntimeClientTest {
     void listToolsParsesServersAndTools() {
         responseStatus = 200;
         responseBody = """
-                [{"server":"notes","transport":"url","error":null,
+                [{"server":"notes","transport":"url","source":"agentgate","error":null,
                   "tools":[{"name":"save_note","title":null,"description":"Save a note.",
                             "input_schema":{"type":"object","required":["title"]},
                             "annotations":{"destructiveHint":true}}]},
@@ -116,6 +116,7 @@ class RuntimeClientTest {
         assertThat(query.get()).isEqualTo("refresh=true");
         assertThat(token.get()).isEqualTo("secret");
         assertThat(servers).hasSize(2);
+        assertThat(servers.get(0).source()).isEqualTo("agentgate");
         McpToolInfo tool = servers.get(0).tools().get(0);
         assertThat(tool.name()).isEqualTo("save_note");
         assertThat(tool.inputSchema().get("required").get(0).asString()).isEqualTo("title");

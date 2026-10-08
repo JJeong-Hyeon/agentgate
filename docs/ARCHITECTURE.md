@@ -238,7 +238,10 @@ Governance를 우회하는 Tool 실행 경로는 두지 않는다. HTTP / MCP �
 
 MCP:
 
-- 사용할 MCP 서버는 Runtime 설정 파일(`MCP_CONFIG_PATH`)에 `mcpServers` 형식으로 등록한다. `command`/`args`는 stdio, `url`은 Streamable HTTP 서버다.
+- MCP 서버는 두 곳에서 등록한다.
+  - **AgentGate** (`/api/v1/mcp-servers`, 화면): Streamable HTTP 서버와 인증 헤더(암호화 저장). Runtime이 Runtime 토큰으로 30초마다 받아오므로 재시작 없이 추가·변경·인증정보 교체가 반영된다. 조회에 실패하면 마지막 목록을 유지한다.
+  - **Runtime 설정 파일** (`MCP_CONFIG_PATH`, `mcpServers` 형식): `command`/`args`는 stdio, `url`은 Streamable HTTP. stdio 서버는 Runtime 호스트에서 명령을 실행하므로 여기서만 등록한다. 이름이 겹치면 설정 파일이 우선하고 Tool 목록에 충돌로 표시된다.
+- Tool은 호출할 때마다 서버 설정을 다시 조회하므로, 승인 대기 중인 실행에도 URL·인증정보 변경이 반영되고 삭제·비활성화된 서버의 호출은 `FAILED`로 기록된다.
 
 ```json
 {"mcpServers": {
