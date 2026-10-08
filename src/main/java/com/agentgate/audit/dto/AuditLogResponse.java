@@ -2,6 +2,7 @@ package com.agentgate.audit.dto;
 
 import com.agentgate.audit.domain.AuditLog;
 import com.agentgate.risk.ActionStatus;
+import com.agentgate.risk.DecisionBasis;
 import com.agentgate.risk.RiskLevel;
 import java.time.Instant;
 import java.util.List;
@@ -15,6 +16,7 @@ public record AuditLogResponse(
         RiskLevel riskLevel,
         ActionStatus status,
         Long approvalId,
+        DecisionBasis basis,
         Instant createdAt
 ) {
     public static AuditLogResponse from(AuditLog auditLog) {
@@ -27,6 +29,7 @@ public record AuditLogResponse(
                 auditLog.getRiskLevel(),
                 auditLog.getStatus(),
                 auditLog.getApprovalId(),
+                auditLog.getBasis(),
                 auditLog.getCreatedAt()
         );
     }

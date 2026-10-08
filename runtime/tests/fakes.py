@@ -6,8 +6,12 @@ import httpx
 class FakeAgentGate:
     """MockTransport handler that records evaluation requests and returns a fixed decision."""
 
-    def __init__(self, status="ALLOWED", risk_level="LOW", approval_id=None, http_status=200):
+    def __init__(
+        self, status="ALLOWED", risk_level="LOW", approval_id=None, http_status=200, basis=None
+    ):
         self.decision = {"status": status, "riskLevel": risk_level, "approvalId": approval_id}
+        if basis:
+            self.decision["basis"] = basis
         self.http_status = http_status
         self.requests: list[httpx.Request] = []
 

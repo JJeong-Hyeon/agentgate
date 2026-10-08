@@ -12,6 +12,7 @@ import com.agentgate.audit.dto.AuditStatsResponse;
 import com.agentgate.audit.service.AuditLogService;
 import com.agentgate.common.exception.AuditLogNotFoundException;
 import com.agentgate.risk.ActionStatus;
+import com.agentgate.risk.DecisionBasis;
 import com.agentgate.risk.RiskLevel;
 import java.time.Instant;
 import java.util.List;
@@ -37,7 +38,7 @@ class AuditLogControllerTest {
     void listReturnsAuditLogs() throws Exception {
         when(auditLogService.list(isNull(), isNull(), isNull())).thenReturn(List.of(
                 new AuditLogResponse(1L, "mail-agent", "VIEW_DATA", null, List.of(),
-                        RiskLevel.LOW, ActionStatus.ALLOWED, null, Instant.now())));
+                        RiskLevel.LOW, ActionStatus.ALLOWED, null, DecisionBasis.POLICY, Instant.now())));
 
         mockMvc.perform(get("/api/v1/audit-logs"))
                 .andExpect(status().isOk())
@@ -57,7 +58,7 @@ class AuditLogControllerTest {
     void getReturnsAuditLog() throws Exception {
         when(auditLogService.get(eq(1L))).thenReturn(
                 new AuditLogResponse(1L, "mail-agent", "SEND_EMAIL", null, List.of("PII"),
-                        RiskLevel.HIGH, ActionStatus.APPROVAL_REQUIRED, 5L, Instant.now()));
+                        RiskLevel.HIGH, ActionStatus.APPROVAL_REQUIRED, 5L, DecisionBasis.POLICY, Instant.now()));
 
         mockMvc.perform(get("/api/v1/audit-logs/1"))
                 .andExpect(status().isOk())

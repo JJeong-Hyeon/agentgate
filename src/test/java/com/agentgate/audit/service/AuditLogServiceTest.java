@@ -12,6 +12,7 @@ import com.agentgate.audit.dto.AuditStatsResponse;
 import com.agentgate.audit.repository.AuditLogRepository;
 import com.agentgate.common.exception.AuditLogNotFoundException;
 import com.agentgate.risk.ActionStatus;
+import com.agentgate.risk.DecisionBasis;
 import com.agentgate.risk.RiskLevel;
 import java.util.List;
 import java.util.Optional;
@@ -36,7 +37,7 @@ class AuditLogServiceTest {
 
     @Test
     void recordSavesAuditLog() {
-        service.record("mail-agent", "VIEW_DATA", null, List.of(), RiskLevel.LOW, ActionStatus.ALLOWED, null);
+        service.record("mail-agent", "VIEW_DATA", null, List.of(), RiskLevel.LOW, ActionStatus.ALLOWED, null, DecisionBasis.POLICY);
 
         verify(auditLogRepository).save(any(AuditLog.class));
     }
@@ -50,8 +51,8 @@ class AuditLogServiceTest {
 
     @Test
     void listFiltersByAgentIdStatusAndRiskLevel() {
-        AuditLog match = new AuditLog("mail-agent", "SEND_EMAIL", null, List.of("PII"), RiskLevel.HIGH, ActionStatus.APPROVAL_REQUIRED, 1L);
-        AuditLog other = new AuditLog("other-agent", "VIEW_DATA", null, List.of(), RiskLevel.LOW, ActionStatus.ALLOWED, null);
+        AuditLog match = new AuditLog("mail-agent", "SEND_EMAIL", null, List.of("PII"), RiskLevel.HIGH, ActionStatus.APPROVAL_REQUIRED, 1L, DecisionBasis.POLICY);
+        AuditLog other = new AuditLog("other-agent", "VIEW_DATA", null, List.of(), RiskLevel.LOW, ActionStatus.ALLOWED, null, DecisionBasis.POLICY);
         when(auditLogRepository.findAll()).thenReturn(List.of(match, other));
 
         List<AuditLogResponse> result = service.list("mail-agent", ActionStatus.APPROVAL_REQUIRED, RiskLevel.HIGH);
@@ -63,7 +64,7 @@ class AuditLogServiceTest {
     @Test
     void listReturnsAllWhenNoFilters() {
         when(auditLogRepository.findAll()).thenReturn(List.of(
-                new AuditLog("mail-agent", "VIEW_DATA", null, List.of(), RiskLevel.LOW, ActionStatus.ALLOWED, null)));
+                new AuditLog("mail-agent", "VIEW_DATA", null, List.of(), RiskLevel.LOW, ActionStatus.ALLOWED, null, DecisionBasis.POLICY)));
 
         List<AuditLogResponse> result = service.list(null, null, null);
 
@@ -73,9 +74,9 @@ class AuditLogServiceTest {
     @Test
     void statsAggregatesCountsAndBlockRate() {
         when(auditLogRepository.findAll()).thenReturn(List.of(
-                new AuditLog("mail-agent", "VIEW_DATA", null, List.of(), RiskLevel.LOW, ActionStatus.ALLOWED, null),
-                new AuditLog("mail-agent", "DELETE_DATA", null, List.of(), RiskLevel.BLOCKED, ActionStatus.BLOCKED, null),
-                new AuditLog("other-agent", "VIEW_DATA", null, List.of(), RiskLevel.LOW, ActionStatus.ALLOWED, null)));
+                new AuditLog("mail-agent", "VIEW_DATA", null, List.of(), RiskLevel.LOW, ActionStatus.ALLOWED, null, DecisionBasis.POLICY),
+                new AuditLog("mail-agent", "DELETE_DATA", null, List.of(), RiskLevel.BLOCKED, ActionStatus.BLOCKED, null, DecisionBasis.POLICY),
+                new AuditLog("other-agent", "VIEW_DATA", null, List.of(), RiskLevel.LOW, ActionStatus.ALLOWED, null, DecisionBasis.POLICY)));
 
         AuditStatsResponse stats = service.stats("mail-agent");
 

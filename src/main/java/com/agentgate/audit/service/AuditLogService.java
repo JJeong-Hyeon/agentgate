@@ -6,6 +6,7 @@ import com.agentgate.audit.dto.AuditStatsResponse;
 import com.agentgate.audit.repository.AuditLogRepository;
 import com.agentgate.common.exception.AuditLogNotFoundException;
 import com.agentgate.risk.ActionStatus;
+import com.agentgate.risk.DecisionBasis;
 import com.agentgate.risk.RiskLevel;
 import java.util.List;
 import java.util.Map;
@@ -24,8 +25,8 @@ public class AuditLogService {
 
     @Transactional
     public void record(String agentId, String action, String target, List<String> labels,
-                        RiskLevel riskLevel, ActionStatus status, Long approvalId) {
-        auditLogRepository.save(new AuditLog(agentId, action, target, labels, riskLevel, status, approvalId));
+                        RiskLevel riskLevel, ActionStatus status, Long approvalId, DecisionBasis basis) {
+        auditLogRepository.save(new AuditLog(agentId, action, target, labels, riskLevel, status, approvalId, basis));
     }
 
     public AuditLogResponse get(Long id) {

@@ -12,6 +12,9 @@ import static org.mockito.Mockito.when;
 import com.agentgate.agent.domain.Agent;
 import com.agentgate.agent.dto.ActionRequest;
 import com.agentgate.agent.dto.ActionResponse;
+import com.agentgate.agent.dto.AgentDefinition;
+import com.agentgate.agent.dto.AgentToolDefinition;
+import com.agentgate.agent.domain.ToolPermission;
 import com.agentgate.agent.repository.AgentRepository;
 import com.agentgate.approval.domain.ApprovalRequest;
 import com.agentgate.approval.service.ApprovalService;
@@ -20,6 +23,7 @@ import com.agentgate.common.exception.AgentNotFoundException;
 import com.agentgate.common.exception.InvalidApiKeyException;
 import com.agentgate.common.security.ApiKeyGenerator;
 import com.agentgate.risk.ActionStatus;
+import com.agentgate.risk.DecisionBasis;
 import com.agentgate.risk.RiskEvaluationResult;
 import com.agentgate.risk.RiskEvaluationService;
 import com.agentgate.risk.RiskLevel;
@@ -41,6 +45,9 @@ class AgentActionServiceTest {
     private AgentRepository agentRepository;
 
     @Mock
+    private AgentDefinitionService agentDefinitionService;
+
+    @Mock
     private RiskEvaluationService riskEvaluationService;
 
     @Mock
@@ -53,7 +60,7 @@ class AgentActionServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new AgentActionService(agentRepository, riskEvaluationService, approvalService, auditLogService);
+        service = new AgentActionService(agentRepository, agentDefinitionService, riskEvaluationService, approvalService, auditLogService);
     }
 
     @Test
@@ -145,6 +152,98 @@ class AgentActionServiceTest {
 
         assertThat(response.status()).isEqualTo(ActionStatus.ALLOWED);
         assertThat(response.riskLevel()).isEqualTo(RiskLevel.LOW);
+    }
+
+    @Test
+    void runtimeMayEvaluateWithoutTheAgentsApiKey() {
+        when(agentRepository.findByAgentId("mail-agent"))
+                .thenReturn(Optional.of(new Agent("mail-agent", "Mail Agent", ApiKeyGenerator.hash(API_KEY))));
+        when(riskEvaluationService.evaluate("VIEW_DATA", List.of()))
+                .thenReturn(new RiskEvaluationResult(RiskLevel.LOW, ActionStatus.ALLOWED));
+
+        ActionResponse response = service.evaluate(
+                new ActionRequest("mail-agent", "VIEW_DATA", null, List.of()), null, true);
+
+        assertThat(response.status()).isEqualTo(ActionStatus.ALLOWED);
+        assertThat(response.basis()).isEqualTo(DecisionBasis.POLICY);
+    }
+
+    @Test
+    void blocksToolsNotInTheDefinition() {
+        Agent agent = agentWithTools(new AgentToolDefinition("notes", "list_notes", ToolPermission.AUTO, List.of()));
+
+        ActionResponse response = service.evaluate(toolCall(agent, "MCP:notes:delete_note"), null, true);
+
+        assertThat(response.status()).isEqualTo(ActionStatus.BLOCKED);
+        assertThat(response.basis()).isEqualTo(DecisionBasis.TOOL_NOT_GRANTED);
+        verify(riskEvaluationService, never()).evaluate(anyString(), any());
+        verify(auditLogService).record(eq("mail-agent"), eq("MCP:notes:delete_note"), any(), any(),
+                eq(RiskLevel.BLOCKED), eq(ActionStatus.BLOCKED), any(), eq(DecisionBasis.TOOL_NOT_GRANTED));
+    }
+
+    @Test
+    void blocksToolsMarkedBlockedWhateverPoliciesSay() {
+        Agent agent = agentWithTools(new AgentToolDefinition("notes", "delete_note", ToolPermission.BLOCKED, List.of()));
+
+        ActionResponse response = service.evaluate(toolCall(agent, "MCP:notes:delete_note"), null, true);
+
+        assertThat(response.status()).isEqualTo(ActionStatus.BLOCKED);
+        assertThat(response.basis()).isEqualTo(DecisionBasis.TOOL_BLOCKED);
+    }
+
+    @Test
+    void requiresApprovalForApprovalToolsEvenWhenPoliciesAllow() {
+        Agent agent = agentWithTools(new AgentToolDefinition("notes", "save_note", ToolPermission.APPROVAL, List.of()));
+        when(riskEvaluationService.evaluate("MCP:notes:save_note", List.of()))
+                .thenReturn(new RiskEvaluationResult(RiskLevel.LOW, ActionStatus.ALLOWED));
+        ApprovalRequest created = new ApprovalRequest("mail-agent", "MCP:notes:save_note", null, List.of(), RiskLevel.LOW);
+        setId(created, 7L);
+        when(approvalService.createRequest(any(), any(), any(), any(), any(), any(), any())).thenReturn(created);
+
+        ActionResponse response = service.evaluate(toolCall(agent, "MCP:notes:save_note"), null, true);
+
+        assertThat(response.status()).isEqualTo(ActionStatus.APPROVAL_REQUIRED);
+        assertThat(response.basis()).isEqualTo(DecisionBasis.TOOL_REQUIRES_APPROVAL);
+        assertThat(response.approvalId()).isEqualTo(7L);
+    }
+
+    @Test
+    void autoToolsFollowPoliciesWithToolLabelsMerged() {
+        Agent agent = agentWithTools(new AgentToolDefinition("crm", "export", ToolPermission.AUTO, List.of("PII")));
+        when(riskEvaluationService.evaluate("MCP:crm:export", List.of("EXTERNAL", "PII")))
+                .thenReturn(new RiskEvaluationResult(RiskLevel.BLOCKED, ActionStatus.BLOCKED));
+
+        ActionRequest request = new ActionRequest("mail-agent", "MCP:crm:export", null, List.of("EXTERNAL"),
+                null, null, null, 2);
+        ActionResponse response = service.evaluate(request, null, true);
+
+        assertThat(response.status()).isEqualTo(ActionStatus.BLOCKED);
+        assertThat(response.basis()).isEqualTo(DecisionBasis.POLICY);
+    }
+
+    @Test
+    void approvalToolsStillHonourTheAgentRiskCap() {
+        Agent agent = agentWithTools(new AgentToolDefinition("notes", "save_note", ToolPermission.APPROVAL, List.of()));
+        agent.restrictTo(RiskLevel.LOW);
+        when(riskEvaluationService.evaluate("MCP:notes:save_note", List.of()))
+                .thenReturn(new RiskEvaluationResult(RiskLevel.MEDIUM, ActionStatus.ALLOWED));
+
+        ActionResponse response = service.evaluate(toolCall(agent, "MCP:notes:save_note"), null, true);
+
+        assertThat(response.status()).isEqualTo(ActionStatus.BLOCKED);
+        assertThat(response.basis()).isEqualTo(DecisionBasis.AGENT_RISK_CAP);
+    }
+
+    private Agent agentWithTools(AgentToolDefinition... tools) {
+        Agent agent = new Agent("mail-agent", "Mail Agent", ApiKeyGenerator.hash(API_KEY));
+        when(agentRepository.findByAgentId("mail-agent")).thenReturn(Optional.of(agent));
+        when(agentDefinitionService.definition(agent, 2)).thenReturn(
+                new AgentDefinition(null, null, null, "prompt", List.of(tools), 8, null));
+        return agent;
+    }
+
+    private static ActionRequest toolCall(Agent agent, String action) {
+        return new ActionRequest(agent.getAgentId(), action, null, List.of(), "exec-1", null, null, 2);
     }
 
     private static void setId(ApprovalRequest approvalRequest, Long id) {

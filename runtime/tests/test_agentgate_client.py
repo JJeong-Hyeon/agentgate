@@ -49,3 +49,27 @@ def test_unreachable_raises():
 
     with pytest.raises(AgentGateError, match="unreachable"):
         client(refuse).evaluate("SEND_REPORT")
+
+
+def test_runtime_token_evaluates_on_behalf_of_an_agent_version():
+    gate = FakeAgentGate()
+    runtime = AgentGateClient(
+        "http://agentgate:8080",
+        "runtime-agent",
+        transport=httpx.MockTransport(gate),
+        runtime_token="runtime-secret",
+    )
+
+    runtime.evaluate("MCP:notes:save_note", agent_id="note-agent", agent_version=3)
+
+    request = gate.requests[0]
+    assert request.headers["X-Runtime-Token"] == "runtime-secret"
+    assert "X-API-Key" not in request.headers
+    assert gate.bodies[0]["agentId"] == "note-agent"
+    assert gate.bodies[0]["agentVersion"] == 3
+
+
+def test_parses_decision_basis():
+    gate = FakeAgentGate(status="BLOCKED", risk_level="BLOCKED", basis="TOOL_NOT_GRANTED")
+
+    assert client(gate).evaluate("MCP:files:read").basis == "TOOL_NOT_GRANTED"

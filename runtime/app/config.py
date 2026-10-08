@@ -7,7 +7,9 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     agentgate_base_url: str = "http://localhost:8080"
+    # Agent that workflow-level tools and approvals are evaluated as; agent nodes use their own.
     agentgate_agent_id: str = "runtime-agent"
+    # Only used without RUNTIME_TOKEN; with it, AgentGate trusts the runtime for any agent.
     agentgate_api_key: str = ""
     llm_base_url: str = "http://localhost:11434/v1"
     llm_api_key: str = ""
@@ -16,7 +18,8 @@ class Settings(BaseSettings):
     llm_timeout_seconds: float = 60.0
     # Empty → in-memory checkpoints (lost on restart).
     runtime_database_url: str = ""
-    # Shared secret AgentGate sends as X-Runtime-Token on resume. Empty → resume disabled.
+    # Shared secret with AgentGate (X-Runtime-Token both ways): it authenticates resume requests
+    # from AgentGate and this runtime's action evaluations and events. Empty → resume disabled.
     runtime_token: str = ""
     # JSON file with MCP servers ({"mcpServers": {...}}); empty → no MCP tools available.
     mcp_config_path: str = ""
