@@ -23,3 +23,7 @@ agentgate:
     # Runtime의 RUNTIME_TOKEN과 같은 값. base-url을 설정했다면 필수.
     token: ${AGENTGATE_RUNTIME_TOKEN:}
     retry-delay: PT30S
+  secrets:
+    # AES-256 key (32 bytes, Base64) for credentials stored in the database, e.g. MCP server headers.
+    # Required in prod (openssl rand -base64 32); empty uses a development key.
+    key: ${AGENTGATE_SECRET_KEY:}

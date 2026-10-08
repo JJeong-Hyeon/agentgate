@@ -25,6 +25,16 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.NOT_FOUND, "AGENT_NOT_FOUND", ex.getMessage(), request);
     }
 
+    @ExceptionHandler(McpServerNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleMcpServerNotFound(McpServerNotFoundException ex, HttpServletRequest request) {
+        return build(HttpStatus.NOT_FOUND, "MCP_SERVER_NOT_FOUND", ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(DuplicateMcpServerException.class)
+    public ResponseEntity<ErrorResponse> handleDuplicateMcpServer(DuplicateMcpServerException ex, HttpServletRequest request) {
+        return build(HttpStatus.CONFLICT, "MCP_SERVER_ALREADY_EXISTS", ex.getMessage(), request);
+    }
+
     @ExceptionHandler(DuplicateAgentException.class)
     public ResponseEntity<ErrorResponse> handleDuplicateAgent(DuplicateAgentException ex, HttpServletRequest request) {
         return build(HttpStatus.CONFLICT, "AGENT_ALREADY_EXISTS", ex.getMessage(), request);

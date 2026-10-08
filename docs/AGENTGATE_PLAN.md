@@ -401,6 +401,7 @@ AgentGate는 AI Agent와 기업 시스템 사이에서
 `spring.profiles.active=prod`로 기동 시 admin 비밀번호가 dev 기본값이면 즉시 기동 실패(`SecurityHardeningCheck`). 필수 환경변수:
 
 - `AGENTGATE_ADMIN_USERNAME`, `AGENTGATE_ADMIN_PASSWORD`
+- `AGENTGATE_SECRET_KEY` (32바이트 Base64, `openssl rand -base64 32`): DB에 저장하는 인증정보 암호화 키
 - `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`
 - `SPRING_DATA_REDIS_HOST`, `SPRING_DATA_REDIS_PORT`
 
