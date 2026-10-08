@@ -4,6 +4,8 @@ import type { Execution, NodeExecution } from "../api/types";
 import { useAuth, useClient } from "../auth/AuthContext";
 import { WorkflowPreview } from "../components/WorkflowPreview";
 import { useAsync } from "../useAsync";
+import { AgentStep } from "./AgentStep";
+import { agentTrace, isQuietAgentStep, totalTokens } from "./agentTrace";
 import { duration, nodeStatuses } from "./state";
 import { useExecutionStream } from "./useExecutionStream";
 
@@ -36,6 +38,7 @@ export function ExecutionPage() {
           {execution.task}
         </span>
         <span className="spacer" />
+        <AgentSummary execution={execution} />
         {error && <span className="error">연결 끊김, 재연결 중…</span>}
         <span className="muted">{new Date(execution.createdAt).toLocaleString()}</span>
       </header>
@@ -49,6 +52,22 @@ export function ExecutionPage() {
         <Timeline nodes={execution.nodes ?? []} />
       </section>
     </div>
+  );
+}
+
+function AgentSummary({ execution }: { execution: Execution }) {
+  const tokens = useMemo(() => totalTokens(execution.nodes), [execution.nodes]);
+  const versions = Object.entries(execution.agentVersions ?? {});
+  if (versions.length === 0) return null;
+  return (
+    <span className="muted agent-versions">
+      {versions.map(([agentId, version]) => (
+        <span key={agentId} className="badge">
+          {agentId} v{version}
+        </span>
+      ))}
+      {tokens && ` 토큰 ${tokens.input} → ${tokens.output}`}
+    </span>
   );
 }
 
@@ -121,7 +140,7 @@ function Timeline({ nodes }: { nodes: NodeExecution[] }) {
   if (nodes.length === 0) return <p className="muted">아직 실행된 단계가 없습니다.</p>;
   return (
     <ol className="timeline">
-      {nodes.map((node) => (
+      {nodes.filter((node) => !isQuietAgentStep(node)).map((node) => (
         <li key={node.taskId} className={`step step-${node.status.toLowerCase()}`}>
           <div className="row">
             <span>
@@ -134,11 +153,16 @@ function Timeline({ nodes }: { nodes: NodeExecution[] }) {
             </span>
           </div>
           {node.error && <pre className="error">{node.error}</pre>}
-          {node.output && node.output !== "{}" && (
-            <details>
-              <summary>출력</summary>
-              <pre>{prettyOutput(node.output)}</pre>
-            </details>
+          {agentTrace(node) ? (
+            <AgentStep trace={agentTrace(node)!} />
+          ) : (
+            node.output &&
+            node.output !== "{}" && (
+              <details>
+                <summary>출력</summary>
+                <pre>{prettyOutput(node.output)}</pre>
+              </details>
+            )
           )}
         </li>
       ))}

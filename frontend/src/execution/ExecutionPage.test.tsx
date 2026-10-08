@@ -122,4 +122,82 @@ describe("ExecutionPage", () => {
     const streamCall = fetchImpl.mock.calls.find(([url]) => String(url).endsWith("/stream"))!;
     expect((streamCall[1]!.headers as Record<string, string>).Authorization).toBe(`Basic ${btoa("admin:pw")}`);
   });
+
+  it("shows what an agent asked for, how AgentGate decided, and what came back", async () => {
+    const agentRun: Execution = {
+      ...running,
+      status: "COMPLETED",
+      agentVersions: { "note-agent": 3 },
+      nodes: [
+        { taskId: "a0", nodeId: "plan", step: "plan", status: "COMPLETED", output: JSON.stringify({ agent: { kind: "start", prompt: "Save the note" } }) },
+        {
+          taskId: "a1",
+          nodeId: "plan",
+          step: "plan.think",
+          status: "COMPLETED",
+          output: JSON.stringify({
+            agent: {
+              kind: "tool_calls",
+              step: 1,
+              tokens: { input: 120, output: 15 },
+              calls: [{ tool: "notes__save_note", arguments: { title: "standup" } }],
+            },
+          }),
+        },
+        {
+          taskId: "a2",
+          nodeId: "plan",
+          step: "plan.gate",
+          status: "COMPLETED",
+          output: JSON.stringify({
+            agent: {
+              kind: "decision",
+              tool: "plan:notes/save_note",
+              status: "APPROVAL_REQUIRED",
+              risk_level: "LOW",
+              basis: "TOOL_REQUIRES_APPROVAL",
+              approval_id: 9,
+              arguments: { title: "standup" },
+            },
+          }),
+        },
+        { taskId: "a3", nodeId: "plan", step: "plan.gate", status: "COMPLETED", output: "{}" },
+        {
+          taskId: "a4",
+          nodeId: "plan",
+          step: "plan.think",
+          status: "COMPLETED",
+          output: JSON.stringify({ agent: { kind: "answer", step: 2, tokens: { input: 200, output: 30 }, answer: "Saved." } }),
+        },
+      ],
+    };
+    sessionStorage.setItem("agentgate.credentials", JSON.stringify({ username: "admin", password: "pw" }));
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/stream")) return streamResponse([sse("snapshot", agentRun)]);
+      if (url.includes("/versions/2")) return Response.json({ version: 2, dsl: DSL });
+      return new Response("{}", { status: 404 });
+    });
+    render(
+      <AuthProvider fetchImpl={fetchImpl as unknown as typeof fetch}>
+        <MemoryRouter initialEntries={["/executions/e1"]}>
+          <Routes>
+            <Route path="/executions/:executionId" element={<ExecutionPage />} />
+          </Routes>
+        </MemoryRouter>
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByText("Save the note")).toBeInTheDocument();
+    expect(screen.getByText("note-agent v3")).toBeInTheDocument();
+    expect(screen.getByText(/토큰 320 → 45/)).toBeInTheDocument();
+    expect(screen.getByText(/Tool 호출 요청 \(턴 1\)/)).toBeInTheDocument();
+    expect(screen.getByText("notes__save_note")).toBeInTheDocument();
+    expect(screen.getByText("승인 필요")).toBeInTheDocument();
+    expect(screen.getByText(/Agent 권한: 항상 승인/)).toBeInTheDocument();
+    expect(screen.getByText(/승인 #9/)).toBeInTheDocument();
+    expect(screen.getByText("Saved.")).toBeInTheDocument();
+    // The empty hand-off step is not listed.
+    expect(screen.getAllByText("plan.gate")).toHaveLength(1);
+  });
 });
