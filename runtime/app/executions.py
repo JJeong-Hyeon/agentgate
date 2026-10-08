@@ -19,11 +19,13 @@ from langgraph.types import Command
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
+from app.agents.resolve import attach_tool_schemas
 from app.config import Settings, get_settings
 from app.dsl import validate_workflow
 from app.dsl.compiler import CompileError
 from app.events import EventReporter, run_graph
 from app.runner import UnknownExecution, WorkflowRunner
+from app.tools_api import Catalog
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/runtime/executions", tags=["executions"])
@@ -119,6 +121,7 @@ def create_execution(
     body: ExecutionRequest,
     runner: Runner,
     reporter: Reporter,
+    catalog: Catalog,
     background: BackgroundTasks,
     response: Response,
 ) -> ExecutionResponse:
@@ -129,6 +132,7 @@ def create_execution(
             {"message": "Invalid workflow", "errors": [i.model_dump() for i in issues]},
         )
     try:
+        workflow = attach_tool_schemas(workflow, catalog)
         graph = runner.graph_for_workflow(workflow)
     except CompileError as e:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e)) from e

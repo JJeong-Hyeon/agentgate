@@ -16,6 +16,8 @@ class ToolResult(BaseModel):
     status: Literal["ALLOWED", "APPROVAL_REQUIRED", "EXECUTED", "BLOCKED", "REJECTED", "FAILED"]
     risk_level: str | None = None
     approval_id: int | None = None
+    # Which AgentGate rule decided (POLICY, TOOL_NOT_GRANTED, ...), when it says.
+    basis: str | None = None
     response_status: int | None = None
     response_body: str | None = None
     error: str | None = None
@@ -37,10 +39,24 @@ class GovernedTool(ABC):
         self.labels = labels
         self._gate = gate
 
-    def authorize(self, execution_id: str | None = None) -> ToolResult:
+    def authorize(
+        self,
+        execution_id: str | None = None,
+        agent_id: str | None = None,
+        agent_version: int | None = None,
+        reason: str | None = None,
+    ) -> ToolResult:
+        """Ask AgentGate; with `agent_id` / `agent_version` it is asked on behalf of that agent,
+        whose definition's tool permissions then apply."""
         try:
             decision = self._gate.evaluate(
-                self.action, target=self.target, labels=self.labels, execution_id=execution_id
+                self.action,
+                target=self.target,
+                labels=self.labels,
+                execution_id=execution_id,
+                reason=reason,
+                agent_id=agent_id,
+                agent_version=agent_version,
             )
         except AgentGateError as e:
             return ToolResult(tool=self.name, status="FAILED", error=str(e))
@@ -49,6 +65,7 @@ class GovernedTool(ABC):
             status=decision.status,
             risk_level=decision.risk_level,
             approval_id=decision.approval_id,
+            basis=decision.basis,
         )
 
     @abstractmethod
@@ -65,4 +82,4 @@ class GovernedTool(ABC):
         return self.execute(payload, authorized)
 
     def _base(self, authorized: ToolResult) -> dict[str, Any]:
-        return authorized.model_dump(include={"tool", "risk_level", "approval_id"})
+        return authorized.model_dump(include={"tool", "risk_level", "approval_id", "basis"})

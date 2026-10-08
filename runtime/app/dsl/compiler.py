@@ -31,6 +31,7 @@ from app.dsl.schema import (
     Workflow,
 )
 from app.governance.agentgate_client import AgentGateClient
+from app.nodes.agent import AgentTool, add_agent, function_names
 from app.nodes.approval import add_approval
 from app.nodes.tool import add_tool
 from app.tools.http import HttpTool, HttpToolSpec
@@ -59,6 +60,8 @@ def _state_schema(workflow: Workflow) -> type:
         "pending_tool": dict | None,
         # reviewer id → number of reviews done
         "revisions": Annotated[dict[str, int], _merge],
+        # agent node id → its conversation and tool-call bookkeeping
+        "agent_runs": Annotated[dict[str, dict], _merge],
     }
     for node in workflow.nodes:
         if node.type in OUTPUT_TYPES:
@@ -119,6 +122,8 @@ class WorkflowCompiler:
         graph = StateGraph(_state_schema(workflow))
         for node in workflow.nodes:
             match node:
+                case AgentNode() if node.config.agent_id:
+                    self._add_agent(graph, workflow, node, targets(node.id))
                 case LlmNode() | AgentNode():
                     graph.add_node(node.id, self._llm_node(node.id, node.config))
                     self._add_edges(graph, node.id, targets(node.id))
@@ -235,6 +240,47 @@ class WorkflowCompiler:
             return next((label for label, v in cases.items() if v == value), node.config.default)
 
         return route
+
+    def _add_agent(
+        self, graph: StateGraph, workflow: Workflow, node: AgentNode, next_nodes: list[str]
+    ) -> None:
+        c = node.config
+        spec = workflow.agents.get(c.agent_id)
+        if spec is None:
+            raise CompileError(f"'{node.id}': agent '{c.agent_id}' was not resolved for this run")
+        if c.agent_version is not None and spec.version != c.agent_version:
+            raise CompileError(
+                f"'{node.id}': needs agent '{c.agent_id}' v{c.agent_version}, got v{spec.version}"
+            )
+        if self._gate is None:
+            raise CompileError(f"'{node.id}': AGENT with tools needs an AgentGate client")
+        usable = [t for t in spec.tools if t.permission != "BLOCKED"]
+        tools = []
+        for function_name, tool in zip(function_names(usable), usable, strict=True):
+            server = self._mcp_servers.get(tool.server)
+            if server is None:
+                raise CompileError(f"'{node.id}': unknown MCP server '{tool.server}'")
+            if tool.input_schema is None:
+                raise CompileError(f"'{node.id}': no schema for tool {tool.server}/{tool.tool}")
+            governed = McpTool(
+                f"{node.id}:{tool.server}/{tool.tool}",
+                tool.server,
+                server,
+                tool.tool,
+                tool.action,
+                [],
+                self._gate,
+            )
+            tools.append(AgentTool(function_name, tool, governed))
+        add_agent(
+            graph,
+            node.id,
+            spec,
+            lambda s, prompt=c.prompt: render(prompt, s),
+            self._llm_factory,
+            tools,
+            next_nodes,
+        )
 
     def _http_tool(self, node: HttpToolNode) -> HttpTool:
         if self._gate is None:
