@@ -154,6 +154,15 @@ class AgentDefinitionIntegrationTest {
     }
 
     @Test
+    void registeringAnExistingAgentIdIsAConflict() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/agents")
+                        .with(httpBasic("test-admin", "test-password"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"agentId\":\"note-agent\",\"name\":\"Again\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("AGENT_ALREADY_EXISTS"));
+    }
+
+    @Test
     void requiresAdminAuthentication() throws Exception {
         mockMvc.perform(get("/api/v1/agents/{id}/definition", agentId)).andExpect(status().isUnauthorized());
     }
