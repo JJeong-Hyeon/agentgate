@@ -1,6 +1,7 @@
 import type { Edge } from "@xyflow/react";
 import { useState } from "react";
 import type { DslNode } from "../api/types";
+import { AgentNodeFields } from "./AgentNodeFields";
 import { CommitInput } from "./CommitInput";
 import { expectedLabels, idProblem } from "./model";
 
@@ -40,7 +41,8 @@ export function NodeInspector({ node, nodes, error, onChange, onRename, onDelete
   };
   const str = (key: string) => (config[key] as string | undefined) ?? "";
   const list = (key: string) => ((config[key] as string[] | undefined) ?? []).join(", ");
-  const isLlm = ["LLM", "AGENT", "ROUTER", "REVIEWER"].includes(node.type);
+  const registeredAgent = node.type === "AGENT" && typeof config.agentId === "string";
+  const isLlm = ["LLM", "AGENT", "ROUTER", "REVIEWER"].includes(node.type) && !registeredAgent;
 
   return (
     <div className="inspector-body">
@@ -71,6 +73,7 @@ export function NodeInspector({ node, nodes, error, onChange, onRename, onDelete
         <input value={node.label ?? ""} onChange={(e) => onChange({ ...node, label: e.target.value || null })} />
       </label>
 
+      {node.type === "AGENT" && <AgentNodeFields config={config} onConfig={(c) => onChange({ ...node, config: c })} />}
       {isLlm && (
         <>
           <label>

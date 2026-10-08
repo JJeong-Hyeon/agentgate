@@ -70,6 +70,8 @@ export interface Execution {
   createdAt: string;
   updatedAt: string;
   finishedAt?: string;
+  // agentId → definition version the run uses
+  agentVersions?: Record<string, number>;
   nodes?: NodeExecution[];
 }
 
@@ -86,6 +88,71 @@ export interface Approval {
   decidedBy: string | null;
   executionId: string | null;
   reason?: string | null;
+}
+
+export type RiskLevel = "LOW" | "MEDIUM" | "HIGH" | "BLOCKED";
+
+export interface Agent {
+  id: number;
+  agentId: string;
+  name: string;
+  description: string | null;
+  maxRiskLevel: RiskLevel | null;
+  // 0 until a definition is saved
+  latestDefinitionVersion: number;
+  createdAt: string;
+}
+
+export interface CreatedAgent {
+  id: number;
+  agentId: string;
+  name: string;
+  // Shown once; only its hash is stored.
+  apiKey: string;
+  createdAt: string;
+}
+
+export type ToolPermission = "AUTO" | "APPROVAL" | "BLOCKED";
+export type ToolCallingMode = "NATIVE" | "JSON";
+
+export interface AgentToolDefinition {
+  server: string;
+  tool: string;
+  permission: ToolPermission;
+  labels?: string[];
+}
+
+export interface AgentDefinition {
+  description?: string | null;
+  model?: string | null;
+  temperature?: number | null;
+  systemPrompt: string;
+  tools: AgentToolDefinition[];
+  maxSteps?: number | null;
+  outputSchema?: Record<string, unknown> | null;
+  toolCalling?: ToolCallingMode | null;
+}
+
+export interface AgentDefinitionVersion {
+  agentId: string;
+  version: number;
+  createdAt: string;
+  definition?: AgentDefinition;
+}
+
+export interface McpToolInfo {
+  name: string;
+  title: string | null;
+  description: string | null;
+  inputSchema: Record<string, unknown>;
+  annotations: Record<string, unknown> | null;
+}
+
+export interface McpServerTools {
+  server: string;
+  transport: "url" | "stdio";
+  tools: McpToolInfo[];
+  error: string | null;
 }
 
 export interface ApiErrorBody {
