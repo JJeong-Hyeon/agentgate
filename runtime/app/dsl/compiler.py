@@ -36,6 +36,7 @@ from app.nodes.approval import add_approval
 from app.nodes.tool import add_tool
 from app.tools.http import HttpTool, HttpToolSpec
 from app.tools.mcp import McpServerConfig, McpTool
+from app.tools.registry import McpServerRegistry
 
 # (model, temperature) → chat model; None keeps the runtime default.
 LlmFactory = Callable[[str | None, float | None], BaseChatModel]
@@ -97,14 +98,18 @@ class WorkflowCompiler:
         llm_factory: LlmFactory,
         gate: AgentGateClient | None = None,
         tool_transport: httpx.BaseTransport | None = None,
-        mcp_servers: dict[str, McpServerConfig] | None = None,
+        mcp_servers: "dict[str, McpServerConfig] | McpServerRegistry | None" = None,
         tool_calling: str = "NATIVE",
     ):
         self._tool_calling = tool_calling
         self._llm_factory = llm_factory
         self._gate = gate
         self._tool_transport = tool_transport
-        self._mcp_servers = mcp_servers or {}
+        self._registry = (
+            mcp_servers
+            if isinstance(mcp_servers, McpServerRegistry)
+            else McpServerRegistry(mcp_servers or {})
+        )
 
     def compile(
         self, workflow: Workflow, checkpointer: BaseCheckpointSaver | None = None
@@ -263,15 +268,14 @@ class WorkflowCompiler:
         usable = [t for t in spec.tools if t.permission != "BLOCKED"]
         tools = []
         for function_name, tool in zip(function_names(usable), usable, strict=True):
-            server = self._mcp_servers.get(tool.server)
-            if server is None:
+            if self._registry.get(tool.server) is None:
                 raise CompileError(f"'{node.id}': unknown MCP server '{tool.server}'")
             if tool.input_schema is None:
                 raise CompileError(f"'{node.id}': no schema for tool {tool.server}/{tool.tool}")
             governed = McpTool(
                 f"{node.id}:{tool.server}/{tool.tool}",
                 tool.server,
-                server,
+                lambda name=tool.server: self._registry.get(name),
                 tool.tool,
                 tool.action,
                 [],
@@ -302,14 +306,13 @@ class WorkflowCompiler:
         if self._gate is None:
             raise CompileError(f"'{node.id}': MCP_TOOL needs an AgentGate client")
         c = node.config
-        server = self._mcp_servers.get(c.server)
-        if server is None:
-            known = ", ".join(sorted(self._mcp_servers)) or "none configured"
+        if self._registry.get(c.server) is None:
+            known = ", ".join(sorted(self._registry.servers())) or "none configured"
             raise CompileError(f"'{node.id}': unknown MCP server '{c.server}' ({known})")
         return McpTool(
             node.id,
             c.server,
-            server,
+            lambda name=c.server: self._registry.get(name),
             c.tool,
             c.action or f"MCP:{c.server}:{c.tool}",
             c.labels,

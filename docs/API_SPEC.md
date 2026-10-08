@@ -133,7 +133,7 @@ Runtime에 설정된 MCP 서버별 Tool 목록. `refresh=true`면 Runtime 캐시
              "annotations": {"destructiveHint": true}}]}]
 ```
 
-연결되지 않은 서버는 `error`에 사유가 담기고 `tools`는 빈 배열이다. Runtime이 없거나 응답하지 않으면 503 `RUNTIME_UNAVAILABLE`.
+`source`는 서버가 등록된 곳(`agentgate` / `runtime` 설정 파일)이다. 연결되지 않은 서버는 `error`에 사유가 담기고 `tools`는 빈 배열이다. Runtime이 없거나 응답하지 않으면 503 `RUNTIME_UNAVAILABLE`.
 
 ## 3. 승인 처리 (status가 APPROVAL_REQUIRED일 때, 관리자 인증 필요)
 

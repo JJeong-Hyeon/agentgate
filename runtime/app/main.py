@@ -13,6 +13,7 @@ from app.llm import LlmHealth, check_llm_health, create_chat_model
 from app.runner import WorkflowRunner
 from app.tools.catalog import ToolCatalog
 from app.tools.mcp import load_mcp_servers
+from app.tools.registry import AgentGateServers, McpServerRegistry
 
 
 def build_gate(settings: Settings) -> AgentGateClient:
@@ -27,7 +28,12 @@ def build_gate(settings: Settings) -> AgentGateClient:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
-    mcp_servers = load_mcp_servers(settings.mcp_config_path)
+    registered = (
+        AgentGateServers(settings.agentgate_base_url, settings.runtime_token)
+        if settings.runtime_token
+        else None
+    )
+    mcp_servers = McpServerRegistry(load_mcp_servers(settings.mcp_config_path), registered)
     app.state.catalog = ToolCatalog(mcp_servers)
     with open_checkpointer(settings.runtime_database_url) as checkpointer:
         compiler = WorkflowCompiler(
