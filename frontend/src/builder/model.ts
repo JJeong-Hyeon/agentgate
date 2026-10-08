@@ -2,13 +2,13 @@
 import type { DslEdge, DslNode, NodeType, WorkflowDsl } from "../api/types";
 
 export const NODE_ID_PATTERN = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
-const RESERVED_IDS = new Set(["task", "workflow", "tool_results", "pending_tool", "revisions"]);
+const RESERVED_IDS = new Set(["task", "workflow", "tool_results", "pending_tool", "revisions", "agent_runs"]);
 
 export const PALETTE: { type: NodeType; title: string; description: string }[] = [
   { type: "START", title: "Start", description: "시작 (1개)" },
   { type: "END", title: "End", description: "종료" },
   { type: "LLM", title: "LLM", description: "LLM 호출" },
-  { type: "AGENT", title: "Agent", description: "역할을 가진 LLM 단계" },
+  { type: "AGENT", title: "Agent", description: "등록된 Agent (Tool 사용) 또는 역할을 가진 LLM 단계" },
   { type: "ROUTER", title: "Router", description: "LLM이 경로 선택" },
   { type: "REVIEWER", title: "Reviewer", description: "APPROVE / REVISE 판정" },
   { type: "CONDITION", title: "Condition", description: "상태 값으로 분기" },

@@ -35,7 +35,8 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/prometheus").permitAll()
                         // Bundled frontend: static files and client-side routes; the UI logs in against the API.
                         .requestMatchers(HttpMethod.GET, "/", "/index.html", "/assets/**", "/favicon.ico",
-                                "/workflows", "/workflows/**", "/executions", "/executions/**", "/approvals").permitAll()
+                                "/workflows", "/workflows/**", "/executions", "/executions/**", "/approvals",
+                                "/agents", "/agents/**").permitAll()
                         .anyRequest().denyAll()
                 );
         return http.build();

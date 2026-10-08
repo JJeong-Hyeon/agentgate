@@ -1,5 +1,16 @@
 import { SseParser, type SseMessage } from "./sse";
-import type { ApiErrorBody, Approval, Execution, WorkflowDsl, WorkflowSummary } from "./types";
+import type {
+  Agent,
+  AgentDefinition,
+  AgentDefinitionVersion,
+  ApiErrorBody,
+  Approval,
+  CreatedAgent,
+  Execution,
+  McpServerTools,
+  WorkflowDsl,
+  WorkflowSummary,
+} from "./types";
 
 export interface Credentials {
   username: string;
@@ -111,6 +122,45 @@ export class AgentGateClient {
       method: "POST",
       body: JSON.stringify({ decidedBy }),
     });
+  }
+
+  listAgents(): Promise<Agent[]> {
+    return this.request("/api/v1/agents");
+  }
+
+  getAgent(id: number): Promise<Agent> {
+    return this.request(`/api/v1/agents/${id}`);
+  }
+
+  createAgent(agentId: string, name: string): Promise<CreatedAgent> {
+    return this.request("/api/v1/agents", { method: "POST", body: JSON.stringify({ agentId, name }) });
+  }
+
+  /** The latest definition, or null when none has been saved yet. */
+  async getAgentDefinition(id: number): Promise<AgentDefinitionVersion | null> {
+    try {
+      return await this.request(`/api/v1/agents/${id}/definition`);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 404 && e.body?.code === "AGENT_DEFINITION_NOT_FOUND") return null;
+      throw e;
+    }
+  }
+
+  getAgentDefinitionVersion(id: number, version: number): Promise<AgentDefinitionVersion> {
+    return this.request(`/api/v1/agents/${id}/definition/versions/${version}`);
+  }
+
+  listAgentDefinitionVersions(id: number): Promise<AgentDefinitionVersion[]> {
+    return this.request(`/api/v1/agents/${id}/definition/versions`);
+  }
+
+  saveAgentDefinition(id: number, definition: AgentDefinition): Promise<AgentDefinitionVersion> {
+    return this.request(`/api/v1/agents/${id}/definition`, { method: "PUT", body: JSON.stringify(definition) });
+  }
+
+  /** Tools of the MCP servers the runtime is configured with. */
+  listTools(refresh = false): Promise<McpServerTools[]> {
+    return this.request(`/api/v1/tools${refresh ? "?refresh=true" : ""}`);
   }
 
   private authorization(): string {
