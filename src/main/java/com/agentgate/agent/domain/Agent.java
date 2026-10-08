@@ -37,6 +37,13 @@ public class Agent {
     @Enumerated(EnumType.STRING)
     private RiskLevel maxRiskLevel;
 
+    // Copied from the latest definition so listings need not load it.
+    @Column(length = 1000)
+    private String description;
+
+    // 0 until the first definition is saved.
+    private int latestDefinitionVersion;
+
     private Instant createdAt;
 
     public Agent(String agentId, String name, String apiKeyHash) {
@@ -52,5 +59,10 @@ public class Agent {
 
     public void restrictTo(RiskLevel maxRiskLevel) {
         this.maxRiskLevel = maxRiskLevel;
+    }
+
+    public int nextDefinitionVersion(String description) {
+        this.description = description;
+        return ++latestDefinitionVersion;
     }
 }
