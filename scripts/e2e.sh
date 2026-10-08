@@ -48,9 +48,9 @@ echo "==> Fake LLM / tool target"
 PIDS+=($!)
 
 wait_for http://localhost:8080/actuator/health AgentGate "$WORK/agentgate.log"
-API_KEY=$(curl -sf -u admin:changeme -X POST http://localhost:8080/api/v1/agents \
-  -H 'Content-Type: application/json' -d '{"agentId":"runtime-agent","name":"Runtime Agent"}' \
-  | "$PYTHON" -c 'import json,sys; print(json.load(sys.stdin)["apiKey"])')
+# Workflow-level tools are evaluated as this agent; the runtime authenticates with the runtime token.
+curl -sf -u admin:changeme -X POST http://localhost:8080/api/v1/agents \
+  -H 'Content-Type: application/json' -d '{"agentId":"runtime-agent","name":"Runtime Agent"}' > /dev/null
 
 echo "==> Runtime"
 # MCP server for the MCP tool scenario: the runtime's own test echo server over stdio.
@@ -58,7 +58,7 @@ cat > "$WORK/mcp.json" <<JSON
 {"mcpServers": {"echo": {"command": "$(command -v "$PYTHON")", "args": ["$ROOT/runtime/tests/mcp_echo_server.py"]}}}
 JSON
 (cd "$ROOT/runtime" && \
-  AGENTGATE_BASE_URL=http://localhost:8080 AGENTGATE_API_KEY="$API_KEY" \
+  AGENTGATE_BASE_URL=http://localhost:8080 \
   LLM_BASE_URL=http://localhost:18081/v1 LLM_MODEL=fake-model \
   RUNTIME_TOKEN="$TOKEN" MCP_CONFIG_PATH="$WORK/mcp.json" \
   "$PYTHON" -m uvicorn app.main:app --port 8000 > "$WORK/runtime.log" 2>&1) &

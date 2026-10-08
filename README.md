@@ -55,13 +55,12 @@ docker compose exec ollama ollama pull qwen2.5:7b
 curl localhost:8000/health
 ```
 
-Runtime의 Tool은 실행 직전에 AgentGate(`POST /api/v1/actions`)를 호출하고, `ALLOWED`일 때만 실제 요청을 보냅니다. Runtime 전용 Agent를 한 번 등록하고 발급된 키를 넘겨주세요.
+Runtime의 Tool은 실행 직전에 AgentGate(`POST /api/v1/actions`)를 호출하고, `ALLOWED`일 때만 실제 요청을 보냅니다. Runtime은 공유 토큰(`RUNTIME_TOKEN`)으로 인증하며, 워크플로 수준의 Tool / 승인 노드는 `runtime-agent`로, Agent 노드는 각 Agent 이름으로 평가됩니다. `runtime-agent`를 한 번 등록해 주세요.
 
 ```bash
 curl -u admin:changeme -X POST localhost:8080/api/v1/agents \
   -H "Content-Type: application/json" -d '{"agentId":"runtime-agent","name":"Runtime Agent"}'
-# 응답의 apiKey 사용
-AGENTGATE_API_KEY=<apiKey> docker compose --profile runtime up -d
+docker compose --profile runtime up -d
 ```
 
 실행할 워크플로는 Workflow DSL로 정의합니다 (예: [`runtime/examples/research.json`](runtime/examples/research.json)). 보통은 프론트엔드 Builder로 만들어 AgentGate에 저장하고, `POST /api/v1/executions`(또는 화면의 실행 버튼)로 실행합니다.

@@ -1,6 +1,7 @@
 package com.agentgate.audit.domain;
 
 import com.agentgate.risk.ActionStatus;
+import com.agentgate.risk.DecisionBasis;
 import com.agentgate.risk.RiskLevel;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.ElementCollection;
@@ -49,10 +50,13 @@ public class AuditLog {
 
     private Long approvalId;
 
+    @Enumerated(EnumType.STRING)
+    private DecisionBasis basis;
+
     private Instant createdAt;
 
     public AuditLog(String agentId, String action, String target, List<String> labels,
-                     RiskLevel riskLevel, ActionStatus status, Long approvalId) {
+                     RiskLevel riskLevel, ActionStatus status, Long approvalId, DecisionBasis basis) {
         this.agentId = agentId;
         this.action = action;
         this.target = target;
@@ -60,6 +64,7 @@ public class AuditLog {
         this.riskLevel = riskLevel;
         this.status = status;
         this.approvalId = approvalId;
+        this.basis = basis;
     }
 
     @PrePersist

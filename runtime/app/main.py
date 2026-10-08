@@ -16,7 +16,10 @@ from app.tools.mcp import load_mcp_servers
 
 def build_gate(settings: Settings) -> AgentGateClient:
     return AgentGateClient(
-        settings.agentgate_base_url, settings.agentgate_agent_id, settings.agentgate_api_key
+        settings.agentgate_base_url,
+        settings.agentgate_agent_id,
+        settings.agentgate_api_key,
+        runtime_token=settings.runtime_token,
     )
 
 

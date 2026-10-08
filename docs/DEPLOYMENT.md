@@ -79,12 +79,11 @@ scripts/deploy-app.sh <키페어.pem>
 
 ## 3. Runtime + Ollama (Runtime EC2)
 
-Runtime이 AgentGate를 호출할 때 쓸 Agent를 한 번 등록한다.
+워크플로 수준의 Tool / 승인 노드를 평가받을 Agent를 한 번 등록한다. Runtime은 공유 토큰(`RUNTIME_TOKEN`)으로 인증하므로 발급된 apiKey는 쓰지 않는다. Agent 노드는 각자의 Agent 이름으로 평가된다.
 
 ```bash
 curl -u admin:<관리자 비밀번호> -X POST http://<alb_dns_name>/api/v1/agents \
   -H "Content-Type: application/json" -d '{"agentId":"runtime-agent","name":"Runtime Agent"}'
-# 응답의 apiKey는 이때 한 번만 보인다
 ```
 
 최초 1회, Runtime EC2에 환경변수 파일을 만든다 ([`deploy/runtime/.env.example`](../deploy/runtime/.env.example)).
@@ -95,7 +94,6 @@ mkdir -p ~/agentgate-runtime
 cat > ~/agentgate-runtime/.env <<EOF
 AGENTGATE_BASE_URL=http://<app_private_ip>:8080
 AGENTGATE_AGENT_ID=runtime-agent
-AGENTGATE_API_KEY=<위에서 받은 apiKey>
 RUNTIME_TOKEN=<App의 AGENTGATE_RUNTIME_TOKEN과 동일>
 RUNTIME_DATABASE_URL=postgresql://agentgate:<RDS 비밀번호>@<rds_endpoint>/agentgate
 LLM_MODEL=qwen2.5:3b

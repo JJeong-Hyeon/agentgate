@@ -61,6 +61,12 @@ public class AgentDefinitionService {
                 .toList();
     }
 
+    /** The given definition version of an agent, for evaluating its tool calls. */
+    @Transactional(readOnly = true)
+    public AgentDefinition definition(Agent agent, int version) {
+        return objectMapper.readValue(findVersion(agent, version).getDefinition(), AgentDefinition.class);
+    }
+
     private static void validate(AgentDefinition definition) {
         Set<String> seen = new HashSet<>();
         for (AgentToolDefinition tool : definition.tools()) {
