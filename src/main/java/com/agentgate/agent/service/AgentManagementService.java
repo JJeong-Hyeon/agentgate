@@ -4,10 +4,12 @@ import com.agentgate.agent.domain.Agent;
 import com.agentgate.agent.dto.AgentCreateRequest;
 import com.agentgate.agent.dto.AgentCreateResponse;
 import com.agentgate.agent.dto.AgentResponse;
+import com.agentgate.agent.dto.ApiKeyResponse;
 import com.agentgate.agent.repository.AgentRepository;
 import com.agentgate.common.exception.AgentNotFoundException;
 import com.agentgate.common.security.ApiKeyGenerator;
 import com.agentgate.risk.RiskLevel;
+import java.time.Instant;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -35,6 +37,14 @@ public class AgentManagementService {
         return agentRepository.findById(id)
                 .map(AgentResponse::from)
                 .orElseThrow(() -> new AgentNotFoundException(id));
+    }
+
+    @Transactional
+    public ApiKeyResponse reissueApiKey(Long id) {
+        Agent agent = agentRepository.findById(id).orElseThrow(() -> new AgentNotFoundException(id));
+        String apiKey = ApiKeyGenerator.generate();
+        agent.reissueApiKey(ApiKeyGenerator.hash(apiKey), Instant.now());
+        return new ApiKeyResponse(agent.getId(), agent.getAgentId(), apiKey, agent.getApiKeyIssuedAt());
     }
 
     @Transactional

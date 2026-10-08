@@ -61,7 +61,13 @@ Content-Type: application/json
 {"agentId": "mail-agent", "name": "Mail Agent"}
 ```
 
-응답에 `apiKey`가 평문으로 **한 번만** 내려옴 — 이 값을 1번 엔드포인트의 `X-API-Key`로 사용. 저장해두지 않으면 다시 조회 불가(재발급은 새 에이전트 등록으로).
+응답에 `apiKey`가 평문으로 **한 번만** 내려옴 — 이 값을 1번 엔드포인트의 `X-API-Key`로 사용. 해시만 저장되므로 다시 조회할 수 없다. 이미 있는 `agentId`면 409 `AGENT_ALREADY_EXISTS`.
+
+키를 잃어버렸거나 유출되면 재발급한다. 기존 키는 즉시 무효가 되고, 새 키는 응답에 한 번만 포함된다. Agent의 정책·정의·Audit 이력은 그대로 유지된다.
+
+```
+POST /api/v1/agents/{id}/api-key        → 200 {"id", "agentId", "apiKey", "issuedAt"}
+```
 
 ### Agent 정의 (관리자 인증 필요)
 

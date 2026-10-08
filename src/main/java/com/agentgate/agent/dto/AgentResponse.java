@@ -12,10 +12,11 @@ public record AgentResponse(
         RiskLevel maxRiskLevel,
         // 0 when no definition has been saved yet.
         int latestDefinitionVersion,
+        Instant apiKeyIssuedAt,
         Instant createdAt
 ) {
     public static AgentResponse from(Agent agent) {
         return new AgentResponse(agent.getId(), agent.getAgentId(), agent.getName(), agent.getDescription(),
-                agent.getMaxRiskLevel(), agent.getLatestDefinitionVersion(), agent.getCreatedAt());
+                agent.getMaxRiskLevel(), agent.getLatestDefinitionVersion(), agent.getApiKeyIssuedAt(), agent.getCreatedAt());
     }
 }

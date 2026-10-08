@@ -142,4 +142,33 @@ class AgentActionIntegrationTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("INVALID_API_KEY"));
     }
+
+    @Test
+    void reissuedApiKeyReplacesTheOldOne() throws Exception {
+        Long id = agentRepository.findByAgentId("mail-agent").orElseThrow().getId();
+        String body = mockMvc.perform(post("/api/v1/agents/{id}/api-key", id)
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors
+                                .httpBasic("test-admin", "test-password")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.agentId").value("mail-agent"))
+                .andExpect(jsonPath("$.issuedAt").exists())
+                .andReturn().getResponse().getContentAsString();
+        String newKey = new tools.jackson.databind.json.JsonMapper().readTree(body).get("apiKey").asString();
+        String action = """
+                {"agentId":"mail-agent","action":"VIEW_DATA","labels":[]}
+                """;
+
+        mockMvc.perform(post("/api/v1/actions").header("X-API-Key", API_KEY)
+                        .contentType(MediaType.APPLICATION_JSON).content(action))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/v1/actions").header("X-API-Key", newKey)
+                        .contentType(MediaType.APPLICATION_JSON).content(action))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void reissuingRequiresAdminAuthentication() throws Exception {
+        Long id = agentRepository.findByAgentId("mail-agent").orElseThrow().getId();
+        mockMvc.perform(post("/api/v1/agents/{id}/api-key", id)).andExpect(status().isUnauthorized());
+    }
 }

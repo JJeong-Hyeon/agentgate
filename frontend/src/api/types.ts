@@ -100,7 +100,16 @@ export interface Agent {
   maxRiskLevel: RiskLevel | null;
   // 0 until a definition is saved
   latestDefinitionVersion: number;
+  apiKeyIssuedAt: string | null;
   createdAt: string;
+}
+
+export interface IssuedApiKey {
+  id: number;
+  agentId: string;
+  // Shown once; only its hash is stored.
+  apiKey: string;
+  issuedAt: string;
 }
 
 export interface CreatedAgent {

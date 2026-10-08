@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import type { McpServerTools, McpToolInfo, ToolPermission } from "../api/types";
 import { useClient } from "../auth/AuthContext";
 import { useAsync } from "../useAsync";
+import { ApiKeySection } from "./ApiKeySection";
 import {
   defaultPermission,
   fromForm,
@@ -193,6 +194,8 @@ export function AgentEditorPage() {
               onChange={(tools) => update({ tools })}
             />
           </section>
+
+          {agent.data && <ApiKeySection agent={agent.data} onReissued={agent.reload} />}
 
           <section className="card stack">
             <h3>버전</h3>

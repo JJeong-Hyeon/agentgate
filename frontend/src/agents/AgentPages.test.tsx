@@ -36,6 +36,7 @@ const AGENT = {
   description: "Keeps notes",
   maxRiskLevel: null,
   latestDefinitionVersion: 2,
+  apiKeyIssuedAt: "2026-10-08T00:00:00Z",
   createdAt: "2026-10-08T00:00:00Z",
 };
 const DEFINITION = {
@@ -99,6 +100,9 @@ describe("AgentsPage", () => {
 
 describe("AgentEditorPage", () => {
   function editorHandler(url: string, init?: RequestInit): Response {
+    if (url === "/api/v1/agents/7/api-key" && init?.method === "POST") {
+      return Response.json({ id: 7, agentId: "note-agent", apiKey: "new-secret", issuedAt: "2026-10-08T01:00:00Z" });
+    }
     if (init?.method === "PUT") return Response.json({ agentId: "note-agent", version: 3, createdAt: "" });
     if (url === "/api/v1/agents/7") return Response.json(AGENT);
     if (url === "/api/v1/agents/7/definition") return Response.json(DEFINITION);
@@ -146,6 +150,18 @@ describe("AgentEditorPage", () => {
 
     expect(await screen.findByDisplayValue("Old.")).toBeInTheDocument();
     expect(screen.getByText("v1 기준 편집 중")).toBeInTheDocument();
+  });
+
+  it("reissues the API key after a second confirmation and shows it once", async () => {
+    const fetchImpl = renderAt("/agents/7", editorHandler);
+
+    fireEvent.click(await screen.findByRole("button", { name: "API Key 재발급" }));
+    expect(sent(fetchImpl, "POST")).toHaveLength(0);
+    expect(screen.getByText("기존 키는 즉시 사용할 수 없게 됩니다.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "재발급 확인" }));
+
+    expect(await screen.findByText("new-secret")).toBeInTheDocument();
+    expect(fetchImpl.mock.calls.some(([u, i]) => String(u) === "/api/v1/agents/7/api-key" && (i as RequestInit)?.method === "POST")).toBe(true);
   });
 
   it("does not save an invalid form", async () => {
