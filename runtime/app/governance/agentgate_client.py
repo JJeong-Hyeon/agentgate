@@ -50,6 +50,7 @@ class AgentGateClient:
         reason: str | None = None,
         agent_id: str | None = None,
         agent_version: int | None = None,
+        delegated_by: str | None = None,
     ) -> Decision:
         """`agent_id` defaults to the client's own; `agent_version` applies that agent
         definition's tool permissions."""
@@ -66,6 +67,8 @@ class AgentGateClient:
             body["reason"] = reason
         if agent_version is not None:
             body["agentVersion"] = agent_version
+        if delegated_by:
+            body["delegatedBy"] = delegated_by
         try:
             response = self._client.post("/api/v1/actions", json=body)
         except httpx.HTTPError as e:

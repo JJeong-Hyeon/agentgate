@@ -481,6 +481,10 @@ def test_agent_steps_report_compact_traces():
     outputs = agent_outputs(graph, state, resume="APPROVED")
 
     traces = [(step, out.get("agent")) for step, out in outputs]
+    # Every step says which agent ran it (here a workflow node, so no delegation chain).
+    assert {t["agent"] for _, t in traces if t} == {"note-agent"}
+    assert all("delegated_by" not in t for _, t in traces if t)
+    traces = [(step, t and {k: v for k, v in t.items() if k != "agent"}) for step, t in traces]
     assert traces[0] == ("helper", {"kind": "start", "prompt": "Task: add things"})
     assert traces[1] == (
         "helper.think",

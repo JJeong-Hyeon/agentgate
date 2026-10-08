@@ -223,6 +223,13 @@ class AgentToolSpec(SnapshotModel):
         return f"MCP:{self.server}:{self.tool}"
 
 
+class AgentDelegateSpec(SnapshotModel):
+    """Another agent this one may hand work to (AgentGate action AGENT:<agentId>)."""
+
+    agent_id: str = Field(min_length=1)
+    permission: Literal["AUTO", "APPROVAL", "BLOCKED"]
+
+
 class AgentSpec(SnapshotModel):
     """One version of an agent definition (see AgentGate's AgentDefinition)."""
 
@@ -238,6 +245,8 @@ class AgentSpec(SnapshotModel):
     output_schema: dict[str, Any] | None = None
     # NATIVE (function calling) or JSON (prompted); None → the runtime's default.
     tool_calling: Literal["NATIVE", "JSON"] | None = None
+    # Agents this one may delegate to; their definitions are in Workflow.agents too.
+    delegates: list[AgentDelegateSpec] = []
 
 
 class Edge(DslModel):

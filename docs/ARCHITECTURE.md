@@ -286,6 +286,7 @@ Agent Definition (v3)
 - 호출마다 AgentGate에 **그 Agent 이름과 정의 버전으로**(`agentId`, `agentVersion`) 평가를 요청하고, 승인자에게는 "어떤 Agent가 어떤 Tool을 어떤 인자로" 호출하려는지 보여준다(`reason`).
 - 거절·차단·실패·알 수 없는 Tool은 사유를 Tool 결과로 LLM에 돌려줘 계속 진행하게 한다. `maxSteps` 마지막 턴에는 Tool 없이 최종 답변을 요구한다.
 - `outputSchema`가 있으면 최종 답변을 JSON으로 파싱해 검증하고, 맞지 않으면 한 번 다시 요청한 뒤 그래도 맞지 않으면 노드를 실패시킨다. 결과는 정규화된 JSON 문자열로 저장한다.
+- **위임 (Multi-Agent)**: 정의의 `delegates`에 있는 Agent는 LLM에 `delegate__<agentId>`(인자 `task`) Tool로 제공된다. 위임 호출은 AgentGate에 `AGENT:<agentId>`로 평가되고(정책이 없으면 기본 MEDIUM·허용, 위임 권한으로 승인/차단 지정), 허용되면 맡은 Agent가 **LangGraph 서브그래프**로 자기 정의·자기 Tool·자기 이름으로 실행된다. 그 Agent의 Tool 호출에는 위임 경로(`delegatedBy`, 예: `lead>research`)가 함께 기록된다. 맡은 Agent 안의 승인 대기는 실행 전체를 멈추고, 재개하면 그 Agent의 중단 지점부터 이어진다(이미 실행된 LLM 단계는 재실행하지 않음). 위임 순환과 3단계를 넘는 위임은 저장·실행 시 거부한다. 맡은 Agent의 단계는 워크플로의 Agent 노드 아래 단계로 보고되고, trace에 실행한 Agent와 위임 경로가 표시된다.
 - 실행을 시작할 때 Tool Catalog의 설명·스키마를 정의 스냅샷에 붙여 실행 상태에 저장하므로, 승인 대기 중 MCP 서버가 내려가도 재개 시 그래프를 복원할 수 있다. 사용할 수 없는 Tool이 있으면 실행 시작을 거부한다.
 
 ---

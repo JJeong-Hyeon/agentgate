@@ -14,12 +14,14 @@ import httpx
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.checkpoint.base import BaseCheckpointSaver
+from langgraph.config import get_config
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
 from app.dsl.schema import (
     OUTPUT_TYPES,
     AgentNode,
+    AgentSpec,
     ApprovalNode,
     ConditionNode,
     HttpToolNode,
@@ -31,9 +33,10 @@ from app.dsl.schema import (
     Workflow,
 )
 from app.governance.agentgate_client import AgentGateClient
-from app.nodes.agent import AgentTool, add_agent, function_names
+from app.nodes.agent import AgentTool, add_agent, delegate_function_name, function_names
 from app.nodes.approval import add_approval
 from app.nodes.tool import add_tool
+from app.tools.delegate import TASK_PARAMETERS, DelegateTool
 from app.tools.http import HttpTool, HttpToolSpec
 from app.tools.mcp import McpServerConfig, McpTool
 from app.tools.registry import McpServerRegistry
@@ -43,6 +46,10 @@ LlmFactory = Callable[[str | None, float | None], BaseChatModel]
 
 VERDICT_INSTRUCTION = "Start your reply with exactly 'VERDICT: APPROVE' or 'VERDICT: REVISE'."
 _VERDICT = re.compile(r"VERDICT:\s*(APPROVE|REVISE)", re.IGNORECASE)
+
+
+# Delegation hops allowed (supervisor → worker → …); AgentGate enforces the same when saving.
+MAX_DELEGATION_DEPTH = 3
 
 
 class CompileError(Exception):
@@ -265,15 +272,31 @@ class WorkflowCompiler:
             )
         if self._gate is None:
             raise CompileError(f"'{node.id}': AGENT with tools needs an AgentGate client")
+        add_agent(
+            graph,
+            node.id,
+            spec,
+            lambda s, prompt=c.prompt: render(prompt, s),
+            self._llm_factory,
+            self._agent_tools(node.id, node.id, spec, workflow, []),
+            next_nodes,
+            spec.tool_calling or self._tool_calling,
+        )
+
+    def _agent_tools(
+        self, where: str, owner: str, spec: AgentSpec, workflow: Workflow, chain: list[str]
+    ) -> list[AgentTool]:
+        """The MCP tools and delegates `spec` may use. `owner` names its node (results are
+        recorded as `<owner>:<tool>`); `chain` lists the agents that delegated to it."""
         usable = [t for t in spec.tools if t.permission != "BLOCKED"]
         tools = []
         for function_name, tool in zip(function_names(usable), usable, strict=True):
             if self._registry.get(tool.server) is None:
-                raise CompileError(f"'{node.id}': unknown MCP server '{tool.server}'")
+                raise CompileError(f"'{where}': unknown MCP server '{tool.server}'")
             if tool.input_schema is None:
-                raise CompileError(f"'{node.id}': no schema for tool {tool.server}/{tool.tool}")
+                raise CompileError(f"'{where}': no schema for tool {tool.server}/{tool.tool}")
             governed = McpTool(
-                f"{node.id}:{tool.server}/{tool.tool}",
+                f"{owner}:{tool.server}/{tool.tool}",
                 tool.server,
                 lambda name=tool.server: self._registry.get(name),
                 tool.tool,
@@ -281,17 +304,75 @@ class WorkflowCompiler:
                 [],
                 self._gate,
             )
-            tools.append(AgentTool(function_name, tool, governed))
+            tools.append(AgentTool.mcp(function_name, tool, governed))
+        for delegate in spec.delegates:
+            if delegate.permission == "BLOCKED":
+                continue
+            target = workflow.agents.get(delegate.agent_id)
+            if target is None:
+                raise CompileError(
+                    f"'{where}': delegate '{delegate.agent_id}' was not resolved for this run"
+                )
+            path = [*chain, spec.agent_id]
+            if delegate.agent_id in path:
+                cycle = " > ".join([*path, delegate.agent_id])
+                raise CompileError(f"'{where}': delegation cycle {cycle}")
+            if len(path) > MAX_DELEGATION_DEPTH:
+                raise CompileError(f"'{where}': delegation deeper than {MAX_DELEGATION_DEPTH}")
+            run = self._delegate_runner(where, target, workflow, path)
+            governed = DelegateTool(
+                f"{owner}:agent/{delegate.agent_id}", delegate.agent_id, run, self._gate
+            )
+            description = f"Hand a task to agent '{delegate.agent_id}'"
+            if target.description:
+                description += f": {target.description}"
+            tools.append(
+                AgentTool(
+                    delegate_function_name(delegate.agent_id),
+                    description,
+                    TASK_PARAMETERS,
+                    f"agent {delegate.agent_id}",
+                    governed,
+                )
+            )
+        return tools
+
+    def _delegate_runner(
+        self, where: str, spec: AgentSpec, workflow: Workflow, chain: list[str]
+    ) -> Callable[[str], str]:
+        """A function running `spec` on a task as a subgraph of the calling node, so its
+        approvals pause and resume with the execution."""
+        name = re.sub(r"[^A-Za-z0-9_-]", "_", spec.agent_id)
+        state = TypedDict(
+            "DelegateState",
+            {
+                "task": str,
+                "agent_runs": Annotated[dict[str, dict], _merge],
+                "tool_results": Annotated[list[dict], operator.add],
+                name: str,
+            },
+            total=False,
+        )
+        graph = StateGraph(state)
         add_agent(
             graph,
-            node.id,
+            name,
             spec,
-            lambda s, prompt=c.prompt: render(prompt, s),
+            lambda s: s["task"],
             self._llm_factory,
-            tools,
-            next_nodes,
+            self._agent_tools(where, name, spec, workflow, chain),
+            [END],
             spec.tool_calling or self._tool_calling,
+            delegated_by=">".join(chain),
         )
+        graph.add_edge(START, name)
+        # No checkpointer: the subgraph checkpoints in the parent's, under its task.
+        subgraph = graph.compile()
+
+        def run(task: str) -> str:
+            return subgraph.invoke({"task": task}, get_config()).get(name, "")
+
+        return run
 
     def _http_tool(self, node: HttpToolNode) -> HttpTool:
         if self._gate is None:
