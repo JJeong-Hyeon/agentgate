@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import type { McpServerTools, McpToolInfo, ToolPermission } from "../api/types";
+import type { McpServerTools, McpToolInfo, RiskLevel, ToolPermission } from "../api/types";
 import { useClient } from "../auth/AuthContext";
 import { useAsync } from "../useAsync";
 import { ApiKeySection } from "./ApiKeySection";
@@ -21,6 +21,17 @@ export function AgentEditorPage() {
   const versions = useAsync(useCallback(() => client.listAgentDefinitionVersions(id), [client, id]));
   const [refresh, setRefresh] = useState(false);
   const catalog = useAsync(useCallback(() => client.listTools(refresh), [client, refresh]));
+  // Policy risk per tool action, shown next to each tool; optional, so failures are ignored.
+  const risks = useAsync(
+    useCallback(
+      () =>
+        client
+          .listToolRisks()
+          .then((servers) => new Map(servers.flatMap((s) => s.tools.map((t) => [t.action, t.effectiveRiskLevel] as const))))
+          .catch(() => new Map<string, RiskLevel>()),
+      [client],
+    ),
+  );
   const [form, setForm] = useState<DefinitionForm | null>(null);
   const [loadedVersion, setLoadedVersion] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -191,6 +202,7 @@ export function AgentEditorPage() {
               catalogError={catalog.error?.message}
               loading={catalog.loading}
               chosen={form.tools}
+              risks={risks.data}
               onChange={(tools) => update({ tools })}
             />
           </section>
@@ -230,10 +242,12 @@ interface ToolPickerProps {
   catalogError?: string;
   loading: boolean;
   chosen: Record<string, ToolChoice>;
+  // tool action (MCP:server:tool) → risk level its policy gives
+  risks?: Map<string, RiskLevel> | null;
   onChange: (tools: Record<string, ToolChoice>) => void;
 }
 
-function ToolPicker({ catalog, catalogError, loading, chosen, onChange }: ToolPickerProps) {
+function ToolPicker({ catalog, catalogError, loading, chosen, risks, onChange }: ToolPickerProps) {
   const known = new Set((catalog ?? []).flatMap((s) => s.tools.map((t) => toolKey(s.server, t.name))));
   const missing = Object.entries(chosen).filter(([key]) => !known.has(key));
 
@@ -273,7 +287,8 @@ function ToolPicker({ catalog, catalogError, loading, chosen, onChange }: ToolPi
                       <label className="inline">
                         <input type="checkbox" checked={!!choice} onChange={() => toggle(server.server, tool)} />
                         <span className="mono">{tool.name}</span>
-                      </label>
+                      </label>{" "}
+                      <RiskBadge level={risks?.get(`MCP:${server.server}:${tool.name}`)} />
                       {tool.description && <div className="muted">{tool.description}</div>}
                     </td>
                     <td>{choice && <PermissionFields toolName={tool.name} choice={choice} onChange={(c) => patch(key, c)} />}</td>
@@ -341,5 +356,14 @@ function PermissionFields({
         onChange={(e) => onChange({ labels: e.target.value })}
       />
     </div>
+  );
+}
+
+function RiskBadge({ level }: { level?: RiskLevel }) {
+  if (!level) return null;
+  return (
+    <span className={`badge risk-${level.toLowerCase()}`} title="Tools 화면에서 정한 정책 위험도">
+      정책 {level}
+    </span>
   );
 }

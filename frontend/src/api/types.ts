@@ -160,8 +160,50 @@ export interface McpToolInfo {
 export interface McpServerTools {
   server: string;
   transport: "url" | "stdio";
+  // where the server is registered: AgentGate, or the runtime's config file
+  source?: "agentgate" | "runtime";
   tools: McpToolInfo[];
   error: string | null;
+}
+
+export interface McpServer {
+  id: number;
+  name: string;
+  url: string;
+  description: string | null;
+  enabled: boolean;
+  // values are never returned
+  headerNames: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface McpServerInput {
+  name: string;
+  url: string;
+  description?: string | null;
+  enabled?: boolean;
+  // replaces all stored headers when present; omitted keeps them
+  headers?: Record<string, string>;
+}
+
+export interface ToolRiskTool {
+  name: string;
+  title: string | null;
+  description: string | null;
+  action: string;
+  riskLevel: RiskLevel | null;
+  policyId: number | null;
+  effectiveRiskLevel: RiskLevel;
+  suggestedRiskLevel: RiskLevel | null;
+}
+
+export interface ToolRiskServer {
+  server: string;
+  source: "agentgate" | "runtime" | null;
+  transport: "url" | "stdio";
+  error: string | null;
+  tools: ToolRiskTool[];
 }
 
 export interface ApiErrorBody {

@@ -8,7 +8,12 @@ import type {
   CreatedAgent,
   Execution,
   IssuedApiKey,
+  McpServer,
+  McpServerInput,
   McpServerTools,
+  RiskLevel,
+  ToolRiskServer,
+  ToolRiskTool,
   WorkflowDsl,
   WorkflowSummary,
 } from "./types";
@@ -164,6 +169,39 @@ export class AgentGateClient {
     return this.request(`/api/v1/agents/${id}/definition`, { method: "PUT", body: JSON.stringify(definition) });
   }
 
+  listMcpServers(): Promise<McpServer[]> {
+    return this.request("/api/v1/mcp-servers");
+  }
+
+  createMcpServer(input: McpServerInput): Promise<McpServer> {
+    return this.request("/api/v1/mcp-servers", { method: "POST", body: JSON.stringify(input) });
+  }
+
+  updateMcpServer(id: number, input: McpServerInput): Promise<McpServer> {
+    return this.request(`/api/v1/mcp-servers/${id}`, { method: "PUT", body: JSON.stringify(input) });
+  }
+
+  deleteMcpServer(id: number): Promise<void> {
+    return this.request(`/api/v1/mcp-servers/${id}`, { method: "DELETE" });
+  }
+
+  listToolRisks(refresh = false): Promise<ToolRiskServer[]> {
+    return this.request(`/api/v1/tool-risks${refresh ? "?refresh=true" : ""}`);
+  }
+
+  setToolRisk(server: string, tool: string, riskLevel: RiskLevel): Promise<ToolRiskTool> {
+    return this.request("/api/v1/tool-risks", { method: "PUT", body: JSON.stringify({ server, tool, riskLevel }) });
+  }
+
+  clearToolRisk(server: string, tool: string): Promise<void> {
+    const query = `server=${encodeURIComponent(server)}&tool=${encodeURIComponent(tool)}`;
+    return this.request(`/api/v1/tool-risks?${query}`, { method: "DELETE" });
+  }
+
+  applyToolRiskSuggestions(): Promise<{ applied: number }> {
+    return this.request("/api/v1/tool-risks/apply-suggestions", { method: "POST" });
+  }
+
   /** Tools of the MCP servers the runtime is configured with. */
   listTools(refresh = false): Promise<McpServerTools[]> {
     return this.request(`/api/v1/tools${refresh ? "?refresh=true" : ""}`);
@@ -190,6 +228,8 @@ export class AgentGateClient {
       const body = (await response.json().catch(() => null)) as ApiErrorBody | null;
       throw new ApiError(response.status, body);
     }
+    // 204 No Content (e.g. DELETE) has no body to parse.
+    if (response.status === 204) return undefined as T;
     return (await response.json()) as T;
   }
 }

@@ -692,3 +692,30 @@ fieldset.mode {
 .stopped-reason {
   border-color: var(--warn);
 }
+
+/* Tools */
+.server-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+.server-list > li {
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  align-items: start;
+}
+.server-form {
+  padding: 12px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+}
+.tool-table th {
+  text-align: left;
+  font-weight: 600;
+  padding: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}

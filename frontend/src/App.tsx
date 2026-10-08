@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes } from "react-r
 import { AgentEditorPage } from "./agents/AgentEditorPage";
 import { AgentsPage } from "./agents/AgentsPage";
 import { useAuth } from "./auth/AuthContext";
+import { ToolsPage } from "./tools/ToolsPage";
 import { BuilderPage } from "./builder/BuilderPage";
 import { ExecutionPage } from "./execution/ExecutionPage";
 import { ApprovalsPage } from "./pages/ApprovalsPage";
@@ -20,6 +21,7 @@ function Layout() {
           <NavLink to="/executions">Executions</NavLink>
           <NavLink to="/approvals">Approvals</NavLink>
           <NavLink to="/agents">Agents</NavLink>
+          <NavLink to="/tools">Tools</NavLink>
         </nav>
         <span className="spacer" />
         <span className="muted">{username}</span>
@@ -49,6 +51,7 @@ export function App() {
           <Route path="/approvals" element={<ApprovalsPage />} />
           <Route path="/agents" element={<AgentsPage />} />
           <Route path="/agents/:id" element={<AgentEditorPage />} />
+          <Route path="/tools" element={<ToolsPage />} />
           <Route path="*" element={<Navigate to="/workflows" replace />} />
         </Route>
       </Routes>
