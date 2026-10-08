@@ -12,6 +12,8 @@ Each call opens its own session (stdio process or Streamable HTTP connection) an
 """
 
 import json
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +21,7 @@ import anyio
 from mcp import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
 from mcp.client.streamable_http import streamable_http_client
+from mcp.types import PaginatedRequestParams
 from pydantic import BaseModel, model_validator
 
 from app.governance.agentgate_client import AgentGateClient
@@ -81,18 +84,62 @@ class McpTool(GovernedTool):
 
     async def _call(self, arguments: dict[str, Any]) -> tuple[bool, str]:
         with anyio.fail_after(self.timeout):
-            if self.server.url:
-                async with streamable_http_client(self.server.url) as streams:
-                    return await self._call_in(streams[0], streams[1], arguments)
-            params = StdioServerParameters(
-                command=self.server.command, args=self.server.args, env=self.server.env
-            )
-            async with stdio_client(params) as (read, write):
-                return await self._call_in(read, write, arguments)
-
-    async def _call_in(self, read, write, arguments: dict[str, Any]) -> tuple[bool, str]:
-        async with ClientSession(read, write) as session:
-            await session.initialize()
-            result = await session.call_tool(self.tool, arguments)
+            async with open_session(self.server) as session:
+                result = await session.call_tool(self.tool, arguments)
         text = "\n".join(c.text for c in result.content if getattr(c, "type", None) == "text")
         return bool(result.is_error), text
+
+
+@asynccontextmanager
+async def open_session(server: McpServerConfig) -> AsyncIterator[ClientSession]:
+    """An initialized session with `server` over its transport (Streamable HTTP or stdio)."""
+    if server.url:
+        async with streamable_http_client(server.url) as streams:
+            async with ClientSession(streams[0], streams[1]) as session:
+                await session.initialize()
+                yield session
+        return
+    params = StdioServerParameters(command=server.command, args=server.args, env=server.env)
+    async with stdio_client(params) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            yield session
+
+
+class McpToolInfo(BaseModel):
+    """A tool as an MCP server describes it (tools/list)."""
+
+    name: str
+    title: str | None = None
+    description: str | None = None
+    # JSON Schema of the tool's arguments.
+    input_schema: dict[str, Any]
+    # Server hints such as readOnlyHint / destructiveHint; untrusted, informational only.
+    annotations: dict[str, Any] | None = None
+
+
+async def list_tools(server: McpServerConfig, timeout: float = 30.0) -> list[McpToolInfo]:
+    with anyio.fail_after(timeout):
+        async with open_session(server) as session:
+            tools: list[McpToolInfo] = []
+            cursor = None
+            while True:
+                params = PaginatedRequestParams(cursor=cursor) if cursor else None
+                page = await session.list_tools(params=params)
+                tools += [
+                    McpToolInfo(
+                        name=t.name,
+                        title=t.title,
+                        description=t.description,
+                        input_schema=t.input_schema,
+                        annotations=(
+                            t.annotations.model_dump(by_alias=True, exclude_none=True)
+                            if t.annotations
+                            else None
+                        ),
+                    )
+                    for t in page.tools
+                ]
+                cursor = page.next_cursor
+                if not cursor:
+                    return tools

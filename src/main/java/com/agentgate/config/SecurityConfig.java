@@ -28,6 +28,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/audit-logs", "/api/v1/audit-logs/**").authenticated()
                         .requestMatchers("/api/v1/agents", "/api/v1/agents/**").authenticated()
                         .requestMatchers("/api/v1/workflows", "/api/v1/workflows/**").authenticated()
+                        .requestMatchers("/api/v1/tools", "/api/v1/tools/**").authenticated()
                         // The runtime authenticates progress events with the shared runtime token instead.
                         .requestMatchers(HttpMethod.POST, "/api/v1/executions/*/events").permitAll()
                         .requestMatchers("/api/v1/executions", "/api/v1/executions/**").authenticated()

@@ -28,6 +28,8 @@ public class RuntimeClient {
     private static final Logger log = LoggerFactory.getLogger(RuntimeClient.class);
 
     private final RestClient restClient;
+    // Listing tools may start stdio MCP servers, which can take a while.
+    private final RestClient slowRestClient;
     private final boolean enabled;
     private final String token;
 
@@ -51,6 +53,10 @@ public class RuntimeClient {
                 .defaultHeader("X-Runtime-Token", token)
                 .requestFactory(requestFactory)
                 .build();
+        SimpleClientHttpRequestFactory slowRequestFactory = new SimpleClientHttpRequestFactory();
+        slowRequestFactory.setConnectTimeout(Duration.ofSeconds(2));
+        slowRequestFactory.setReadTimeout(Duration.ofSeconds(35));
+        this.slowRestClient = restClient.mutate().requestFactory(slowRequestFactory).build();
     }
 
     public boolean isEnabled() {
@@ -127,6 +133,28 @@ public class RuntimeClient {
         } catch (RestClientException e) {
             log.warn("Failed to start execution {}", executionId, e);
             throw new RuntimeUnavailableException("Agent runtime could not start the execution");
+        }
+    }
+
+    /**
+     * The MCP servers configured in the runtime and their tools.
+     *
+     * @param refresh bypass the runtime's short-lived cache
+     * @throws RuntimeUnavailableException when the runtime is disabled or cannot answer
+     */
+    public List<McpServerTools> listTools(boolean refresh) {
+        if (!enabled) {
+            throw new RuntimeUnavailableException("Agent runtime is not configured");
+        }
+        try {
+            McpServerTools[] servers = slowRestClient.get()
+                    .uri(uri -> uri.path("/runtime/tools").queryParam("refresh", refresh).build())
+                    .retrieve()
+                    .body(McpServerTools[].class);
+            return servers == null ? List.of() : List.of(servers);
+        } catch (RestClientException e) {
+            log.warn("Failed to list runtime tools", e);
+            throw new RuntimeUnavailableException("Agent runtime could not list its tools");
         }
     }
 }

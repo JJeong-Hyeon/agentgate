@@ -9,6 +9,7 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,6 +21,7 @@ class RuntimeClientTest {
 
     private HttpServer server;
     private final AtomicReference<String> path = new AtomicReference<>();
+    private final AtomicReference<String> query = new AtomicReference<>();
     private final AtomicReference<String> token = new AtomicReference<>();
     private final AtomicReference<String> body = new AtomicReference<>();
     private volatile int responseStatus = 202;
@@ -30,6 +32,7 @@ class RuntimeClientTest {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/", exchange -> {
             path.set(exchange.getRequestURI().getPath());
+            query.set(exchange.getRequestURI().getQuery());
             token.set(exchange.getRequestHeaders().getFirst("X-Runtime-Token"));
             body.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
             if (responseBody == null) {
@@ -94,6 +97,37 @@ class RuntimeClientTest {
     void baseUrlWithoutTokenIsRejected() {
         assertThatThrownBy(() -> new RuntimeClient(RestClient.builder(), "http://runtime:8000", ""))
                 .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void listToolsParsesServersAndTools() {
+        responseStatus = 200;
+        responseBody = """
+                [{"server":"notes","transport":"url","error":null,
+                  "tools":[{"name":"save_note","title":null,"description":"Save a note.",
+                            "input_schema":{"type":"object","required":["title"]},
+                            "annotations":{"destructiveHint":true}}]},
+                 {"server":"files","transport":"stdio","tools":[],"error":"connection refused"}]
+                """;
+
+        List<McpServerTools> servers = client().listTools(true);
+
+        assertThat(path.get()).isEqualTo("/runtime/tools");
+        assertThat(query.get()).isEqualTo("refresh=true");
+        assertThat(token.get()).isEqualTo("secret");
+        assertThat(servers).hasSize(2);
+        McpToolInfo tool = servers.get(0).tools().get(0);
+        assertThat(tool.name()).isEqualTo("save_note");
+        assertThat(tool.inputSchema().get("required").get(0).asString()).isEqualTo("title");
+        assertThat(tool.annotations().get("destructiveHint").asBoolean()).isTrue();
+        assertThat(servers.get(1).error()).isEqualTo("connection refused");
+    }
+
+    @Test
+    void listToolsFailsWhenRuntimeIsDown() {
+        responseStatus = 500;
+
+        assertThatThrownBy(() -> client().listTools(false)).isInstanceOf(RuntimeUnavailableException.class);
     }
 
     @Test
