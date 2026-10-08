@@ -75,7 +75,8 @@ class ExistingDatabaseMigrationTest {
     void upgradesInPlaceKeepingDataAndAcceptingNewValues() {
         List<String> applied = jdbc.queryForList(
                 "select version from flyway_schema_history where success order by installed_rank", String.class);
-        assertThat(applied).containsExactly("0", "1", "2");
+        assertThat(applied.get(0)).isEqualTo("0");  // the baseline of a database from before Flyway
+        assertThat(applied.subList(1, applied.size())).isEqualTo(PostgresSchema.shippedVersions());
         assertThat(agentRepository.findByAgentId("old-agent")).isPresent();
         assertThat(jdbc.queryForObject("select count(*) from checkpoints", Integer.class)).isZero();
 

@@ -4,6 +4,7 @@ import com.agentgate.approval.domain.ApprovalStatus;
 import com.agentgate.approval.dto.ApprovalDecisionRequest;
 import com.agentgate.approval.dto.ApprovalResponse;
 import com.agentgate.approval.service.ApprovalService;
+import java.security.Principal;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -22,16 +23,19 @@ public class ApprovalController {
 
     private final ApprovalService approvalService;
 
+    // The decider is recorded as the signed-in user; a decidedBy in the body is accepted but ignored.
     @PostMapping("/{id}/approve")
     public ResponseEntity<ApprovalResponse> approve(@PathVariable Long id,
-                                                      @RequestBody(required = false) ApprovalDecisionRequest request) {
-        return ResponseEntity.ok(approvalService.approve(id, decidedBy(request)));
+                                                      @RequestBody(required = false) ApprovalDecisionRequest request,
+                                                      Principal principal) {
+        return ResponseEntity.ok(approvalService.approve(id, principal.getName()));
     }
 
     @PostMapping("/{id}/reject")
     public ResponseEntity<ApprovalResponse> reject(@PathVariable Long id,
-                                                     @RequestBody(required = false) ApprovalDecisionRequest request) {
-        return ResponseEntity.ok(approvalService.reject(id, decidedBy(request)));
+                                                     @RequestBody(required = false) ApprovalDecisionRequest request,
+                                                     Principal principal) {
+        return ResponseEntity.ok(approvalService.reject(id, principal.getName()));
     }
 
     @GetMapping
@@ -43,9 +47,5 @@ public class ApprovalController {
     @GetMapping("/{id}")
     public ResponseEntity<ApprovalResponse> get(@PathVariable Long id) {
         return ResponseEntity.ok(approvalService.get(id));
-    }
-
-    private String decidedBy(ApprovalDecisionRequest request) {
-        return (request == null) ? null : request.decidedBy();
     }
 }
