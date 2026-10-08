@@ -232,3 +232,14 @@ def test_mcp_tool_is_governed_by_agentgate(action_risk, level, expected):
 
     assert execution["status"] == "COMPLETED"
     assert execution["state"]["say"] == expected
+
+
+def test_tools_of_configured_mcp_servers_are_listed(admin):
+    response = admin.get("/api/v1/tools", params={"refresh": "true"}, timeout=40)
+
+    assert response.status_code == 200
+    [echo] = [s for s in response.json() if s["server"] == "echo"]
+    assert echo["error"] is None
+    tools = {t["name"]: t for t in echo["tools"]}
+    assert {"echo", "add", "fail"} <= set(tools)
+    assert tools["add"]["inputSchema"]["required"] == ["a", "b"]
