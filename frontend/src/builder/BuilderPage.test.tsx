@@ -121,6 +121,7 @@ describe("BuilderPage", () => {
 
     expect(await screen.findByText("검증 오류 1건")).toBeInTheDocument();
     expect(screen.getByText(/Unknown variable/)).toBeInTheDocument();
-    expect(document.querySelector(".dsl-node.has-error")).toHaveTextContent("answer");
+    // The node highlight follows the error list in a later render.
+    await waitFor(() => expect(document.querySelector(".dsl-node.has-error")).toHaveTextContent("answer"));
   });
 });
