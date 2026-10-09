@@ -63,7 +63,7 @@ SPRING_DATASOURCE_PASSWORD=<RDS 비밀번호>
 SPRING_DATA_REDIS_HOST=localhost
 SPRING_DATA_REDIS_PORT=6379
 AGENTGATE_ADMIN_USERNAME=admin
-AGENTGATE_ADMIN_PASSWORD=<AgentGate 관리자 비밀번호>
+AGENTGATE_ADMIN_PASSWORD=<AgentGate 관리자 비밀번호; 사용자가 없을 때 첫 ADMIN 계정 생성에만 쓰임>
 AGENTGATE_RUNTIME_BASE_URL=http://<runtime_private_ip>:8000
 AGENTGATE_RUNTIME_TOKEN=<임의의 긴 문자열, Runtime의 RUNTIME_TOKEN과 동일>
 AGENTGATE_SECRET_KEY=<openssl rand -base64 32 결과. DB에 저장하는 인증정보(MCP 서버 헤더 등) 암호화 키, 바꾸면 기존 값을 읽을 수 없음>
@@ -143,6 +143,10 @@ App이 기동할 때 Flyway가 RDS 스키마를 마이그레이션한다(`db/mig
 - Flyway 도입 전부터 쓰던 RDS는 첫 기동 때 자동으로 baseline된 뒤 V1(이미 있는 테이블은 건너뜀), V2(enum CHECK 제약 갱신, `STOPPED` 상태 허용)가 적용된다.
 - 엔티티와 스키마가 다르면 App이 기동하지 않는다(`ddl-auto: validate`). 로그의 Hibernate 스키마 검증 오류를 확인한다.
 - 배포 전 RDS 스냅샷을 만들어 두는 것을 권장한다.
+
+## 사용자와 역할
+
+첫 기동 때(사용자가 없을 때) `AGENTGATE_ADMIN_USERNAME` / `AGENTGATE_ADMIN_PASSWORD`로 ADMIN 사용자가 만들어진다. 이후 사용자와 비밀번호는 콘솔(또는 `/api/v1/users`, `/api/v1/me/password`)에서 관리하며, 환경변수의 비밀번호를 바꿔도 기존 계정에는 반영되지 않는다. 운영 전 역할별 계정(EDITOR / APPROVER / VIEWER)을 만들고 공용 관리자 계정 사용을 줄이는 것을 권장한다.
 
 ## 보안 참고
 

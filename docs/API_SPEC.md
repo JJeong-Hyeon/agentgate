@@ -52,6 +52,32 @@ X-Runtime-Token: <runtime token>    # Agent Runtime: 등록된 어느 Agent의 �
 
 **주의**: `decision`, `approvalRequired`(boolean) 같은 필드는 없음 — `status` 값 하나로 전부 표현됨.
 
+## 사용자와 역할 (콘솔 인증)
+
+콘솔 API는 HTTP Basic으로 DB 사용자를 인증한다. 역할은 여럿 가질 수 있다.
+
+| 역할 | 할 수 있는 일 |
+|---|---|
+| `ADMIN` | 아래 전부 + 사용자, 정책, Tool 위험도, MCP 서버, Agent 등록·API Key·위험도 상한 |
+| `EDITOR` | Workflow 저장, 실행 시작, Agent 정의 저장 |
+| `APPROVER` | 승인 · 거절 |
+| `VIEWER` | 조회 (GET) |
+
+모든 역할이 조회할 수 있고, 권한이 없으면 403이다. 사용자가 없을 때 기동하면 `agentgate.admin.*` 설정으로 첫 ADMIN이 만들어진다.
+
+```
+GET    /api/v1/me                    내 정보 (username, roles)
+PUT    /api/v1/me/password           {"currentPassword", "newPassword"(8자 이상)} → 204
+POST   /api/v1/users                 (ADMIN) {"username", "displayName", "password", "roles": ["EDITOR"], "enabled"} → 201
+GET    /api/v1/users, /api/v1/users/{id}
+PUT    /api/v1/users/{id}            이름·역할·사용 여부, password는 주면 변경. username은 바뀌지 않음
+DELETE /api/v1/users/{id}            → 204
+```
+
+- 자기 자신 삭제, 마지막 활성 ADMIN의 삭제·비활성화·ADMIN 역할 제거는 400 `INVALID_USER_CHANGE`
+- 중복 사용자 409 `USER_ALREADY_EXISTS`, 비밀번호는 BCrypt로 저장
+- 승인·거절의 `decidedBy`는 로그인한 사용자로 기록된다(요청 본문의 값은 무시)
+
 ## 2. 에이전트 등록 (최초 1회, 관리자 인증 필요)
 
 ```

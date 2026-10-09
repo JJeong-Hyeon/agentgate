@@ -233,7 +233,7 @@ Grafana + Prometheus (도입 완료) — `/actuator/prometheus`로 메트릭 노
 
 ## 인증
 
-- `/api/v1/policies/**`, `/api/v1/approvals/**`, `/api/v1/audit-logs/**`, `/api/v1/agents/**`: HTTP Basic Auth (운영자 계정, `agentgate.admin.username`/`agentgate.admin.password` 설정값)
+- 콘솔 API: HTTP Basic Auth (DB 사용자, 역할 ADMIN / EDITOR / APPROVER / VIEWER — `API_SPEC.md` "사용자와 역할"). 사용자가 없으면 `agentgate.admin.username`/`agentgate.admin.password`로 첫 ADMIN이 생성된다
 - `/api/v1/actions`: Agent API Key (`X-API-Key` 헤더). 키는 `POST /api/v1/agents`로 에이전트를 등록할 때 한 번만 평문으로 응답에 포함되며, 이후엔 해시만 저장되어 다시 조회할 수 없다.
 
 ## Agent 등록

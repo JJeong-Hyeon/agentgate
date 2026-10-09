@@ -38,7 +38,7 @@ class FreshDatabaseMigrationTest {
         // Starting the context already ran the migrations and Hibernate's validation.
         List<String> applied = jdbc.queryForList(
                 "select version from flyway_schema_history where success order by installed_rank", String.class);
-        assertThat(applied).containsExactly("1", "2");
+        assertThat(applied).isEqualTo(PostgresSchema.shippedVersions());
 
         Execution stopped = new Execution("fresh-1", "wf", 1, "task");
         stopped.stopped("report: rejected by an approver", Instant.now());

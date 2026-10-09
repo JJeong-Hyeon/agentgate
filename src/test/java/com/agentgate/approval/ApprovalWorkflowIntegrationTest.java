@@ -102,7 +102,8 @@ class ApprovalWorkflowIntegrationTest {
         mockMvc.perform(get("/api/v1/approvals/" + approvalId).with(httpBasic("test-admin", "test-password")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("APPROVED"))
-                .andExpect(jsonPath("$.decidedBy").value("alice"));
+                // The signed-in user, not the decidedBy the request body claims.
+                .andExpect(jsonPath("$.decidedBy").value("test-admin"));
     }
 
     @Test

@@ -25,6 +25,21 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.NOT_FOUND, "AGENT_NOT_FOUND", ex.getMessage(), request);
     }
 
+    @ExceptionHandler(UserNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleUserNotFound(UserNotFoundException ex, HttpServletRequest request) {
+        return build(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(DuplicateUserException.class)
+    public ResponseEntity<ErrorResponse> handleDuplicateUser(DuplicateUserException ex, HttpServletRequest request) {
+        return build(HttpStatus.CONFLICT, "USER_ALREADY_EXISTS", ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(InvalidUserChangeException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidUserChange(InvalidUserChangeException ex, HttpServletRequest request) {
+        return build(HttpStatus.BAD_REQUEST, "INVALID_USER_CHANGE", ex.getMessage(), request);
+    }
+
     @ExceptionHandler(McpServerNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleMcpServerNotFound(McpServerNotFoundException ex, HttpServletRequest request) {
         return build(HttpStatus.NOT_FOUND, "MCP_SERVER_NOT_FOUND", ex.getMessage(), request);
