@@ -1,12 +1,14 @@
 import { useCallback, useState } from "react";
 import { Link } from "react-router-dom";
-import { useClient } from "../auth/AuthContext";
+import { useAuth, useClient } from "../auth/AuthContext";
 import { WorkflowPreview } from "../components/WorkflowPreview";
 import { StartExecution } from "../execution/StartExecution";
 import { useAsync } from "../useAsync";
 
 export function WorkflowsPage() {
   const client = useClient();
+  const { hasRole } = useAuth();
+  const canEdit = hasRole("ADMIN", "EDITOR");
   const [selected, setSelected] = useState<string | null>(null);
   const workflows = useAsync(useCallback(() => client.listWorkflows(), [client]));
   const detail = useAsync(
@@ -21,9 +23,11 @@ export function WorkflowsPage() {
       <section className="card list">
         <div className="row">
           <h2>Workflows</h2>
-          <Link className="button" to="/workflows/new">
-            새 워크플로
-          </Link>
+          {canEdit && (
+            <Link className="button" to="/workflows/new">
+              새 워크플로
+            </Link>
+          )}
         </div>
         {workflows.error && <p className="error">{workflows.error.message}</p>}
         {workflows.data?.length === 0 && <p className="muted">저장된 워크플로가 없습니다.</p>}
@@ -52,9 +56,11 @@ export function WorkflowsPage() {
               <h2>
                 {detail.data.name} <span className="muted">v{detail.data.latestVersion}</span>
               </h2>
-              <Link className="button" to={`/workflows/${detail.data.workflowId}/edit`}>
-                편집
-              </Link>
+              {canEdit && (
+                <Link className="button" to={`/workflows/${detail.data.workflowId}/edit`}>
+                  편집
+                </Link>
+              )}
             </div>
             <StartExecution
               key={detail.data.workflowId}

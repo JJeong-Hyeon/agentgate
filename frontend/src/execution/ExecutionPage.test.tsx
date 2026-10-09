@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import type { Execution } from "../api/types";
 import { AuthProvider } from "../auth/AuthContext";
+import { withMe } from "../testUtils/me";
 import { ExecutionPage } from "./ExecutionPage";
 
 const DSL = {
@@ -68,27 +69,28 @@ function streamResponse(chunks: string[]): Response {
 
 function renderPage() {
   sessionStorage.setItem("agentgate.credentials", JSON.stringify({ username: "admin", password: "pw" }));
-  const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = String(input);
-    if (url.endsWith("/stream")) {
-      return streamResponse([sse("snapshot", running), sse("update", nodeWaiting), sse("update", waiting)]);
-    }
-    if (url.includes("/versions/2")) return Response.json({ version: 2, dsl: DSL });
-    if (url === "/api/v1/approvals/7" && !init?.method) {
-      return Response.json({
-        id: 7,
-        agentId: "runtime-agent",
-        action: "SEND_REPORT",
-        target: "http://x",
-        labels: ["PII"],
-        riskLevel: "HIGH",
-        status: "PENDING",
-        reason: "Send the report about runtimes?",
-      });
-    }
-    if (url === "/api/v1/approvals/7/approve") return Response.json({ id: 7, status: "APPROVED" });
-    return new Response("{}", { status: 404 });
-  });
+  const fetchImpl = vi.fn(
+    withMe(async (url, init) => {
+      if (url.endsWith("/stream")) {
+        return streamResponse([sse("snapshot", running), sse("update", nodeWaiting), sse("update", waiting)]);
+      }
+      if (url.includes("/versions/2")) return Response.json({ version: 2, dsl: DSL });
+      if (url === "/api/v1/approvals/7" && !init?.method) {
+        return Response.json({
+          id: 7,
+          agentId: "runtime-agent",
+          action: "SEND_REPORT",
+          target: "http://x",
+          labels: ["PII"],
+          riskLevel: "HIGH",
+          status: "PENDING",
+          reason: "Send the report about runtimes?",
+        });
+      }
+      if (url === "/api/v1/approvals/7/approve") return Response.json({ id: 7, status: "APPROVED" });
+      return new Response("{}", { status: 404 });
+    }),
+  );
   render(
     <AuthProvider fetchImpl={fetchImpl as unknown as typeof fetch}>
       <MemoryRouter initialEntries={["/executions/e1"]}>
@@ -172,12 +174,13 @@ describe("ExecutionPage", () => {
       ],
     };
     sessionStorage.setItem("agentgate.credentials", JSON.stringify({ username: "admin", password: "pw" }));
-    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.endsWith("/stream")) return streamResponse([sse("snapshot", agentRun)]);
-      if (url.includes("/versions/2")) return Response.json({ version: 2, dsl: DSL });
-      return new Response("{}", { status: 404 });
-    });
+    const fetchImpl = vi.fn(
+      withMe(async (url) => {
+        if (url.endsWith("/stream")) return streamResponse([sse("snapshot", agentRun)]);
+        if (url.includes("/versions/2")) return Response.json({ version: 2, dsl: DSL });
+        return new Response("{}", { status: 404 });
+      }),
+    );
     render(
       <AuthProvider fetchImpl={fetchImpl as unknown as typeof fetch}>
         <MemoryRouter initialEntries={["/executions/e1"]}>
@@ -204,12 +207,13 @@ describe("ExecutionPage", () => {
   it("explains why a stopped execution ended", async () => {
     const stopped: Execution = { ...running, status: "STOPPED", error: "report: rejected by an approver", nodes: [] };
     sessionStorage.setItem("agentgate.credentials", JSON.stringify({ username: "admin", password: "pw" }));
-    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.endsWith("/stream")) return streamResponse([sse("snapshot", stopped)]);
-      if (url.includes("/versions/2")) return Response.json({ version: 2, dsl: DSL });
-      return new Response("{}", { status: 404 });
-    });
+    const fetchImpl = vi.fn(
+      withMe(async (url) => {
+        if (url.endsWith("/stream")) return streamResponse([sse("snapshot", stopped)]);
+        if (url.includes("/versions/2")) return Response.json({ version: 2, dsl: DSL });
+        return new Response("{}", { status: 404 });
+      }),
+    );
     render(
       <AuthProvider fetchImpl={fetchImpl as unknown as typeof fetch}>
         <MemoryRouter initialEntries={["/executions/e1"]}>
@@ -258,12 +262,13 @@ describe("ExecutionPage", () => {
       ],
     };
     sessionStorage.setItem("agentgate.credentials", JSON.stringify({ username: "admin", password: "pw" }));
-    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.endsWith("/stream")) return streamResponse([sse("snapshot", team)]);
-      if (url.includes("/versions/2")) return Response.json({ version: 2, dsl: DSL });
-      return new Response("{}", { status: 404 });
-    });
+    const fetchImpl = vi.fn(
+      withMe(async (url) => {
+        if (url.endsWith("/stream")) return streamResponse([sse("snapshot", team)]);
+        if (url.includes("/versions/2")) return Response.json({ version: 2, dsl: DSL });
+        return new Response("{}", { status: 404 });
+      }),
+    );
     render(
       <AuthProvider fetchImpl={fetchImpl as unknown as typeof fetch}>
         <MemoryRouter initialEntries={["/executions/e1"]}>
