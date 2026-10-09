@@ -1,14 +1,17 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { useClient } from "../auth/AuthContext";
+import { useAuth, useClient } from "../auth/AuthContext";
 
 /** Task input that starts a run of a saved workflow version and opens its execution view. */
 export function StartExecution({ workflowId, version }: { workflowId: string; version?: number }) {
   const client = useClient();
+  const { hasRole } = useAuth();
   const navigate = useNavigate();
   const [task, setTask] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
+
+  if (!hasRole("ADMIN", "EDITOR")) return null;
 
   async function start(event: FormEvent) {
     event.preventDefault();

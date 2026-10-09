@@ -93,7 +93,8 @@ function ExecutionGraph({ execution }: { execution: Execution }) {
 
 function ApprovalPanel({ approvalId }: { approvalId: number }) {
   const client = useClient();
-  const { username } = useAuth();
+  const { hasRole } = useAuth();
+  const canDecide = hasRole("ADMIN", "APPROVER");
   const approval = useAsync(useCallback(() => client.getApproval(approvalId), [client, approvalId]));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -103,7 +104,7 @@ function ApprovalPanel({ approvalId }: { approvalId: number }) {
     setError(null);
     try {
       // The execution resumes on its own; the stream brings the result.
-      await client.decideApproval(approvalId, decision, username ?? "admin");
+      await client.decideApproval(approvalId, decision);
       approval.reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -133,7 +134,7 @@ function ApprovalPanel({ approvalId }: { approvalId: number }) {
         {a && a.status !== "PENDING" && <p className="muted">{a.status === "APPROVED" ? "승인됨" : "거절됨"} — 재개 중…</p>}
         {error && <p className="error">{error}</p>}
       </div>
-      {(!a || a.status === "PENDING") && (
+      {canDecide && (!a || a.status === "PENDING") && (
         <div className="actions">
           <button disabled={busy} onClick={() => decide("approve")}>
             승인

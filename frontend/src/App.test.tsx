@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { App } from "./App";
 import { AuthProvider } from "./auth/AuthContext";
+import { withMe } from "./testUtils/me";
 
 function renderApp(fetchImpl: typeof fetch) {
   sessionStorage.clear();
@@ -22,8 +23,12 @@ describe("App", () => {
   });
 
   it("logs in and lists workflows", async () => {
-    const fetchImpl = vi.fn(async () =>
-      Response.json([{ id: 1, workflowId: "research", name: "Research", latestVersion: 2 }]),
+    const fetchImpl = vi.fn(
+      withMe(async (url) => {
+        if (url === "/api/v1/workflows")
+          return Response.json([{ id: 1, workflowId: "research", name: "Research", latestVersion: 2 }]);
+        return new Response("{}", { status: 404 });
+      }),
     );
     renderApp(fetchImpl);
 

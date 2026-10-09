@@ -1,13 +1,15 @@
 import { useCallback, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import type { CreatedAgent } from "../api/types";
-import { useClient } from "../auth/AuthContext";
+import { useAuth, useClient } from "../auth/AuthContext";
 import { useAsync } from "../useAsync";
 
 const AGENT_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
 
 export function AgentsPage() {
   const client = useClient();
+  const { hasRole } = useAuth();
+  const canCreate = hasRole("ADMIN");
   const agents = useAsync(useCallback(() => client.listAgents(), [client]));
   const [agentId, setAgentId] = useState("");
   const [name, setName] = useState("");
@@ -61,39 +63,41 @@ export function AgentsPage() {
           ))}
         </ul>
       </section>
-      <section className="card detail">
-        <h2>새 Agent</h2>
-        <p className="hint">
-          Agent는 거버넌스 신원(정책, 위험도 상한, Audit)과 실행 정의(모델, 프롬프트, Tool 권한)를 함께 가집니다. 등록 후
-          정의를 저장해야 워크플로에서 쓸 수 있습니다.
-        </p>
-        <form className="stack" onSubmit={create}>
-          <label>
-            Agent id
-            <input value={agentId} onChange={(e) => setAgentId(e.target.value)} placeholder="research-agent" />
-          </label>
-          <label>
-            이름
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Research Agent" />
-          </label>
-          {error && <p className="error">{error}</p>}
-          <button type="submit" disabled={busy || !agentId}>
-            등록
-          </button>
-        </form>
-        {created && (
-          <div className="notice" role="status">
-            <p>
-              <strong>{created.agentId}</strong>를 등록했습니다. 이 Agent가 직접 AgentGate를 호출할 때 쓰는 API Key는
-              지금 한 번만 표시됩니다.
-            </p>
-            <code className="mono">{created.apiKey}</code>
-            <p>
-              <Link to={`/agents/${created.id}`}>정의 작성하기 →</Link>
-            </p>
-          </div>
-        )}
-      </section>
+      {canCreate && (
+        <section className="card detail">
+          <h2>새 Agent</h2>
+          <p className="hint">
+            Agent는 거버넌스 신원(정책, 위험도 상한, Audit)과 실행 정의(모델, 프롬프트, Tool 권한)를 함께 가집니다. 등록
+            후 정의를 저장해야 워크플로에서 쓸 수 있습니다.
+          </p>
+          <form className="stack" onSubmit={create}>
+            <label>
+              Agent id
+              <input value={agentId} onChange={(e) => setAgentId(e.target.value)} placeholder="research-agent" />
+            </label>
+            <label>
+              이름
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Research Agent" />
+            </label>
+            {error && <p className="error">{error}</p>}
+            <button type="submit" disabled={busy || !agentId}>
+              등록
+            </button>
+          </form>
+          {created && (
+            <div className="notice" role="status">
+              <p>
+                <strong>{created.agentId}</strong>를 등록했습니다. 이 Agent가 직접 AgentGate를 호출할 때 쓰는 API
+                Key는 지금 한 번만 표시됩니다.
+              </p>
+              <code className="mono">{created.apiKey}</code>
+              <p>
+                <Link to={`/agents/${created.id}`}>정의 작성하기 →</Link>
+              </p>
+            </div>
+          )}
+        </section>
+      )}
     </div>
   );
 }

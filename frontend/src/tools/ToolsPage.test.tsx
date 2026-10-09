@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { AuthProvider } from "../auth/AuthContext";
+import { withMe } from "../testUtils/me";
 import { headersFrom } from "./McpServersSection";
 import { ToolsPage } from "./ToolsPage";
 
@@ -50,19 +51,20 @@ const SERVERS = [
 
 function renderPage() {
   sessionStorage.setItem("agentgate.credentials", JSON.stringify({ username: "admin", password: "pw" }));
-  const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = String(input);
-    const method = init?.method ?? "GET";
-    if (url.startsWith("/api/v1/tool-risks/apply-suggestions")) return Response.json({ applied: 1 });
-    if (url.startsWith("/api/v1/tool-risks") && method === "DELETE") return new Response(null, { status: 204 });
-    if (url.startsWith("/api/v1/tool-risks") && method === "PUT") return Response.json({});
-    if (url.startsWith("/api/v1/tool-risks")) return Response.json(RISKS);
-    if (url === "/api/v1/mcp-servers" && method === "POST") return Response.json({ ...SERVERS[0], id: 9 });
-    if (url === "/api/v1/mcp-servers/3" && method === "PUT") return Response.json(SERVERS[0]);
-    if (url === "/api/v1/mcp-servers/3" && method === "DELETE") return new Response(null, { status: 204 });
-    if (url === "/api/v1/mcp-servers") return Response.json(SERVERS);
-    return new Response("{}", { status: 404 });
-  });
+  const fetchImpl = vi.fn(
+    withMe(async (url, init) => {
+      const method = init?.method ?? "GET";
+      if (url.startsWith("/api/v1/tool-risks/apply-suggestions")) return Response.json({ applied: 1 });
+      if (url.startsWith("/api/v1/tool-risks") && method === "DELETE") return new Response(null, { status: 204 });
+      if (url.startsWith("/api/v1/tool-risks") && method === "PUT") return Response.json({});
+      if (url.startsWith("/api/v1/tool-risks")) return Response.json(RISKS);
+      if (url === "/api/v1/mcp-servers" && method === "POST") return Response.json({ ...SERVERS[0], id: 9 });
+      if (url === "/api/v1/mcp-servers/3" && method === "PUT") return Response.json(SERVERS[0]);
+      if (url === "/api/v1/mcp-servers/3" && method === "DELETE") return new Response(null, { status: 204 });
+      if (url === "/api/v1/mcp-servers") return Response.json(SERVERS);
+      return new Response("{}", { status: 404 });
+    }),
+  );
   render(
     <AuthProvider fetchImpl={fetchImpl as unknown as typeof fetch}>
       <MemoryRouter>

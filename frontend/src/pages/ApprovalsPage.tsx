@@ -4,7 +4,8 @@ import { useAsync } from "../useAsync";
 
 export function ApprovalsPage() {
   const client = useClient();
-  const { username } = useAuth();
+  const { hasRole } = useAuth();
+  const canDecide = hasRole("ADMIN", "APPROVER");
   const approvals = useAsync(useCallback(() => client.listApprovals("PENDING"), [client]));
   const [busy, setBusy] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -13,7 +14,7 @@ export function ApprovalsPage() {
     setBusy(id);
     setError(null);
     try {
-      await client.decideApproval(id, decision, username ?? "admin");
+      await client.decideApproval(id, decision);
       approvals.reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -48,14 +49,16 @@ export function ApprovalsPage() {
               {a.reason && <div className="approval-reason">{a.reason}</div>}
               {a.executionId && <div className="muted mono">실행 {a.executionId}</div>}
             </div>
-            <div className="actions">
-              <button disabled={busy === a.id} onClick={() => decide(a.id, "approve")}>
-                승인
-              </button>
-              <button className="danger" disabled={busy === a.id} onClick={() => decide(a.id, "reject")}>
-                거절
-              </button>
-            </div>
+            {canDecide && (
+              <div className="actions">
+                <button disabled={busy === a.id} onClick={() => decide(a.id, "approve")}>
+                  승인
+                </button>
+                <button className="danger" disabled={busy === a.id} onClick={() => decide(a.id, "reject")}>
+                  거절
+                </button>
+              </div>
+            )}
           </li>
         ))}
       </ul>

@@ -215,6 +215,30 @@ export interface ToolRiskServer {
   tools: ToolRiskTool[];
 }
 
+export type Role = "ADMIN" | "EDITOR" | "APPROVER" | "VIEWER";
+
+export interface UserSummary {
+  id: number;
+  username: string;
+  displayName: string | null;
+  roles: Role[];
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** GET /api/v1/me returns the same shape as a user list entry. */
+export type Me = UserSummary;
+
+export interface UserInput {
+  username: string;
+  displayName?: string | null;
+  // required on create; omitted on update keeps the current password
+  password?: string;
+  roles: Role[];
+  enabled?: boolean;
+}
+
 export interface ApiErrorBody {
   status: number;
   code: string;

@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "../auth/AuthContext";
 import { BuilderPage } from "../builder/BuilderPage";
+import { withMe } from "../testUtils/me";
 import { AgentEditorPage } from "./AgentEditorPage";
 import { AgentsPage } from "./AgentsPage";
 
@@ -9,7 +10,7 @@ type Handler = (url: string, init?: RequestInit) => Response;
 
 function renderAt(path: string, handler: Handler) {
   sessionStorage.setItem("agentgate.credentials", JSON.stringify({ username: "admin", password: "pw" }));
-  const fetchImpl = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => handler(String(url), init));
+  const fetchImpl = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => withMe(handler)(String(url), init));
   render(
     <AuthProvider fetchImpl={fetchImpl as unknown as typeof fetch}>
       <MemoryRouter initialEntries={[path]}>

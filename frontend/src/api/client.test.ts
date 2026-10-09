@@ -16,16 +16,15 @@ describe("AgentGateClient", () => {
     expect((init!.headers as Record<string, string>).Authorization).toBe(`Basic ${btoa("admin:pw")}`);
   });
 
-  it("posts approval decisions as JSON", async () => {
+  it("posts approval decisions without a body (the server records the signed-in user)", async () => {
     const fetchImpl = fakeFetch(200, { id: 3, status: "APPROVED" });
 
-    await new AgentGateClient({ username: "a", password: "b" }, fetchImpl).decideApproval(3, "approve", "alice");
+    await new AgentGateClient({ username: "a", password: "b" }, fetchImpl).decideApproval(3, "approve");
 
     const [url, init] = fetchImpl.mock.calls[0];
     expect(url).toBe("/api/v1/approvals/3/approve");
     expect(init!.method).toBe("POST");
-    expect(init!.body).toBe(JSON.stringify({ decidedBy: "alice" }));
-    expect((init!.headers as Record<string, string>)["Content-Type"]).toBe("application/json");
+    expect(init!.body).toBeUndefined();
   });
 
   it("raises ApiError with AgentGate's error body", async () => {

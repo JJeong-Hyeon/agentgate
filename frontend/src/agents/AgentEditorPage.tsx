@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import type { McpServerTools, McpToolInfo, RiskLevel, ToolPermission } from "../api/types";
-import { useClient } from "../auth/AuthContext";
+import { useAuth, useClient } from "../auth/AuthContext";
 import { useAsync } from "../useAsync";
 import { ApiKeySection } from "./ApiKeySection";
 import { DelegatesSection } from "./DelegatesSection";
@@ -18,6 +18,8 @@ import {
 export function AgentEditorPage() {
   const id = Number(useParams().id);
   const client = useClient();
+  const { hasRole } = useAuth();
+  const canEdit = hasRole("ADMIN", "EDITOR");
   const agent = useAsync(useCallback(() => client.getAgent(id), [client, id]));
   const versions = useAsync(useCallback(() => client.listAgentDefinitionVersions(id), [client, id]));
   const allAgents = useAsync(useCallback(() => client.listAgents(), [client]));
@@ -104,9 +106,11 @@ export function AgentEditorPage() {
           </h2>
           <span className="spacer" />
           {loadedVersion && <span className="muted">v{loadedVersion} 기준 편집 중</span>}
-          <button onClick={save} disabled={busy || !form}>
-            새 버전 저장
-          </button>
+          {canEdit && (
+            <button onClick={save} disabled={busy || !form}>
+              새 버전 저장
+            </button>
+          )}
         </div>
         {agent.error && <p className="error">{agent.error.message}</p>}
         {error && <p className="error">{error}</p>}

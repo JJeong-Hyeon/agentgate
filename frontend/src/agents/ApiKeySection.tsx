@@ -1,10 +1,11 @@
 import { useState } from "react";
 import type { Agent, IssuedApiKey } from "../api/types";
-import { useClient } from "../auth/AuthContext";
+import { useAuth, useClient } from "../auth/AuthContext";
 
 /** Reissuing the agent's API key, confirmed by a second click; the new key is shown once. */
 export function ApiKeySection({ agent, onReissued }: { agent: Agent; onReissued: () => void }) {
   const client = useClient();
+  const { hasRole } = useAuth();
   const [confirming, setConfirming] = useState(false);
   const [issued, setIssued] = useState<IssuedApiKey | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +33,7 @@ export function ApiKeySection({ agent, onReissued }: { agent: Agent; onReissued:
         Runtime으로 실행하는 경우에는 필요 없습니다.
         {agent.apiKeyIssuedAt && ` 현재 키 발급: ${new Date(agent.apiKeyIssuedAt).toLocaleString()}`}
       </p>
-      {!confirming ? (
+      {!hasRole("ADMIN") ? null : !confirming ? (
         <div>
           <button className="secondary" onClick={() => setConfirming(true)}>
             API Key 재발급

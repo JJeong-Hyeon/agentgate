@@ -15,7 +15,7 @@ import { useCallback, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ApiError } from "../api/client";
 import type { DslNode, NodeType, WorkflowDsl } from "../api/types";
-import { useClient } from "../auth/AuthContext";
+import { useAuth, useClient } from "../auth/AuthContext";
 import { nodeTypes } from "../components/DslNodeView";
 import { dslToFlow, edgeId, flowToDsl, routeEdges, type FlowNode } from "../dsl/flow";
 import { useAsync } from "../useAsync";
@@ -66,6 +66,8 @@ interface EditorProps {
 
 function Editor({ initial, workflowId, initialName, version: initialVersion }: EditorProps) {
   const client = useClient();
+  const { hasRole } = useAuth();
+  const canEdit = hasRole("ADMIN", "EDITOR");
   const navigate = useNavigate();
   const { screenToFlowPosition } = useReactFlow();
   const flow = useMemo(() => dslToFlow(initial), [initial]);
@@ -214,9 +216,11 @@ function Editor({ initial, workflowId, initialName, version: initialVersion }: E
         <span className="spacer" />
         {message && <span className={message.kind === "ok" ? "ok" : "error"}>{message.text}</span>}
         {workflowId && version > 0 && <StartExecution workflowId={workflowId} version={version} />}
-        <button onClick={save} disabled={saving}>
-          {saving ? "저장 중…" : workflowId ? "새 버전 저장" : "만들기"}
-        </button>
+        {canEdit && (
+          <button onClick={save} disabled={saving}>
+            {saving ? "저장 중…" : workflowId ? "새 버전 저장" : "만들기"}
+          </button>
+        )}
       </header>
 
       <aside className="card palette">

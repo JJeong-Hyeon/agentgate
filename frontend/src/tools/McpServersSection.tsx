@@ -1,6 +1,6 @@
 import { useCallback, useState, type FormEvent } from "react";
 import type { McpServer } from "../api/types";
-import { useClient } from "../auth/AuthContext";
+import { useAuth, useClient } from "../auth/AuthContext";
 import { useAsync } from "../useAsync";
 
 const NAME_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
@@ -27,6 +27,8 @@ export function headersFrom(rows: HeaderRow[]): { headers: Record<string, string
 /** MCP servers registered in AgentGate: added and changed here without touching the runtime. */
 export function McpServersSection({ onChanged }: { onChanged: () => void }) {
   const client = useClient();
+  const { hasRole } = useAuth();
+  const canEdit = hasRole("ADMIN");
   const servers = useAsync(useCallback(() => client.listMcpServers(), [client]));
   const [editing, setEditing] = useState<McpServer | "new" | null>(null);
 
@@ -41,7 +43,7 @@ export function McpServersSection({ onChanged }: { onChanged: () => void }) {
       <div className="row">
         <h2>MCP 서버</h2>
         <span className="spacer" />
-        <button onClick={() => setEditing("new")}>서버 등록</button>
+        {canEdit && <button onClick={() => setEditing("new")}>서버 등록</button>}
       </div>
       <p className="hint">
         여기서 등록한 Streamable HTTP 서버는 Runtime 재시작 없이 30초 안에 반영됩니다. 인증 헤더는 암호화해 저장하고 다시
@@ -49,11 +51,11 @@ export function McpServersSection({ onChanged }: { onChanged: () => void }) {
         있습니다.
       </p>
       {servers.error && <p className="error">{servers.error.message}</p>}
-      {editing === "new" && <ServerForm onDone={done} onCancel={() => setEditing(null)} />}
+      {canEdit && editing === "new" && <ServerForm onDone={done} onCancel={() => setEditing(null)} />}
       {servers.data?.length === 0 && editing !== "new" && <p className="muted">등록된 서버가 없습니다.</p>}
       <ul className="server-list">
         {servers.data?.map((server) =>
-          editing !== "new" && editing?.id === server.id ? (
+          canEdit && editing !== "new" && editing?.id === server.id ? (
             <li key={server.id}>
               <ServerForm server={server} onDone={done} onCancel={() => setEditing(null)} />
             </li>
@@ -69,9 +71,11 @@ export function McpServersSection({ onChanged }: { onChanged: () => void }) {
                 )}
               </span>
               <span className="spacer" />
-              <button className="secondary" onClick={() => setEditing(server)}>
-                수정
-              </button>
+              {canEdit && (
+                <button className="secondary" onClick={() => setEditing(server)}>
+                  수정
+                </button>
+              )}
             </li>
           ),
         )}

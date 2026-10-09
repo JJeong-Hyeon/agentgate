@@ -23,7 +23,7 @@ class SpaRoutingTest {
 
     @Test
     void clientRoutesForwardToIndexWithoutLogin() throws Exception {
-        for (String path : new String[] {"/", "/workflows/research/edit", "/executions/abc", "/approvals", "/agents", "/agents/3", "/tools", "/users"}) {
+        for (String path : new String[] {"/", "/workflows/research/edit", "/executions/abc", "/approvals", "/agents", "/agents/3", "/tools", "/users", "/account"}) {
             mockMvc.perform(get(path)).andExpect(status().isOk()).andExpect(forwardedUrl("/index.html"));
         }
     }

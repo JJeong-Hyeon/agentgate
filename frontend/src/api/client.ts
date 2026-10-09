@@ -11,9 +11,12 @@ import type {
   McpServer,
   McpServerInput,
   McpServerTools,
+  Me,
   RiskLevel,
   ToolRiskServer,
   ToolRiskTool,
+  UserInput,
+  UserSummary,
   WorkflowDsl,
   WorkflowSummary,
 } from "./types";
@@ -123,11 +126,9 @@ export class AgentGateClient {
     return this.request(`/api/v1/approvals${status ? `?status=${status}` : ""}`);
   }
 
-  decideApproval(id: number, decision: "approve" | "reject", decidedBy: string): Promise<Approval> {
-    return this.request(`/api/v1/approvals/${id}/${decision}`, {
-      method: "POST",
-      body: JSON.stringify({ decidedBy }),
-    });
+  /** `decidedBy` is always the signed-in user; the server ignores any body value. */
+  decideApproval(id: number, decision: "approve" | "reject"): Promise<Approval> {
+    return this.request(`/api/v1/approvals/${id}/${decision}`, { method: "POST" });
   }
 
   listAgents(): Promise<Agent[]> {
@@ -205,6 +206,33 @@ export class AgentGateClient {
   /** Tools of the MCP servers the runtime is configured with. */
   listTools(refresh = false): Promise<McpServerTools[]> {
     return this.request(`/api/v1/tools${refresh ? "?refresh=true" : ""}`);
+  }
+
+  getMe(): Promise<Me> {
+    return this.request("/api/v1/me");
+  }
+
+  changeMyPassword(currentPassword: string, newPassword: string): Promise<void> {
+    return this.request("/api/v1/me/password", {
+      method: "PUT",
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+  }
+
+  listUsers(): Promise<UserSummary[]> {
+    return this.request("/api/v1/users");
+  }
+
+  createUser(input: UserInput): Promise<UserSummary> {
+    return this.request("/api/v1/users", { method: "POST", body: JSON.stringify(input) });
+  }
+
+  updateUser(id: number, input: UserInput): Promise<UserSummary> {
+    return this.request(`/api/v1/users/${id}`, { method: "PUT", body: JSON.stringify(input) });
+  }
+
+  deleteUser(id: number): Promise<void> {
+    return this.request(`/api/v1/users/${id}`, { method: "DELETE" });
   }
 
   private authorization(): string {

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { RiskLevel, ToolRiskServer, ToolRiskTool } from "../api/types";
-import { useClient } from "../auth/AuthContext";
+import { useAuth, useClient } from "../auth/AuthContext";
 import type { AsyncState } from "../useAsync";
 
 export const RISK_TEXT: Record<RiskLevel, string> = {
@@ -15,6 +15,8 @@ const SOURCE_TEXT = { agentgate: "AgentGate 등록", runtime: "Runtime 설정 �
 /** Per-tool risk levels: what applies to calls today and what the server's hints suggest. */
 export function ToolRisksSection({ risks, onRefresh }: { risks: AsyncState<ToolRiskServer[]>; onRefresh: () => void }) {
   const client = useClient();
+  const { hasRole } = useAuth();
+  const canEdit = hasRole("ADMIN");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmApply, setConfirmApply] = useState(false);
@@ -43,7 +45,7 @@ export function ToolRisksSection({ risks, onRefresh }: { risks: AsyncState<ToolR
         <button className="secondary" onClick={onRefresh}>
           목록 새로고침
         </button>
-        {confirmApply ? (
+        {canEdit && (confirmApply ? (
           <>
             <span className="muted">위험도가 없는 Tool {unset}개에 추천값을 적용합니다.</span>
             <button
@@ -66,7 +68,7 @@ export function ToolRisksSection({ risks, onRefresh }: { risks: AsyncState<ToolR
           <button disabled={unset === 0} onClick={() => setConfirmApply(true)}>
             추천값 일괄 적용
           </button>
-        )}
+        ))}
       </div>
       <p className="hint">
         위험도는 Tool 호출을 판정하는 정책(<span className="mono">MCP:서버:Tool</span>)으로 저장됩니다. 지정하지 않은
@@ -102,6 +104,7 @@ export function ToolRisksSection({ risks, onRefresh }: { risks: AsyncState<ToolR
                     server={server.server}
                     tool={tool}
                     busy={busy === tool.action}
+                    disabled={!canEdit}
                     onSet={(level) => run(tool.action, () => client.setToolRisk(server.server, tool.name, level))}
                     onClear={() => run(tool.action, () => client.clearToolRisk(server.server, tool.name))}
                   />
@@ -119,10 +122,11 @@ function ToolRow(props: {
   server: string;
   tool: ToolRiskTool;
   busy: boolean;
+  disabled: boolean;
   onSet: (level: RiskLevel) => void;
   onClear: () => void;
 }) {
-  const { tool, busy, onSet, onClear } = props;
+  const { tool, busy, disabled, onSet, onClear } = props;
   return (
     <tr className={tool.riskLevel ? "chosen" : undefined}>
       <td>
@@ -133,7 +137,7 @@ function ToolRow(props: {
         <select
           aria-label={`${tool.name} 위험도`}
           className={`risk-${tool.effectiveRiskLevel.toLowerCase()}`}
-          disabled={busy}
+          disabled={busy || disabled}
           value={tool.riskLevel ?? ""}
           onChange={(e) => (e.target.value ? onSet(e.target.value as RiskLevel) : onClear())}
         >
