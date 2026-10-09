@@ -14,8 +14,9 @@ export const ADMIN_ME: UserSummary = {
 export function withMe(
   handler: (url: string, init?: RequestInit) => Promise<Response> | Response,
   me: UserSummary = ADMIN_ME,
-): (url: string, init?: RequestInit) => Promise<Response> {
-  return async (url, init) => {
+): typeof fetch {
+  return async (input, init) => {
+    const url = String(input);
     if (url === "/api/v1/me" && (!init?.method || init.method === "GET")) return Response.json(me);
     return handler(url, init);
   };
