@@ -48,4 +48,15 @@ class ApprovalRequestTest {
         assertThatThrownBy(() -> request.reject("bob"))
                 .isInstanceOf(IllegalApprovalStateException.class);
     }
+
+    @Test
+    void expireTransitionsFromPendingToExpiredBySystem() {
+        ApprovalRequest request = new ApprovalRequest("mail-agent", "SEND_EMAIL", null, List.of("PII"), RiskLevel.HIGH);
+
+        request.expire();
+
+        assertThat(request.getStatus()).isEqualTo(ApprovalStatus.EXPIRED);
+        assertThat(request.getDecidedBy()).isEqualTo(ApprovalRequest.SYSTEM);
+        assertThatThrownBy(() -> request.approve("alice")).isInstanceOf(IllegalApprovalStateException.class);
+    }
 }

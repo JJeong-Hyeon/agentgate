@@ -22,6 +22,10 @@ agentgate:
     # 로컬 개발용 기본값. 운영 배포 전 반드시 환경변수(AGENTGATE_ADMIN_USERNAME/AGENTGATE_ADMIN_PASSWORD)로 override할 것.
     username: admin
     password: changeme
+  approval:
+    # PENDING 상태로 이 시간이 지난 승인 요청은 EXPIRED 처리되고, 대기 중인 실행은 거절과 동일하게 진행된다.
+    ttl: ${AGENTGATE_APPROVAL_TTL:PT24H}
+    expiry-check-delay: PT1M
   runtime:
     # Python agent runtime (runtime/). 비워두면 승인 결정 후 실행 재개 호출을 하지 않는다.
     base-url: ${AGENTGATE_RUNTIME_BASE_URL:}

@@ -197,6 +197,8 @@ GET /api/v1/approvals?status=PENDING&executionId=<실행 ID>
 Authorization: Basic <admin 계정>
 ```
 
+승인 요청의 `status`: `PENDING` | `APPROVED` | `REJECTED` | `EXPIRED`. `PENDING`인 채로 `agentgate.approval.ttl`(기본 24시간, 환경변수 `AGENTGATE_APPROVAL_TTL`)이 지나면 `EXPIRED`가 되고(`decidedBy`는 `system`), 대기 중인 실행은 거절과 같이 처리된다. 이미 결정·만료된 요청을 승인·거절하면 409.
+
 승인 요청과 Audit Log 응답의 `delegatedBy`는 이 행동을 위임한 Agent 경로다(바깥부터, 예: `lead>research`; 직접 실행이면 `null`). 승인 요청의 `agentId`는 실제로 행동한(위임받은) Agent다.
 
 ## 4. 에러 응답 공통 형식

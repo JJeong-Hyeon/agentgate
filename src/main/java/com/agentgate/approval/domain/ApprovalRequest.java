@@ -29,6 +29,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ApprovalRequest {
 
+    public static final String SYSTEM = "system";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -105,6 +107,10 @@ public class ApprovalRequest {
 
     public void reject(String decidedBy) {
         transitionTo(ApprovalStatus.REJECTED, decidedBy);
+    }
+
+    public void expire() {
+        transitionTo(ApprovalStatus.EXPIRED, SYSTEM);
     }
 
     public boolean needsRuntimeNotification() {

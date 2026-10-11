@@ -82,7 +82,7 @@ export interface Approval {
   target: string | null;
   labels: string[];
   riskLevel: "LOW" | "MEDIUM" | "HIGH" | "BLOCKED";
-  status: "PENDING" | "APPROVED" | "REJECTED";
+  status: "PENDING" | "APPROVED" | "REJECTED" | "EXPIRED";
   createdAt: string;
   decidedAt: string | null;
   decidedBy: string | null;

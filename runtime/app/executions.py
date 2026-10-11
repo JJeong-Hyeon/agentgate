@@ -56,7 +56,7 @@ class ResumeRequest(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     approval_id: int
-    decision: Literal["APPROVED", "REJECTED"]
+    decision: Literal["APPROVED", "REJECTED", "EXPIRED"]
 
 
 def get_runner(request: Request) -> WorkflowRunner:

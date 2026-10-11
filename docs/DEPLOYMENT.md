@@ -67,6 +67,7 @@ AGENTGATE_ADMIN_PASSWORD=<AgentGate 관리자 비밀번호; 사용자가 없을 
 AGENTGATE_RUNTIME_BASE_URL=http://<runtime_private_ip>:8000
 AGENTGATE_RUNTIME_TOKEN=<임의의 긴 문자열, Runtime의 RUNTIME_TOKEN과 동일>
 AGENTGATE_SECRET_KEY=<openssl rand -base64 32 결과. DB에 저장하는 인증정보(MCP 서버 헤더 등) 암호화 키, 바꾸면 기존 값을 읽을 수 없음>
+AGENTGATE_APPROVAL_TTL=PT24H  # 선택. 이 시간 동안 결정되지 않은 승인 요청은 EXPIRED 처리(ISO-8601 기간)
 EOF
 ```
 

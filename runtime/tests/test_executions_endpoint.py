@@ -137,6 +137,17 @@ def test_resume_rejected_skips_tool(approval_client, target):
     assert target.requests == []
 
 
+def test_resume_expired_skips_tool_like_rejection(approval_client, target):
+    execution_id = start(approval_client)["execution_id"]
+
+    response = resume(approval_client, execution_id, decision="EXPIRED")
+
+    assert response.status_code == 202
+    after = approval_client.get(f"/runtime/executions/{execution_id}").json()
+    assert after["state"]["tool_results"][0]["status"] == "REJECTED"
+    assert target.requests == []
+
+
 def test_resume_twice_is_conflict(approval_client, target):
     execution_id = start(approval_client)["execution_id"]
     resume(approval_client, execution_id)
