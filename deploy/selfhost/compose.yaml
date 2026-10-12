@@ -96,7 +96,56 @@ services:
     image: redis:7
     restart: unless-stopped
 
+  # Optional: docker compose --profile monitoring up -d
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    profiles: ['monitoring']
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-30d}
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    depends_on:
+      - app
+    restart: unless-stopped
+
+  # The dashboard file is written for Grafana's import screen (data source chosen at import);
+  # provisioning has no such step, so point it at the provisioned data source first.
+  grafana-dashboards:
+    image: busybox:1.36
+    profiles: ['monitoring']
+    command: ['sh', '-c', 'sed "s/\$${DS_PROMETHEUS}/prometheus/g" /src/agentgate-dashboard.json > /dashboards/agentgate.json']
+    volumes:
+      - ../../infra/grafana/agentgate-dashboard.json:/src/agentgate-dashboard.json:ro
+      - grafana-dashboards:/dashboards
+
+  grafana:
+    image: grafana/grafana:11.3.1
+    profiles: ['monitoring']
+    environment:
+      GF_SERVER_ROOT_URL: https://${AGENTGATE_DOMAIN}/grafana/
+      GF_SERVER_SERVE_FROM_SUB_PATH: 'true'
+      GF_SECURITY_ADMIN_USER: admin
+      # Empty → Grafana's default (admin), which it makes you change at first sign-in.
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_ANALYTICS_REPORTING_ENABLED: 'false'
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      grafana-dashboards:
+        condition: service_completed_successfully
+      prometheus:
+        condition: service_started
+    restart: unless-stopped
+
 volumes:
   caddy-data:
   caddy-config:
   postgres-data:
+  prometheus-data:
+  grafana-data:
+  grafana-dashboards:

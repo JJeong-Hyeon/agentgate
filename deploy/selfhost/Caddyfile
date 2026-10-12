@@ -6,5 +6,8 @@
 	# Metrics stay on the internal network (scrape app:8080 directly).
 	respond /actuator/prometheus 404
 
+	# Grafana, when started with --profile monitoring (otherwise this path answers 502).
+	reverse_proxy /grafana* grafana:3000
+
 	reverse_proxy app:8080
 }
