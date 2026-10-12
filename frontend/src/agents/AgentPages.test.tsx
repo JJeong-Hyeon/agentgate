@@ -223,10 +223,12 @@ describe("AgentEditorPage", () => {
     fireEvent.change(screen.getByLabelText("기억 검색 권한"), { target: { value: "AUTO" } });
     fireEvent.change(screen.getByLabelText("기억 저장 권한"), { target: { value: "APPROVAL" } });
     fireEvent.change(screen.getByLabelText(/자동 회상/), { target: { value: "3" } });
+    fireEvent.change(screen.getByLabelText("생각(추론) 수준"), { target: { value: "none" } });
     fireEvent.click(screen.getByRole("button", { name: "새 버전 저장" }));
 
     await screen.findByText("v3 저장됨");
     expect(sent(fetchImpl, "PUT")[0].body.memory).toEqual({ read: "AUTO", write: "APPROVAL", recall: 3 });
+    expect(sent(fetchImpl, "PUT")[0].body.reasoningEffort).toBe("none");
   });
 
   it("browses, searches, adds and forgets memories", async () => {

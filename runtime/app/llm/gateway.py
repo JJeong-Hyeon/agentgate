@@ -21,7 +21,9 @@ def create_chat_model(
     *,
     model: str | None = None,
     temperature: float | None = None,
+    reasoning_effort: str | None = None,
 ) -> BaseChatModel:
+    effort = reasoning_effort or settings.llm_reasoning_effort or None
     return ChatOpenAI(
         base_url=settings.llm_base_url,
         api_key=settings.llm_api_key or _PLACEHOLDER_API_KEY,
@@ -29,6 +31,7 @@ def create_chat_model(
         temperature=settings.llm_temperature if temperature is None else temperature,
         timeout=settings.llm_timeout_seconds,
         max_retries=1,
+        reasoning_effort=effort,
     )
 
 

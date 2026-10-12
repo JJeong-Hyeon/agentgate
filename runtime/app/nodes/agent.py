@@ -48,7 +48,8 @@ from app.telemetry import set_attributes, set_content, tracer
 from app.tools.base import GovernedTool, ToolResult
 from app.tools.memory import memory_prompt
 
-LlmFactory = Callable[[str | None, float | None], BaseChatModel]
+# (model, temperature, reasoning effort) → chat model; None means the runtime's default.
+LlmFactory = Callable[[str | None, float | None, str | None], BaseChatModel]
 # (task, execution id) → memories for the agent's first turn, and the record of looking them up.
 Recall = Callable[[str, str | None], tuple[list[str], ToolResult]]
 
@@ -180,7 +181,7 @@ def add_agent(
         messages = list(run["messages"])
         if definitions and final_turn and not answering:
             messages.append(HumanMessage(FINAL_TURN_NOTE))
-        llm = llm_factory(spec.model, spec.temperature)
+        llm = llm_factory(spec.model, spec.temperature, spec.reasoning_effort)
         offer_tools = bool(definitions) and not final_turn
         started = time.perf_counter()
         requested_model = spec.model or _model_name(llm)

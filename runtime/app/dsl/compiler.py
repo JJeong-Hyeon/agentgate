@@ -53,7 +53,8 @@ from app.tools.memory import (
 from app.tools.registry import McpServerRegistry
 
 # (model, temperature) → chat model; None keeps the runtime default.
-LlmFactory = Callable[[str | None, float | None], BaseChatModel]
+# (model, temperature, reasoning effort) → chat model; None means the runtime's default.
+LlmFactory = Callable[[str | None, float | None, str | None], BaseChatModel]
 
 VERDICT_INSTRUCTION = "Start your reply with exactly 'VERDICT: APPROVE' or 'VERDICT: REVISE'."
 _VERDICT = re.compile(r"VERDICT:\s*(APPROVE|REVISE)", re.IGNORECASE)
@@ -214,7 +215,7 @@ class WorkflowCompiler:
             graph.add_edge(source, destination)
 
     def _ask(self, config: LlmConfig, state: dict, extra_system: str | None = None) -> str:
-        llm = self._llm_factory(config.model, config.temperature)
+        llm = self._llm_factory(config.model, config.temperature, None)
         system = "\n\n".join(p for p in (config.system, extra_system) if p)
         messages = [SystemMessage(render(system, state))] if system else []
         messages.append(HumanMessage(render(config.prompt, state)))

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import type { McpServerTools, McpToolInfo, RiskLevel, ToolPermission } from "../api/types";
+import type { McpServerTools, McpToolInfo, ReasoningEffort, RiskLevel, ToolPermission } from "../api/types";
 import { useAuth, useClient } from "../auth/AuthContext";
 import { useAsync } from "../useAsync";
 import { ApiKeySection } from "./ApiKeySection";
@@ -10,6 +10,7 @@ import {
   defaultPermission,
   fromForm,
   PERMISSION_LABELS,
+  REASONING_EFFORT_LABELS,
   toForm,
   toolKey,
   type DefinitionForm,
@@ -164,6 +165,20 @@ export function AgentEditorPage() {
                   <option value="">Runtime 기본값</option>
                   <option value="NATIVE">Function calling (NATIVE)</option>
                   <option value="JSON">JSON 응답 (JSON)</option>
+                </select>
+              </label>
+              <label>
+                생각(추론) 수준
+                <select
+                  value={form.reasoningEffort}
+                  onChange={(e) => update({ reasoningEffort: e.target.value as DefinitionForm["reasoningEffort"] })}
+                >
+                  <option value="">Runtime 기본값</option>
+                  {(Object.keys(REASONING_EFFORT_LABELS) as ReasoningEffort[]).map((effort) => (
+                    <option key={effort} value={effort}>
+                      {REASONING_EFFORT_LABELS[effort]}
+                    </option>
+                  ))}
                 </select>
               </label>
               <label>

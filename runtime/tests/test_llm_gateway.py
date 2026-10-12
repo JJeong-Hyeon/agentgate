@@ -42,6 +42,18 @@ def test_create_chat_model_overrides():
     assert model.temperature == 0.7
 
 
+def test_reasoning_effort_is_sent_only_when_set():
+    def payload(model):
+        return model._get_request_payload([("user", "hi")])
+
+    assert "reasoning_effort" not in payload(create_chat_model(settings()))
+    by_default = create_chat_model(settings(llm_reasoning_effort="none"))
+    assert payload(by_default)["reasoning_effort"] == "none"
+    # An agent's own setting wins over the runtime default.
+    agent = create_chat_model(settings(llm_reasoning_effort="none"), reasoning_effort="high")
+    assert payload(agent)["reasoning_effort"] == "high"
+
+
 def test_create_chat_model_uses_placeholder_key_when_unset():
     model = create_chat_model(settings())
 

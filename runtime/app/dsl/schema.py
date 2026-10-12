@@ -254,6 +254,8 @@ class AgentSpec(SnapshotModel):
     output_schema: dict[str, Any] | None = None
     # NATIVE (function calling) or JSON (prompted); None → the runtime's default.
     tool_calling: Literal["NATIVE", "JSON"] | None = None
+    # How much the model reasons before answering; None → the runtime's default.
+    reasoning_effort: Literal["none", "minimal", "low", "medium", "high"] | None = None
     # Agents this one may delegate to; their definitions are in Workflow.agents too.
     delegates: list[AgentDelegateSpec] = []
     memory: AgentMemorySpec | None = None

@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     # How agents call tools unless their definition says: "native" (OpenAI function calling)
     # or "json" (tools described in the prompt, calls read from the model's JSON reply).
     llm_tool_calling: Literal["native", "json"] = "native"
+    # How much the model reasons before answering (OpenAI reasoning_effort: none, minimal, low,
+    # medium, high), unless an agent's definition says. Empty → not sent; the model decides.
+    # "none" turns off thinking in reasoning models such as qwen3 on Ollama (much faster).
+    llm_reasoning_effort: Literal["", "none", "minimal", "low", "medium", "high"] = ""
     # Empty → in-memory checkpoints (lost on restart).
     runtime_database_url: str = ""
     # Shared secret with AgentGate (X-Runtime-Token both ways): it authenticates resume requests

@@ -188,7 +188,11 @@ export interface AgentDefinition {
   delegates?: AgentDelegateDefinition[];
   // long-term memory access; null → none
   memory?: AgentMemoryDefinition | null;
+  // how much the model reasons before answering; null → the runtime's default
+  reasoningEffort?: ReasoningEffort | null;
 }
+
+export type ReasoningEffort = "none" | "minimal" | "low" | "medium" | "high";
 
 export interface AgentDefinitionVersion {
   agentId: string;
