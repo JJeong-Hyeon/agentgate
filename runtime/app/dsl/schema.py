@@ -230,6 +230,15 @@ class AgentDelegateSpec(SnapshotModel):
     permission: Literal["AUTO", "APPROVAL", "BLOCKED"]
 
 
+class AgentMemorySpec(SnapshotModel):
+    """The agent's long-term memory access (AgentGate actions MEMORY:SEARCH / MEMORY:SAVE)."""
+
+    read: Literal["AUTO", "APPROVAL", "BLOCKED"] = "BLOCKED"
+    write: Literal["AUTO", "APPROVAL", "BLOCKED"] = "BLOCKED"
+    # Memories looked up with the task and given to the agent before its first turn.
+    recall: int = Field(default=0, ge=0, le=10)
+
+
 class AgentSpec(SnapshotModel):
     """One version of an agent definition (see AgentGate's AgentDefinition)."""
 
@@ -247,6 +256,7 @@ class AgentSpec(SnapshotModel):
     tool_calling: Literal["NATIVE", "JSON"] | None = None
     # Agents this one may delegate to; their definitions are in Workflow.agents too.
     delegates: list[AgentDelegateSpec] = []
+    memory: AgentMemorySpec | None = None
 
 
 class Edge(DslModel):

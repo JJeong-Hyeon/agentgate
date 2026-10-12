@@ -44,8 +44,11 @@ from langgraph.types import Command, interrupt
 
 from app.dsl.schema import AgentSpec, AgentToolSpec
 from app.tools.base import GovernedTool, ToolResult
+from app.tools.memory import memory_prompt
 
 LlmFactory = Callable[[str | None, float | None], BaseChatModel]
+# (task, execution id) → memories for the agent's first turn, and the record of looking them up.
+Recall = Callable[[str, str | None], tuple[list[str], ToolResult]]
 
 FINAL_TURN_NOTE = (
     "You have used all your tool calls for this task. "
@@ -126,9 +129,11 @@ def add_agent(
     next_nodes: list[str],
     tool_calling: str = "NATIVE",
     delegated_by: str | None = None,
+    recall: Recall | None = None,
 ) -> None:
     """`delegated_by` is the chain of agents that handed this one its task (outermost first),
-    reported with each of its tool calls; None when it runs as a workflow node."""
+    reported with each of its tool calls; None when it runs as a workflow node. `recall`, if
+    given, looks up memories for the task and adds them to the system prompt."""
     think_node = f"{name}.think"
     gate_node = f"{name}.gate"
     approval_node = f"{name}.approval"
@@ -145,16 +150,24 @@ def add_agent(
     def save(run: dict, **changes) -> dict:
         return {"agent_runs": {name: {**run, **changes}}}
 
-    def start(state: dict) -> Command:
-        messages = [SystemMessage(system_prompt), HumanMessage(build_prompt(state))]
+    def start(state: dict, config: RunnableConfig) -> Command:
+        prompt = build_prompt(state)
+        system, update = system_prompt, {}
+        recalled: list[str] = []
+        if recall is not None:
+            recalled, looked = recall(prompt, config.get("configurable", {}).get("thread_id"))
+            if recalled:
+                system = f"{system_prompt}\n\n{memory_prompt(recalled)}"
+            update["tool_results"] = [looked.model_dump()]
         run = {
-            "messages": messages,
+            "messages": [SystemMessage(system), HumanMessage(prompt)],
             "steps": 0,
             "pending": None,
             "agent_id": spec.agent_id,
             "delegated_by": delegated_by,
+            "recalled": recalled,
         }
-        return Command(update={"agent_runs": {name: run}}, goto=think_node)
+        return Command(update={"agent_runs": {name: run}, **update}, goto=think_node)
 
     def think(state: dict) -> Command:
         run = run_of(state)
@@ -404,7 +417,11 @@ def _agent_trace(sub: str, node_id: str, run: dict, update: dict) -> dict | None
 
     if sub == "":
         prompt = next((m.content for m in messages if isinstance(m, HumanMessage)), "")
-        return {"kind": "start", "prompt": _clip(prompt)}
+        trace = {"kind": "start", "prompt": _clip(prompt)}
+        if results:
+            trace["memories"] = [_clip(m) for m in run.get("recalled", [])]
+            trace["memory_status"] = results[-1]["status"]
+        return trace
 
     if sub == "think":
         reply = next((m for m in reversed(messages) if isinstance(m, AIMessage)), None)

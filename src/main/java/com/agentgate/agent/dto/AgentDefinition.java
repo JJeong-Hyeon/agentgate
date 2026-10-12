@@ -29,7 +29,9 @@ public record AgentDefinition(
         // Null → the runtime's default (LLM_TOOL_CALLING).
         ToolCallingMode toolCalling,
         // Agents this one may delegate to; null or empty → none.
-        @Size(max = 10) List<@Valid @NotNull AgentDelegateDefinition> delegates
+        @Size(max = 10) List<@Valid @NotNull AgentDelegateDefinition> delegates,
+        // Long-term memory access; null → none.
+        @Valid AgentMemoryDefinition memory
 ) {
     public static final int DEFAULT_MAX_STEPS = 8;
 
@@ -41,6 +43,6 @@ public record AgentDefinition(
                 .toList();
         return new AgentDefinition(description, model, temperature, systemPrompt, normalizedTools,
                 maxSteps == null ? DEFAULT_MAX_STEPS : maxSteps, outputSchema, toolCalling,
-                delegates == null ? List.of() : delegates);
+                delegates == null ? List.of() : delegates, memory == null ? null : memory.normalized());
     }
 }

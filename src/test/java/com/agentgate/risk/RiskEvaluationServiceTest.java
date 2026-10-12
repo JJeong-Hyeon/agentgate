@@ -26,4 +26,16 @@ class RiskEvaluationServiceTest {
         assertThat(result.riskLevel()).isEqualTo(RiskLevel.HIGH);
         assertThat(result.status()).isEqualTo(ActionStatus.APPROVAL_REQUIRED);
     }
+
+    @Test
+    void delegationAndMemoryDefaultToMediumRisk() {
+        when(policyRepository.findAll()).thenReturn(List.of());
+        RiskEvaluationService service = new RiskEvaluationService(policyRepository);
+
+        for (String action : List.of("AGENT:worker", "MEMORY:SEARCH", "MEMORY:SAVE")) {
+            RiskEvaluationResult result = service.evaluate(action, List.of());
+            assertThat(result.riskLevel()).as(action).isEqualTo(RiskLevel.MEDIUM);
+            assertThat(result.status()).as(action).isEqualTo(ActionStatus.ALLOWED);
+        }
+    }
 }

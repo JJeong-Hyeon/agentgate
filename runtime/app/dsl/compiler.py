@@ -39,6 +39,17 @@ from app.nodes.tool import add_tool
 from app.tools.delegate import TASK_PARAMETERS, DelegateTool
 from app.tools.http import HttpTool, HttpToolSpec
 from app.tools.mcp import McpServerConfig, McpTool
+from app.tools.memory import (
+    SAVE_DESCRIPTION,
+    SAVE_FUNCTION,
+    SAVE_PARAMETERS,
+    SEARCH_DESCRIPTION,
+    SEARCH_FUNCTION,
+    SEARCH_PARAMETERS,
+    MemorySaveTool,
+    MemorySearchTool,
+    recall,
+)
 from app.tools.registry import McpServerRegistry
 
 # (model, temperature) → chat model; None keeps the runtime default.
@@ -281,13 +292,15 @@ class WorkflowCompiler:
             self._agent_tools(node.id, node.id, spec, workflow, []),
             next_nodes,
             spec.tool_calling or self._tool_calling,
+            recall=self._recall(node.id, spec, None),
         )
 
     def _agent_tools(
         self, where: str, owner: str, spec: AgentSpec, workflow: Workflow, chain: list[str]
     ) -> list[AgentTool]:
-        """The MCP tools and delegates `spec` may use. `owner` names its node (results are
-        recorded as `<owner>:<tool>`); `chain` lists the agents that delegated to it."""
+        """The MCP tools, memory tools and delegates `spec` may use. `owner` names its node
+        (results are recorded as `<owner>:<tool>`); `chain` lists the agents that delegated
+        to it."""
         usable = [t for t in spec.tools if t.permission != "BLOCKED"]
         tools = []
         for function_name, tool in zip(function_names(usable), usable, strict=True):
@@ -305,6 +318,19 @@ class WorkflowCompiler:
                 self._gate,
             )
             tools.append(AgentTool.mcp(function_name, tool, governed))
+        memory = spec.memory
+        if memory is not None and memory.read != "BLOCKED":
+            search = MemorySearchTool(f"{owner}:memory/search", spec.agent_id, self._gate)
+            tools.append(
+                AgentTool(
+                    SEARCH_FUNCTION, SEARCH_DESCRIPTION, SEARCH_PARAMETERS, "memory search", search
+                )
+            )
+        if memory is not None and memory.write != "BLOCKED":
+            save = MemorySaveTool(f"{owner}:memory/save", spec.agent_id, self._gate)
+            tools.append(
+                AgentTool(SAVE_FUNCTION, SAVE_DESCRIPTION, SAVE_PARAMETERS, "memory save", save)
+            )
         for delegate in spec.delegates:
             if delegate.permission == "BLOCKED":
                 continue
@@ -337,6 +363,16 @@ class WorkflowCompiler:
             )
         return tools
 
+    def _recall(self, owner: str, spec: AgentSpec, delegated_by: str | None):
+        """Looks up memories for the agent's task at the start of a run, if its definition asks."""
+        memory = spec.memory
+        if memory is None or memory.recall == 0 or memory.read != "AUTO":
+            return None
+        tool = MemorySearchTool(f"{owner}:memory/recall", spec.agent_id, self._gate)
+        return lambda task, execution_id: recall(
+            tool, task, memory.recall, execution_id, spec.version, delegated_by or None
+        )
+
     def _delegate_runner(
         self, where: str, spec: AgentSpec, workflow: Workflow, chain: list[str]
     ) -> Callable[[str], str]:
@@ -364,6 +400,7 @@ class WorkflowCompiler:
             [END],
             spec.tool_calling or self._tool_calling,
             delegated_by=">".join(chain),
+            recall=self._recall(name, spec, ">".join(chain)),
         )
         graph.add_edge(START, name)
         # No checkpointer: the subgraph checkpoints in the parent's, under its task.

@@ -76,3 +76,22 @@ class AgentGateClient:
         if response.status_code != 200:
             raise AgentGateError(f"AgentGate returned {response.status_code}: {response.text}")
         return Decision.model_validate(response.json())
+
+    def save_memory(self, agent_id: str, content: str, execution_id: str | None = None) -> dict:
+        """Store a memory for `agent_id` (runtime token only); returns the stored memory."""
+        body = {"agentId": agent_id, "content": content, "executionId": execution_id}
+        return self._memory_call("/api/v1/runtime/memories", body, 201)
+
+    def search_memories(self, agent_id: str, query: str, limit: int = 5) -> list[dict]:
+        """`agent_id`'s memories most relevant to `query` (runtime token only)."""
+        body = {"agentId": agent_id, "query": query, "limit": limit}
+        return self._memory_call("/api/v1/runtime/memories/search", body, 200)
+
+    def _memory_call(self, path: str, body: dict, expected: int):
+        try:
+            response = self._client.post(path, json=body)
+        except httpx.HTTPError as e:
+            raise AgentGateError(f"AgentGate unreachable: {e}") from e
+        if response.status_code != expected:
+            raise AgentGateError(f"AgentGate returned {response.status_code}: {response.text}")
+        return response.json()
