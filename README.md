@@ -156,6 +156,8 @@ PYTHON=python3.12 ./scripts/e2e.sh   # Docker, Java 21, Python 3.12 + runtime �
 
 ## 배포
 
+사내 서버 한 대에 설치할 때는 [`docs/SELF_HOSTING.md`](docs/SELF_HOSTING.md) — `deploy/selfhost`의 Docker Compose 스택(AgentGate + Runtime + PostgreSQL + Redis + Caddy 자동 HTTPS)을 `.env`만 채워 띄웁니다.
+
 `spring.profiles.active=prod`로 기동 시 필수 환경변수가 없거나 기본 admin 비밀번호가 그대로면 기동에 실패합니다. AWS(ALB + App/Runtime EC2 + RDS) 배포 절차는 [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) (`scripts/deploy-app.sh`, `scripts/deploy-runtime.sh`), 필요한 환경변수 목록은 [배포 섹션](docs/AGENTGATE_PLAN.md#12-배포-prod-프로파일)을 참고하세요.
 
 ## 문서
@@ -163,5 +165,6 @@ PYTHON=python3.12 ./scripts/e2e.sh   # Docker, Java 21, Python 3.12 + runtime �
 - 기획 / Governance Core 설계: [`docs/AGENTGATE_PLAN.md`](docs/AGENTGATE_PLAN.md)
 - 확장 아키텍처 (Workflow Builder + LangGraph Runtime): [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - API 스펙: [`docs/API_SPEC.md`](docs/API_SPEC.md)
+- 단일 서버 설치: [`docs/SELF_HOSTING.md`](docs/SELF_HOSTING.md)
 - AWS 배포: [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)
 - 모니터링 (Prometheus + Grafana): [`docs/MONITORING.md`](docs/MONITORING.md)

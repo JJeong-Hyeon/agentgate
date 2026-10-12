@@ -1,0 +1,92 @@
+# AgentGate on a single server: console/API, agent runtime, PostgreSQL, Redis and Caddy (HTTPS).
+# The model server is not included; point LLM_BASE_URL at yours. See docs/SELF_HOSTING.md.
+#   cp .env.example .env   # fill in
+#   docker compose up -d --build
+name: agentgate
+
+services:
+  caddy:
+    image: caddy:2
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    environment:
+      AGENTGATE_DOMAIN: ${AGENTGATE_DOMAIN:?set AGENTGATE_DOMAIN in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - app
+    restart: unless-stopped
+
+  app:
+    build:
+      context: ../..
+    image: agentgate:local
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/agentgate
+      SPRING_DATASOURCE_USERNAME: agentgate
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      SPRING_DATA_REDIS_HOST: redis
+      AGENTGATE_ADMIN_USERNAME: ${AGENTGATE_ADMIN_USERNAME:-admin}
+      AGENTGATE_ADMIN_PASSWORD: ${AGENTGATE_ADMIN_PASSWORD:?set AGENTGATE_ADMIN_PASSWORD in .env}
+      AGENTGATE_RUNTIME_BASE_URL: http://runtime:8000
+      AGENTGATE_RUNTIME_TOKEN: ${RUNTIME_TOKEN:?set RUNTIME_TOKEN in .env}
+      AGENTGATE_SECRET_KEY: ${AGENTGATE_SECRET_KEY:?set AGENTGATE_SECRET_KEY in .env}
+      AGENTGATE_PUBLIC_URL: https://${AGENTGATE_DOMAIN}
+      AGENTGATE_APPROVAL_TTL: ${AGENTGATE_APPROVAL_TTL:-PT24H}
+      AGENTGATE_NOTIFY_WEBHOOK_URL: ${AGENTGATE_NOTIFY_WEBHOOK_URL:-}
+      AGENTGATE_NOTIFY_WEBHOOK_FORMAT: ${AGENTGATE_NOTIFY_WEBHOOK_FORMAT:-SLACK}
+      AGENTGATE_NOTIFY_WEBHOOK_SECRET: ${AGENTGATE_NOTIFY_WEBHOOK_SECRET:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  runtime:
+    build: ../../runtime
+    image: agentgate-runtime:local
+    environment:
+      AGENTGATE_BASE_URL: http://app:8080
+      AGENTGATE_AGENT_ID: runtime-agent
+      RUNTIME_TOKEN: ${RUNTIME_TOKEN:?set RUNTIME_TOKEN in .env}
+      RUNTIME_DATABASE_URL: postgresql://agentgate:${POSTGRES_PASSWORD}@postgres:5432/agentgate
+      LLM_BASE_URL: ${LLM_BASE_URL:?set LLM_BASE_URL in .env}
+      LLM_MODEL: ${LLM_MODEL:?set LLM_MODEL in .env}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_TOOL_CALLING: ${LLM_TOOL_CALLING:-native}
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: agentgate
+      POSTGRES_USER: agentgate
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U agentgate -d agentgate']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+
+volumes:
+  caddy-data:
+  caddy-config:
+  postgres-data:

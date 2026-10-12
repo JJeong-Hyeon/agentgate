@@ -1,0 +1,10 @@
+# Terminates HTTPS for the console. With a public domain Caddy obtains and renews a Let's Encrypt certificate;
+# with "localhost" or an internal name it uses its own CA (trust it on clients, or put your certificate in tls).
+{$AGENTGATE_DOMAIN} {
+	encode zstd gzip
+
+	# Metrics stay on the internal network (scrape app:8080 directly).
+	respond /actuator/prometheus 404
+
+	reverse_proxy app:8080
+}
