@@ -11,6 +11,11 @@ spring:
     baseline-on-migrate: true
     baseline-version: 0
 
+server:
+  # Trust X-Forwarded-* from reverse proxies on private networks (ALB, Caddy), so requests that reached the
+  # proxy over HTTPS are treated as secure (HSTS, redirect URLs).
+  forward-headers-strategy: native
+
 management:
   endpoints:
     web:

@@ -10,6 +10,14 @@ resource "aws_security_group" "alb" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  ingress {
+    description = "HTTPS"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
@@ -46,10 +54,38 @@ resource "aws_lb_target_group_attachment" "app" {
   port             = 8080
 }
 
+locals {
+  https_enabled = var.certificate_arn != ""
+}
+
+# With a certificate, HTTP only redirects to HTTPS; without one, it serves the console.
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.app.arn
   port              = 80
   protocol          = "HTTP"
+
+  default_action {
+    type             = local.https_enabled ? "redirect" : "forward"
+    target_group_arn = local.https_enabled ? null : aws_lb_target_group.app.arn
+
+    dynamic "redirect" {
+      for_each = local.https_enabled ? [1] : []
+      content {
+        protocol    = "HTTPS"
+        port        = "443"
+        status_code = "HTTP_301"
+      }
+    }
+  }
+}
+
+resource "aws_lb_listener" "https" {
+  count             = local.https_enabled ? 1 : 0
+  load_balancer_arn = aws_lb.app.arn
+  port              = 443
+  protocol          = "HTTPS"
+  ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
+  certificate_arn   = var.certificate_arn
 
   default_action {
     type             = "forward"
