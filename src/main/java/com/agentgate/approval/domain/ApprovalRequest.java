@@ -62,6 +62,8 @@ public class ApprovalRequest {
 
     private Instant runtimeNotifiedAt;
 
+    private Instant approverNotifiedAt;
+
     @Column(length = 1000)
     private String reason;
 
@@ -119,6 +121,14 @@ public class ApprovalRequest {
 
     public void markRuntimeNotified() {
         this.runtimeNotifiedAt = Instant.now();
+    }
+
+    public boolean needsApproverNotification() {
+        return status == ApprovalStatus.PENDING && approverNotifiedAt == null;
+    }
+
+    public void markApproverNotified() {
+        this.approverNotifiedAt = Instant.now();
     }
 
     private void transitionTo(ApprovalStatus newStatus, String decidedBy) {

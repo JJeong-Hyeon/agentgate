@@ -3,6 +3,7 @@ package com.agentgate.approval.service;
 import com.agentgate.approval.domain.ApprovalRequest;
 import com.agentgate.approval.domain.ApprovalStatus;
 import com.agentgate.approval.dto.ApprovalResponse;
+import com.agentgate.approval.notification.ApprovalRequestedEvent;
 import com.agentgate.approval.repository.ApprovalRequestRepository;
 import com.agentgate.approval.runtime.ApprovalDecidedEvent;
 import com.agentgate.common.exception.ApprovalNotFoundException;
@@ -25,7 +26,9 @@ public class ApprovalService {
                                          String executionId, String reason, String delegatedBy) {
         ApprovalRequest approvalRequest = new ApprovalRequest(agentId, action, target, labels, riskLevel, executionId,
                 reason, delegatedBy);
-        return approvalRequestRepository.save(approvalRequest);
+        ApprovalRequest saved = approvalRequestRepository.save(approvalRequest);
+        eventPublisher.publishEvent(new ApprovalRequestedEvent(saved.getId()));
+        return saved;
     }
 
     @Transactional
