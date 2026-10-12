@@ -3,12 +3,24 @@ import {
   CALL_STATUS_TEXT,
   callLabel,
   delegationPath,
+  formatMs,
   toolLabel,
   type AgentTrace,
+  type LlmCall,
   type Tokens,
 } from "./agentTrace";
 
 const json = (value: unknown) => JSON.stringify(value, null, 2);
+
+function LlmText({ llm }: { llm?: LlmCall }) {
+  if (!llm) return null;
+  return (
+    <span className="muted">
+      {" "}
+      · {llm.model ?? "모델"} {llm.latency_ms != null && formatMs(llm.latency_ms)}
+    </span>
+  );
+}
 
 function TokenText({ tokens }: { tokens?: Tokens }) {
   if (!tokens) return null;
@@ -73,6 +85,7 @@ function StepBody({ trace }: { trace: AgentTrace }) {
         <div className="agent-step">
           <span className="agent-step-kind">
             Tool 호출 요청 (턴 {trace.step})
+            <LlmText llm={trace.llm} />
             <TokenText tokens={trace.tokens} />
           </span>
           <ul>
@@ -90,6 +103,7 @@ function StepBody({ trace }: { trace: AgentTrace }) {
         <div className="agent-step">
           <span className="agent-step-kind">
             최종 답변 (턴 {trace.step})
+            <LlmText llm={trace.llm} />
             <TokenText tokens={trace.tokens} />
           </span>
           <pre>{trace.answer}</pre>
@@ -100,6 +114,7 @@ function StepBody({ trace }: { trace: AgentTrace }) {
         <div className="agent-step">
           <span className="agent-step-kind">
             출력 형식 재요청
+            <LlmText llm={trace.llm} />
             <TokenText tokens={trace.tokens} />
           </span>
           <pre>{trace.answer}</pre>
@@ -118,6 +133,7 @@ function StepBody({ trace }: { trace: AgentTrace }) {
             )}
             {trace.risk_level && <span className="muted"> · 위험도 {trace.risk_level}</span>}
             {trace.approval_id && <span className="muted"> · 승인 #{trace.approval_id}</span>}
+            {trace.duration_ms != null && <span className="muted"> · {formatMs(trace.duration_ms)}</span>}
           </span>
           {trace.arguments !== undefined && <pre>{json(trace.arguments)}</pre>}
           {trace.content && <pre>{trace.content}</pre>}

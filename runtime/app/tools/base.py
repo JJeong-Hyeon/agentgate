@@ -1,5 +1,6 @@
 """What every tool shares: an AgentGate check before it may run, and one result format."""
 
+import time
 from abc import ABC, abstractmethod
 from typing import Any, Literal
 
@@ -21,6 +22,8 @@ class ToolResult(BaseModel):
     response_status: int | None = None
     response_body: str | None = None
     error: str | None = None
+    # How long running the tool took (not the governance check or an approval wait).
+    duration_ms: int | None = None
 
 
 class GovernedTool(ABC):
@@ -74,6 +77,13 @@ class GovernedTool(ABC):
     def execute(self, payload: dict[str, Any] | None, authorized: ToolResult) -> ToolResult:
         """Run the tool; only called after authorize() allowed it (directly or via approval)."""
 
+    def execute_timed(self, payload: dict[str, Any] | None, authorized: ToolResult) -> ToolResult:
+        """execute(), with how long it took recorded in the result."""
+        started = time.perf_counter()
+        result = self.execute(payload, authorized)
+        elapsed = round((time.perf_counter() - started) * 1000)
+        return result.model_copy(update={"duration_ms": elapsed})
+
     def run(
         self, payload: dict[str, Any] | None = None, execution_id: str | None = None
     ) -> ToolResult:
@@ -81,7 +91,7 @@ class GovernedTool(ABC):
         authorized = self.authorize(execution_id)
         if authorized.status != "ALLOWED":
             return authorized
-        return self.execute(payload, authorized)
+        return self.execute_timed(payload, authorized)
 
     def _base(self, authorized: ToolResult) -> dict[str, Any]:
         return authorized.model_dump(include={"tool", "risk_level", "approval_id", "basis"})

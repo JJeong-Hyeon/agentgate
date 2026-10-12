@@ -178,7 +178,7 @@ class AgentActionServiceTest {
         assertThat(response.basis()).isEqualTo(DecisionBasis.TOOL_NOT_GRANTED);
         verify(riskEvaluationService, never()).evaluate(anyString(), any());
         verify(auditLogService).record(eq("mail-agent"), eq("MCP:notes:delete_note"), any(), any(),
-                eq(RiskLevel.BLOCKED), eq(ActionStatus.BLOCKED), any(), eq(DecisionBasis.TOOL_NOT_GRANTED), any());
+                eq(RiskLevel.BLOCKED), eq(ActionStatus.BLOCKED), any(), eq(DecisionBasis.TOOL_NOT_GRANTED), any(), any());
     }
 
     @Test

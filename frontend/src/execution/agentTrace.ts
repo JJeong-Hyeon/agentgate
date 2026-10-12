@@ -12,12 +12,24 @@ export interface TraceAgent {
   delegated_by?: string | null;
 }
 
+// The model call behind a turn: which model answered and how long it took.
+export interface LlmCall {
+  model?: string | null;
+  latency_ms?: number | null;
+}
+
 export type AgentTrace = TraceAgent &
   (
   | { kind: "start"; prompt: string; memories?: string[]; memory_status?: string }
-  | { kind: "tool_calls"; step?: number; tokens?: Tokens; calls: { tool: string; arguments: unknown }[] }
-  | { kind: "answer"; step?: number; tokens?: Tokens; answer: string }
-  | { kind: "repair"; step?: number; tokens?: Tokens; answer: string; problem: string }
+  | {
+      kind: "tool_calls";
+      step?: number;
+      tokens?: Tokens;
+      llm?: LlmCall;
+      calls: { tool: string; arguments: unknown }[];
+    }
+  | { kind: "answer"; step?: number; tokens?: Tokens; llm?: LlmCall; answer: string }
+  | { kind: "repair"; step?: number; tokens?: Tokens; llm?: LlmCall; answer: string; problem: string }
   | {
       kind: "decision" | "result";
       tool: string;
@@ -27,6 +39,7 @@ export type AgentTrace = TraceAgent &
       approval_id?: number | null;
       arguments?: unknown;
       content?: string;
+      duration_ms?: number | null;
     }
   );
 
@@ -104,4 +117,35 @@ export function callLabel(functionName: string): string {
 export function delegationPath(trace: TraceAgent): string | null {
   if (!trace.delegated_by) return null;
   return [...trace.delegated_by.split(">"), trace.agent ?? "?"].join(" → ");
+}
+
+export interface ExecutionStats {
+  llmCalls: number;
+  llmMs: number;
+  toolRuns: number;
+  toolMs: number;
+}
+
+/** Model calls and tool runs the run's agents made, with the time they took. */
+export function executionStats(nodes: NodeExecution[] = []): ExecutionStats {
+  const stats = { llmCalls: 0, llmMs: 0, toolRuns: 0, toolMs: 0 };
+  for (const node of nodes) {
+    const trace = agentTrace(node);
+    if (!trace) continue;
+    if ("llm" in trace && trace.llm) {
+      stats.llmCalls += 1;
+      stats.llmMs += trace.llm.latency_ms ?? 0;
+    }
+    if (trace.kind === "result" && trace.duration_ms != null) {
+      stats.toolRuns += 1;
+      stats.toolMs += trace.duration_ms;
+    }
+  }
+  return stats;
+}
+
+export function formatMs(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
+  return `${Math.floor(ms / 60_000)}m ${Math.round((ms % 60_000) / 1000)}s`;
 }

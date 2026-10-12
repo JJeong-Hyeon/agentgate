@@ -32,6 +32,7 @@ interrupting, because LangGraph re-runs an interrupted node from the top on resu
 
 import json
 import re
+import time
 from collections.abc import Callable
 from typing import Any
 
@@ -180,6 +181,7 @@ def add_agent(
             messages.append(HumanMessage(FINAL_TURN_NOTE))
         llm = llm_factory(spec.model, spec.temperature)
         offer_tools = bool(definitions) and not final_turn
+        started = time.perf_counter()
         if json_calls:
             reply = llm.invoke(flatten(messages))
             if offer_tools:
@@ -188,6 +190,11 @@ def add_agent(
                 )
         else:
             reply = (llm.bind_tools(definitions) if offer_tools else llm).invoke(messages)
+        llm_call = {
+            "model": reply.response_metadata.get("model_name") or spec.model or _model_name(llm),
+            "latency_ms": round((time.perf_counter() - started) * 1000),
+        }
+        run = {**run, "llm": llm_call}
         messages.append(reply)
         if reply.tool_calls and not final_turn:
             return Command(update=save(run, messages=messages, steps=steps), goto=gate_node)
@@ -252,7 +259,7 @@ def add_agent(
     def execute(state: dict) -> Command:
         run = run_of(state)
         call, authorized = run["pending"]["call"], ToolResult(**run["pending"]["result"])
-        result = by_name[call["name"]].tool.execute(call["args"], authorized)
+        result = by_name[call["name"]].tool.execute_timed(call["args"], authorized)
         if result.status == "EXECUTED":
             content = result.response_body or "(no output)"
         else:
@@ -386,6 +393,10 @@ def repair_note(problem: str, schema: dict) -> str:
 _TRACE_TEXT_CHARS = 1500
 
 
+def _model_name(llm: BaseChatModel) -> str | None:
+    return getattr(llm, "model_name", None) or getattr(llm, "model", None)
+
+
 def _clip(text: Any) -> str:
     text = str(text)
     return text if len(text) <= _TRACE_TEXT_CHARS else text[: _TRACE_TEXT_CHARS - 1] + "…"
@@ -428,6 +439,8 @@ def _agent_trace(sub: str, node_id: str, run: dict, update: dict) -> dict | None
         if reply is None:
             return None
         trace: dict[str, Any] = {"step": run.get("steps")}
+        if run.get("llm"):
+            trace["llm"] = run["llm"]
         if reply.usage_metadata:
             trace["tokens"] = {
                 "input": reply.usage_metadata.get("input_tokens"),
@@ -448,7 +461,7 @@ def _agent_trace(sub: str, node_id: str, run: dict, update: dict) -> dict | None
         result = results[-1]
         told = messages[-1].content if messages and isinstance(messages[-1], ToolMessage) else ""
         kind = "result" if result["status"] in ("EXECUTED", "FAILED") else "decision"
-        return {
+        trace = {
             "kind": kind,
             "tool": result["tool"],
             "status": result["status"],
@@ -457,6 +470,9 @@ def _agent_trace(sub: str, node_id: str, run: dict, update: dict) -> dict | None
             "approval_id": result.get("approval_id"),
             "content": _clip(told),
         }
+        if result.get("duration_ms") is not None:
+            trace["duration_ms"] = result["duration_ms"]
+        return trace
 
     pending = run.get("pending")
     if sub == "gate" and pending:

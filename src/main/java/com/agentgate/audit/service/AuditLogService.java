@@ -8,12 +8,11 @@ import com.agentgate.common.exception.AuditLogNotFoundException;
 import com.agentgate.risk.ActionStatus;
 import com.agentgate.risk.DecisionBasis;
 import com.agentgate.risk.RiskLevel;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,12 +22,16 @@ public class AuditLogService {
 
     private final AuditLogRepository auditLogRepository;
 
+    /** Most entries a list returns; the console shows the newest. */
+    public static final int MAX_LIMIT = 1000;
+    public static final int DEFAULT_LIMIT = 200;
+
     @Transactional
     public void record(String agentId, String action, String target, List<String> labels,
-                        RiskLevel riskLevel, ActionStatus status, Long approvalId, DecisionBasis basis,
-                        String delegatedBy) {
+                       RiskLevel riskLevel, ActionStatus status, Long approvalId, DecisionBasis basis,
+                       String delegatedBy, String executionId) {
         auditLogRepository.save(new AuditLog(agentId, action, target, labels, riskLevel, status, approvalId, basis,
-                delegatedBy));
+                delegatedBy, executionId));
     }
 
     public AuditLogResponse get(Long id) {
@@ -37,29 +40,24 @@ public class AuditLogService {
                 .orElseThrow(() -> new AuditLogNotFoundException(id));
     }
 
-    public List<AuditLogResponse> list(String agentId, ActionStatus status, RiskLevel riskLevel) {
-        return filterByAgentId(agentId)
-                .filter(log -> status == null || log.getStatus() == status)
-                .filter(log -> riskLevel == null || log.getRiskLevel() == riskLevel)
+    @Transactional(readOnly = true)
+    public List<AuditLogResponse> list(String agentId, String executionId, ActionStatus status, RiskLevel riskLevel,
+                                       Integer limit) {
+        int size = limit == null ? DEFAULT_LIMIT : Math.clamp(limit, 1, MAX_LIMIT);
+        return auditLogRepository.search(agentId, executionId, status, riskLevel, PageRequest.of(0, size)).stream()
                 .map(AuditLogResponse::from)
                 .toList();
     }
 
+    @Transactional(readOnly = true)
     public AuditStatsResponse stats(String agentId) {
-        List<AuditLog> logs = filterByAgentId(agentId).toList();
-
-        Map<RiskLevel, Long> byRiskLevel = logs.stream()
-                .collect(Collectors.groupingBy(AuditLog::getRiskLevel, Collectors.counting()));
-        Map<ActionStatus, Long> byStatus = logs.stream()
-                .collect(Collectors.groupingBy(AuditLog::getStatus, Collectors.counting()));
-        long total = logs.size();
+        Map<RiskLevel, Long> byRiskLevel = new EnumMap<>(RiskLevel.class);
+        auditLogRepository.countByRiskLevel(agentId).forEach(row -> byRiskLevel.put((RiskLevel) row[0], (Long) row[1]));
+        Map<ActionStatus, Long> byStatus = new EnumMap<>(ActionStatus.class);
+        auditLogRepository.countByStatus(agentId).forEach(row -> byStatus.put((ActionStatus) row[0], (Long) row[1]));
+        long total = byStatus.values().stream().mapToLong(Long::longValue).sum();
         double blockRate = (total == 0) ? 0.0 : byRiskLevel.getOrDefault(RiskLevel.BLOCKED, 0L) / (double) total;
 
         return new AuditStatsResponse(total, byRiskLevel, byStatus, blockRate);
-    }
-
-    private Stream<AuditLog> filterByAgentId(String agentId) {
-        return auditLogRepository.findAll().stream()
-                .filter(log -> agentId == null || Objects.equals(log.getAgentId(), agentId));
     }
 }

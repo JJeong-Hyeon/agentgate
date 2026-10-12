@@ -1,11 +1,19 @@
 import { useCallback, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import type { Execution, NodeExecution } from "../api/types";
+import type { Approval, AuditLog, Execution, NodeExecution } from "../api/types";
 import { useAuth, useClient } from "../auth/AuthContext";
 import { WorkflowPreview } from "../components/WorkflowPreview";
 import { useAsync } from "../useAsync";
 import { AgentStep } from "./AgentStep";
-import { agentTrace, isQuietAgentStep, totalTokens } from "./agentTrace";
+import {
+  agentTrace,
+  BASIS_TEXT,
+  CALL_STATUS_TEXT,
+  executionStats,
+  formatMs,
+  isQuietAgentStep,
+  totalTokens,
+} from "./agentTrace";
 import { duration, nodeStatuses } from "./state";
 import { useExecutionStream } from "./useExecutionStream";
 
@@ -59,6 +67,7 @@ export function ExecutionPage() {
       <section className="card">
         <ExecutionGraph execution={execution} />
       </section>
+      <ExecutionInsights execution={execution} />
       <section className="card">
         <h2>단계</h2>
         <Timeline nodes={execution.nodes ?? []} />
@@ -81,6 +90,118 @@ function AgentSummary({ execution }: { execution: Execution }) {
       {tokens && ` 토큰 ${tokens.input} → ${tokens.output}`}
     </span>
   );
+}
+
+/** Where the run's time went and what AgentGate decided along the way. */
+function ExecutionInsights({ execution }: { execution: Execution }) {
+  const client = useClient();
+  const nodes = execution.nodes ?? [];
+  // Refetched as the run progresses: each new step may come with new decisions.
+  const progress = `${execution.status}:${nodes.length}`;
+  const governance = useAsync(
+    useCallback(
+      () =>
+        Promise.all([
+          client.listExecutionAuditLogs(execution.executionId),
+          client.listApprovals(undefined, execution.executionId),
+        ]),
+      [client, execution.executionId, progress],
+    ),
+  );
+  const stats = useMemo(() => executionStats(nodes), [nodes]);
+  const tokens = useMemo(() => totalTokens(nodes), [nodes]);
+  const [audits, approvals] = governance.data ?? [[], []];
+  const end = execution.finishedAt ? new Date(execution.finishedAt).getTime() : Date.now();
+  const elapsed = end - new Date(execution.createdAt).getTime();
+  const counts = { ALLOWED: 0, APPROVAL_REQUIRED: 0, BLOCKED: 0 };
+  for (const audit of audits) counts[audit.status] += 1;
+
+  return (
+    <section className="card stack" aria-label="실행 분석">
+      <h2>실행 분석</h2>
+      <dl className="insights">
+        <Metric label={execution.finishedAt ? "총 소요" : "경과"} value={formatMs(Math.max(elapsed, 0))} />
+        <Metric label="LLM 호출" value={`${stats.llmCalls}회 · ${formatMs(stats.llmMs)}`} />
+        {tokens && <Metric label="토큰 (입력 → 출력)" value={`${tokens.input} → ${tokens.output}`} />}
+        <Metric label="Tool 실행" value={`${stats.toolRuns}회 · ${formatMs(stats.toolMs)}`} />
+        <Metric
+          label="판정 (허용 / 승인 필요 / 차단)"
+          value={`${counts.ALLOWED} / ${counts.APPROVAL_REQUIRED} / ${counts.BLOCKED}`}
+        />
+        <Metric label="승인 대기" value={approvalWait(approvals)} />
+      </dl>
+      {governance.error && <p className="error">{governance.error.message}</p>}
+      <GovernanceTable audits={audits} approvals={approvals} />
+    </section>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="muted">{label}</dt>
+      <dd>{value}</dd>
+    </div>
+  );
+}
+
+/** Total time approvals of this run waited for a decision (still-pending ones count until now). */
+function approvalWait(approvals: Approval[]): string {
+  if (approvals.length === 0) return "없음";
+  let ms = 0;
+  for (const a of approvals) {
+    const decided = a.decidedAt ? new Date(a.decidedAt).getTime() : Date.now();
+    ms += Math.max(decided - new Date(a.createdAt).getTime(), 0);
+  }
+  const pending = approvals.filter((a) => a.status === "PENDING").length;
+  return `${approvals.length}건 · ${formatMs(ms)}${pending ? ` (대기 중 ${pending})` : ""}`;
+}
+
+function GovernanceTable({ audits, approvals }: { audits: AuditLog[]; approvals: Approval[] }) {
+  if (audits.length === 0) return <p className="muted">아직 거버넌스 판정이 없습니다.</p>;
+  const byId = new Map(approvals.map((a) => [a.id, a]));
+  return (
+    <table className="governance-table">
+      <thead>
+        <tr>
+          <th>시각</th>
+          <th>Agent</th>
+          <th>행동</th>
+          <th>판정</th>
+          <th>근거</th>
+          <th>승인</th>
+        </tr>
+      </thead>
+      <tbody>
+        {[...audits].reverse().map((audit) => {
+          const approval = audit.approvalId ? byId.get(audit.approvalId) : undefined;
+          return (
+            <tr key={audit.id}>
+              <td className="muted">{new Date(audit.createdAt).toLocaleTimeString()}</td>
+              <td>
+                {audit.agentId}
+                {audit.delegatedBy && <div className="muted">위임: {audit.delegatedBy.split(">").join(" → ")}</div>}
+              </td>
+              <td className="mono">{audit.action}</td>
+              <td>
+                <span className={`badge risk-${audit.riskLevel.toLowerCase()}`}>{audit.riskLevel}</span>{" "}
+                {CALL_STATUS_TEXT[audit.status] ?? audit.status}
+              </td>
+              <td className="muted">{audit.basis ? BASIS_TEXT[audit.basis] ?? audit.basis : ""}</td>
+              <td>{approval ? approvalText(approval) : audit.approvalId ? `#${audit.approvalId}` : ""}</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+function approvalText(approval: Approval): string {
+  const status = DECISION_TEXT[approval.status] ?? "대기 중";
+  if (!approval.decidedAt) return `#${approval.id} ${status}`;
+  const waited = new Date(approval.decidedAt).getTime() - new Date(approval.createdAt).getTime();
+  return `#${approval.id} ${status} (${approval.decidedBy ?? "?"}, ${formatMs(Math.max(waited, 0))})`;
 }
 
 function ExecutionGraph({ execution }: { execution: Execution }) {

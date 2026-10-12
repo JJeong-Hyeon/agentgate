@@ -199,6 +199,19 @@ DELETE /api/v1/agents/{agentId}/memories/{id}             → 204 (ADMIN)
 
 Runtime 전용 (`X-Runtime-Token`): `POST /api/v1/runtime/memories` `{"agentId","content","executionId"}` → 201, `POST /api/v1/runtime/memories/search` `{"agentId","query","limit"(1~20, 기본 5)}`.
 
+### Audit Log (모든 역할)
+
+모든 행동 평가 결과(판정·근거·위험도)가 남는다.
+
+```
+GET /api/v1/audit-logs?agentId=&executionId=&status=&riskLevel=&limit=200   최신순, limit 1~1000 (기본 200)
+GET /api/v1/audit-logs/{id}
+GET /api/v1/audit-logs/stats?agentId=                                       위험도·판정별 건수, 차단율
+```
+
+- 응답: `id`, `agentId`, `action`, `target`, `labels`, `riskLevel`, `status`, `approvalId`, `basis`, `delegatedBy`, `executionId`(Runtime 실행 중 판정이면 그 실행 ID), `createdAt`
+- 실행 화면의 "실행 분석"은 `executionId`로 이 목록과 승인 요청(`/api/v1/approvals?executionId=`)을 모아 판정·승인 대기 시간을 보여준다
+
 ## 3. 승인 처리 (status가 APPROVAL_REQUIRED일 때, 관리자 인증 필요)
 
 ```

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import httpx
 import pytest
-from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
 from pydantic import ValidationError
@@ -484,7 +484,12 @@ def test_agent_steps_report_compact_traces():
     # Every step says which agent ran it (here a workflow node, so no delegation chain).
     assert {t["agent"] for _, t in traces if t} == {"note-agent"}
     assert all("delegated_by" not in t for _, t in traces if t)
-    traces = [(step, t and {k: v for k, v in t.items() if k != "agent"}) for step, t in traces]
+    # Each model turn reports its model and latency (timing varies, so checked apart).
+    llm_calls = [t["llm"] for step, t in traces if step == "helper.think"]
+    assert len(llm_calls) == 2
+    assert all(c["model"] is None and c["latency_ms"] >= 0 for c in llm_calls)
+    hidden = ("agent", "llm")
+    traces = [(step, t and {k: v for k, v in t.items() if k not in hidden}) for step, t in traces]
     assert traces[0] == ("helper", {"kind": "start", "prompt": "Task: add things"})
     assert traces[1] == (
         "helper.think",
@@ -512,9 +517,25 @@ def test_agent_steps_report_compact_traces():
     assert executed["kind"] == "result"
     assert executed["status"] == "EXECUTED"
     assert executed["content"] == "5"
+    assert executed["duration_ms"] >= 0
     assert traces[-1] == ("helper.think", {"step": 2, "kind": "answer", "answer": "2+3=5"})
     # Nothing in the reports is the raw conversation.
     assert all("agent_runs" not in out for _, out in outputs)
+
+
+def test_model_name_comes_from_the_reply_or_the_definition():
+    reply = AIMessage(content="ok", response_metadata={"model_name": "qwen3-32b"})
+    llm = ScriptedChatModel.of(reply, "summary")
+    graph, state = build(agent_workflow(), llm, PolicyGate())
+
+    outputs = agent_outputs(graph, state)
+    [think] = [out["agent"] for step, out in outputs if step == "helper.think"]
+    assert think["llm"]["model"] == "qwen3-32b"
+
+    llm = ScriptedChatModel.of("ok", "summary")
+    graph, state = build(agent_workflow(model="llama-3.3-70b"), llm, PolicyGate())
+    [think] = [out["agent"] for step, out in agent_outputs(graph, state) if step == "helper.think"]
+    assert think["llm"]["model"] == "llama-3.3-70b"
 
 
 def test_denied_and_repaired_steps_are_traced():

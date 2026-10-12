@@ -100,7 +100,8 @@ class AgentToolPermissionIntegrationTest {
         mockMvc.perform(get("/api/v1/audit-logs").param("agentId", "note-agent")
                         .with(httpBasic("test-admin", "test-password")))
                 .andExpect(jsonPath("$[0].agentId").value("note-agent"))
-                .andExpect(jsonPath("$[0].basis").value("POLICY"));
+                .andExpect(jsonPath("$[0].basis").value("POLICY"))
+                .andExpect(jsonPath("$[0].executionId").value("exec-1"));
     }
 
     @Test

@@ -68,7 +68,8 @@ public class AgentActionService {
         }
 
         auditLogService.record(request.agentId(), request.action(), request.target(), labels,
-                decision.riskLevel(), decision.status(), approvalId, decision.basis(), request.delegatedBy());
+                decision.riskLevel(), decision.status(), approvalId, decision.basis(), request.delegatedBy(),
+                request.executionId());
 
         return new ActionResponse(decision.status(), decision.riskLevel(), approvalId, decision.basis());
     }

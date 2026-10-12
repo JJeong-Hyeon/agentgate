@@ -75,6 +75,22 @@ export interface Execution {
   nodes?: NodeExecution[];
 }
 
+// One governance decision AgentGate made (and why), as recorded in the audit log.
+export interface AuditLog {
+  id: number;
+  agentId: string;
+  action: string;
+  target: string | null;
+  labels: string[];
+  riskLevel: "LOW" | "MEDIUM" | "HIGH" | "BLOCKED";
+  status: "ALLOWED" | "APPROVAL_REQUIRED" | "BLOCKED";
+  approvalId: number | null;
+  basis: string | null;
+  delegatedBy: string | null;
+  executionId: string | null;
+  createdAt: string;
+}
+
 export interface Approval {
   id: number;
   agentId: string;
