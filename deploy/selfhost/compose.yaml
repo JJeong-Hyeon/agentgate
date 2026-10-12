@@ -1,5 +1,5 @@
 # AgentGate on a single server: console/API, agent runtime, PostgreSQL, Redis and Caddy (HTTPS).
-# The model server is not included; point LLM_BASE_URL at yours. See docs/SELF_HOSTING.md.
+# The model server (Ollama or vLLM) is not included; point LLM_BASE_URL at yours. See docs/SELF_HOSTING.md.
 #   cp .env.example .env   # fill in
 #   docker compose up -d --build
 name: agentgate
@@ -44,6 +44,7 @@ services:
       AGENTGATE_EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-}
       AGENTGATE_EMBEDDING_MODEL: ${EMBEDDING_MODEL:-}
       AGENTGATE_EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
+      AGENTGATE_MEMORY_MIN_SCORE: ${MEMORY_MIN_SCORE:-0.3}
     depends_on:
       postgres:
         condition: service_healthy
@@ -63,6 +64,7 @@ services:
       LLM_MODEL: ${LLM_MODEL:?set LLM_MODEL in .env}
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_TOOL_CALLING: ${LLM_TOOL_CALLING:-native}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-60}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
       OTEL_EXPORTER_OTLP_HEADERS: ${OTEL_EXPORTER_OTLP_HEADERS:-}
       OTEL_CAPTURE_CONTENT: ${OTEL_CAPTURE_CONTENT:-false}
