@@ -41,6 +41,9 @@ services:
       AGENTGATE_NOTIFY_WEBHOOK_URL: ${AGENTGATE_NOTIFY_WEBHOOK_URL:-}
       AGENTGATE_NOTIFY_WEBHOOK_FORMAT: ${AGENTGATE_NOTIFY_WEBHOOK_FORMAT:-SLACK}
       AGENTGATE_NOTIFY_WEBHOOK_SECRET: ${AGENTGATE_NOTIFY_WEBHOOK_SECRET:-}
+      AGENTGATE_EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-}
+      AGENTGATE_EMBEDDING_MODEL: ${EMBEDDING_MODEL:-}
+      AGENTGATE_EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -68,7 +71,8 @@ services:
     restart: unless-stopped
 
   postgres:
-    image: postgres:17
+    # PostgreSQL 17 with pgvector, for semantic search over agent memories.
+    image: pgvector/pgvector:pg17
     environment:
       POSTGRES_DB: agentgate
       POSTGRES_USER: agentgate

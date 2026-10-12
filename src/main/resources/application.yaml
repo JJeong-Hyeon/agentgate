@@ -42,6 +42,16 @@ agentgate:
       # JSON 포맷에서 설정하면 본문의 HMAC-SHA256을 X-AgentGate-Signature: sha256=<hex>로 보낸다.
       secret: ${AGENTGATE_NOTIFY_WEBHOOK_SECRET:}
     retry-delay: PT30S
+  memory:
+    embedding:
+      # OpenAI 호환 임베딩 서버(예: vLLM으로 bge-m3 서빙, http://<서버>:8001/v1). 비우면 기억 검색은 키워드로만 한다.
+      # 의미 검색에는 PostgreSQL에 pgvector 확장도 필요하다.
+      base-url: ${AGENTGATE_EMBEDDING_BASE_URL:}
+      model: ${AGENTGATE_EMBEDDING_MODEL:}
+      api-key: ${AGENTGATE_EMBEDDING_API_KEY:}
+    # 의미 검색 결과로 인정할 최소 코사인 유사도. 모델마다 분포가 달라 조정이 필요할 수 있다.
+    min-score: ${AGENTGATE_MEMORY_MIN_SCORE:0.3}
+    backfill-delay: PT5M
   runtime:
     # Python agent runtime (runtime/). 비워두면 승인 결정 후 실행 재개 호출을 하지 않는다.
     base-url: ${AGENTGATE_RUNTIME_BASE_URL:}

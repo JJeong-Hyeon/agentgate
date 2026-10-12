@@ -77,6 +77,11 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.NOT_FOUND, "APPROVAL_NOT_FOUND", ex.getMessage(), request);
     }
 
+    @ExceptionHandler(MemoryNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleMemoryNotFound(MemoryNotFoundException ex, HttpServletRequest request) {
+        return build(HttpStatus.NOT_FOUND, "MEMORY_NOT_FOUND", ex.getMessage(), request);
+    }
+
     @ExceptionHandler(AuditLogNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleAuditLogNotFound(AuditLogNotFoundException ex, HttpServletRequest request) {
         return build(HttpStatus.NOT_FOUND, "AUDIT_LOG_NOT_FOUND", ex.getMessage(), request);
