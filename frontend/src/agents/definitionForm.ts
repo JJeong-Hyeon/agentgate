@@ -22,7 +22,16 @@ export interface DefinitionForm {
   tools: Record<string, ToolChoice>;
   // agentId → permission for delegating to that agent
   delegates: Record<string, ToolPermission>;
+  memory: MemoryForm;
 }
+
+export interface MemoryForm {
+  read: ToolPermission;
+  write: ToolPermission;
+  recall: string;
+}
+
+const NO_MEMORY: MemoryForm = { read: "BLOCKED", write: "BLOCKED", recall: "0" };
 
 export const toolKey = (server: string, tool: string) => `${server}/${tool}`;
 
@@ -37,6 +46,7 @@ export function emptyForm(): DefinitionForm {
     outputSchema: "",
     tools: {},
     delegates: {},
+    memory: NO_MEMORY,
   };
 }
 
@@ -61,6 +71,9 @@ export function toForm(definition: AgentDefinition | null | undefined): Definiti
     outputSchema: definition.outputSchema ? JSON.stringify(definition.outputSchema, null, 2) : "",
     tools,
     delegates: Object.fromEntries((definition.delegates ?? []).map((d) => [d.agentId, d.permission])),
+    memory: definition.memory
+      ? { read: definition.memory.read, write: definition.memory.write, recall: String(definition.memory.recall ?? 0) }
+      : NO_MEMORY,
   };
 }
 
@@ -93,6 +106,14 @@ export function fromForm(form: DefinitionForm): { definition: AgentDefinition } 
       return { error: "출력 스키마가 올바른 JSON이 아닙니다." };
     }
   }
+  const recall = Number(form.memory.recall);
+  if (!Number.isInteger(recall) || recall < 0 || recall > 10) {
+    return { error: "자동 회상 개수는 0 ~ 10 사이의 정수여야 합니다." };
+  }
+  if (recall > 0 && form.memory.read !== "AUTO") {
+    return { error: "자동 회상을 쓰려면 기억 검색 권한이 '자동'이어야 합니다." };
+  }
+  const noMemory = form.memory.read === "BLOCKED" && form.memory.write === "BLOCKED";
   const tools: AgentToolDefinition[] = Object.values(form.tools).map((t) => ({
     server: t.server,
     tool: t.tool,
@@ -113,6 +134,7 @@ export function fromForm(form: DefinitionForm): { definition: AgentDefinition } 
       outputSchema,
       tools,
       delegates: Object.entries(form.delegates).map(([agentId, permission]) => ({ agentId, permission })),
+      memory: noMemory ? null : { read: form.memory.read, write: form.memory.write, recall },
     },
   };
 }

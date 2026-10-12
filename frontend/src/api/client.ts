@@ -3,6 +3,7 @@ import type {
   Agent,
   AgentDefinition,
   AgentDefinitionVersion,
+  AgentMemory,
   ApiErrorBody,
   Approval,
   CreatedAgent,
@@ -168,6 +169,23 @@ export class AgentGateClient {
 
   saveAgentDefinition(id: number, definition: AgentDefinition): Promise<AgentDefinitionVersion> {
     return this.request(`/api/v1/agents/${id}/definition`, { method: "PUT", body: JSON.stringify(definition) });
+  }
+
+  /** The agent's newest memories, or the best matches for `query`. */
+  listAgentMemories(agentId: string, query?: string): Promise<AgentMemory[]> {
+    const search = query?.trim() ? `?query=${encodeURIComponent(query.trim())}` : "";
+    return this.request(`/api/v1/agents/${encodeURIComponent(agentId)}/memories${search}`);
+  }
+
+  addAgentMemory(agentId: string, content: string): Promise<AgentMemory> {
+    return this.request(`/api/v1/agents/${encodeURIComponent(agentId)}/memories`, {
+      method: "POST",
+      body: JSON.stringify({ content }),
+    });
+  }
+
+  deleteAgentMemory(agentId: string, id: number): Promise<void> {
+    return this.request(`/api/v1/agents/${encodeURIComponent(agentId)}/memories/${id}`, { method: "DELETE" });
   }
 
   listMcpServers(): Promise<McpServer[]> {

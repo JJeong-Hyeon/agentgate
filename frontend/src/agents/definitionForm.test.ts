@@ -12,6 +12,7 @@ describe("definition form", () => {
       outputSchema: { type: "object" },
       tools: [{ server: "notes", tool: "save_note", permission: "APPROVAL" as const, labels: ["PII", "EXT"] }],
       delegates: [{ agentId: "research", permission: "AUTO" as const }],
+      memory: { read: "AUTO" as const, write: "APPROVAL" as const, recall: 3 },
     };
 
     const form = toForm(definition);
@@ -33,6 +34,7 @@ describe("definition form", () => {
         outputSchema: null,
         tools: [],
         delegates: [],
+        memory: null,
       },
     });
   });
@@ -44,7 +46,12 @@ describe("definition form", () => {
     [{ maxSteps: "2.5" }, "최대 단계는 1 ~ 50 사이의 정수여야 합니다."],
     [{ outputSchema: "{oops" }, "출력 스키마가 올바른 JSON이 아닙니다."],
     [{ outputSchema: "[1]" }, "출력 스키마는 JSON 객체여야 합니다."],
-  ])("rejects %o", (patch, error) => {
+    [{ memory: { read: "AUTO", write: "BLOCKED", recall: "11" } }, "자동 회상 개수는 0 ~ 10 사이의 정수여야 합니다."],
+    [
+      { memory: { read: "APPROVAL", write: "BLOCKED", recall: "2" } },
+      "자동 회상을 쓰려면 기억 검색 권한이 '자동'이어야 합니다.",
+    ],
+  ] as const)("rejects %o", (patch, error) => {
     expect(fromForm({ ...emptyForm(), systemPrompt: "x", ...patch })).toEqual({ error });
   });
 

@@ -5,6 +5,7 @@ import { useAuth, useClient } from "../auth/AuthContext";
 import { useAsync } from "../useAsync";
 import { ApiKeySection } from "./ApiKeySection";
 import { DelegatesSection } from "./DelegatesSection";
+import { MemoryBrowser, MemorySettings } from "./MemorySection";
 import {
   defaultPermission,
   fromForm,
@@ -219,6 +220,10 @@ export function AgentEditorPage() {
             chosen={form.delegates}
             onChange={(delegates) => update({ delegates })}
           />
+
+          <MemorySettings memory={form.memory} onChange={(memory) => update({ memory })} />
+
+          {agent.data && <MemoryBrowser agentId={agent.data.agentId} />}
 
           {agent.data && <ApiKeySection agent={agent.data} onReissued={agent.reload} />}
 

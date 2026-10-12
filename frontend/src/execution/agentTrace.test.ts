@@ -39,6 +39,12 @@ describe("agent traces", () => {
     expect(toolLabel("helper:notes/save_note")).toBe("notes/save_note");
   });
 
+  it("reads memory tools as people would", () => {
+    expect(toolLabel("helper:memory/recall")).toBe("기억 회상");
+    expect(toolLabel("helper:memory/save")).toBe("기억 저장");
+    expect(callLabel("memory_search")).toBe("기억 검색");
+  });
+
   it("reads delegations as people would", () => {
     expect(toolLabel("lead:agent/research")).toBe("→ research에게 위임");
     expect(callLabel("delegate__research")).toBe("→ research에게 위임");

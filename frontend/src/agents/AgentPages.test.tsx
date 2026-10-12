@@ -69,6 +69,18 @@ const CATALOG = [
   { server: "files", transport: "stdio", error: "connection refused", tools: [] },
 ];
 
+const MEMORY = {
+  id: 11,
+  agentId: "note-agent",
+  content: "Kim likes lattes",
+  source: "AGENT",
+  executionId: "0f8e2c1a-aaaa-bbbb-cccc-000000000000",
+  createdBy: "note-agent",
+  createdAt: "2026-10-12T00:00:00Z",
+  score: null,
+  matchedBy: null,
+};
+
 describe("AgentsPage", () => {
   it("registers an agent and shows its API key once", async () => {
     const fetchImpl = renderAt("/agents", (_url, init) => {
@@ -124,6 +136,11 @@ describe("AgentEditorPage", () => {
       return Response.json({ ...DEFINITION, version: 1, definition: { ...DEFINITION.definition, systemPrompt: "Old." } });
     }
     if (url.startsWith("/api/v1/tools")) return Response.json(CATALOG);
+    if (url.startsWith("/api/v1/agents/note-agent/memories")) {
+      if (init?.method === "POST") return Response.json({ ...MEMORY, id: 12, content: "new fact" }, { status: 201 });
+      if (init?.method === "DELETE") return new Response(null, { status: 204 });
+      return Response.json(url.includes("query=") ? [{ ...MEMORY, matchedBy: "SEMANTIC", score: 0.8 }] : [MEMORY]);
+    }
     return new Response(null, { status: 404 });
   }
 
@@ -195,6 +212,59 @@ describe("AgentEditorPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "새 버전 저장" }));
 
     expect(await screen.findByText("시스템 프롬프트를 입력하세요.")).toBeInTheDocument();
+    expect(sent(fetchImpl, "PUT")).toHaveLength(0);
+  });
+
+  it("sets memory permissions and saves them with the definition", async () => {
+    const fetchImpl = renderAt("/agents/7", editorHandler);
+
+    await screen.findByDisplayValue("Be careful.");
+    expect(screen.getByLabelText("기억 검색 권한")).toHaveValue("BLOCKED");
+    fireEvent.change(screen.getByLabelText("기억 검색 권한"), { target: { value: "AUTO" } });
+    fireEvent.change(screen.getByLabelText("기억 저장 권한"), { target: { value: "APPROVAL" } });
+    fireEvent.change(screen.getByLabelText(/자동 회상/), { target: { value: "3" } });
+    fireEvent.click(screen.getByRole("button", { name: "새 버전 저장" }));
+
+    await screen.findByText("v3 저장됨");
+    expect(sent(fetchImpl, "PUT")[0].body.memory).toEqual({ read: "AUTO", write: "APPROVAL", recall: 3 });
+  });
+
+  it("browses, searches, adds and forgets memories", async () => {
+    const fetchImpl = renderAt("/agents/7", editorHandler);
+
+    expect(await screen.findByText("Kim likes lattes")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "실행 0f8e2c1a" })).toHaveAttribute(
+      "href",
+      "/executions/0f8e2c1a-aaaa-bbbb-cccc-000000000000",
+    );
+    fireEvent.change(screen.getByLabelText("기억 검색어"), { target: { value: "coffee" } });
+    fireEvent.click(screen.getByRole("button", { name: "검색" }));
+    expect(await screen.findByText(/의미 일치/)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("새 기억"), { target: { value: " new fact " } });
+    fireEvent.click(screen.getByRole("button", { name: "추가" }));
+    await waitFor(() => expect(sent(fetchImpl, "POST")).toHaveLength(1));
+    expect(sent(fetchImpl, "POST")[0]).toEqual({ url: "/api/v1/agents/note-agent/memories", body: { content: "new fact" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "삭제" }));
+    await waitFor(() =>
+      expect(
+        fetchImpl.mock.calls.some(
+          ([u, i]) => String(u) === "/api/v1/agents/note-agent/memories/11" && (i as RequestInit)?.method === "DELETE",
+        ),
+      ).toBe(true),
+    );
+  });
+
+  it("does not save recall without automatic memory search", async () => {
+    const fetchImpl = renderAt("/agents/7", editorHandler);
+
+    await screen.findByDisplayValue("Be careful.");
+    fireEvent.change(screen.getByLabelText("기억 검색 권한"), { target: { value: "APPROVAL" } });
+    fireEvent.change(screen.getByLabelText(/자동 회상/), { target: { value: "2" } });
+    fireEvent.click(screen.getByRole("button", { name: "새 버전 저장" }));
+
+    expect(await screen.findByText("자동 회상을 쓰려면 기억 검색 권한이 '자동'이어야 합니다.")).toBeInTheDocument();
     expect(sent(fetchImpl, "PUT")).toHaveLength(0);
   });
 });

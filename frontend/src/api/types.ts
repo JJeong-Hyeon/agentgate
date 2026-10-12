@@ -138,6 +138,27 @@ export interface AgentDelegateDefinition {
   permission: ToolPermission;
 }
 
+export interface AgentMemoryDefinition {
+  read: ToolPermission;
+  write: ToolPermission;
+  // memories looked up with the task and given to the agent at the start of each run
+  recall?: number | null;
+}
+
+export interface AgentMemory {
+  id: number;
+  agentId: string;
+  content: string;
+  // AGENT: saved by the agent during a run; USER: added in the console
+  source: "AGENT" | "USER";
+  executionId: string | null;
+  createdBy: string | null;
+  createdAt: string;
+  // set in search results
+  score: number | null;
+  matchedBy: "SEMANTIC" | "KEYWORD" | null;
+}
+
 export interface AgentDefinition {
   description?: string | null;
   model?: string | null;
@@ -149,6 +170,8 @@ export interface AgentDefinition {
   toolCalling?: ToolCallingMode | null;
   // agents this one may hand work to
   delegates?: AgentDelegateDefinition[];
+  // long-term memory access; null → none
+  memory?: AgentMemoryDefinition | null;
 }
 
 export interface AgentDefinitionVersion {
