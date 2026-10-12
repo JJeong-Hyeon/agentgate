@@ -23,7 +23,7 @@ class Llm:
         self.model = FakeListChatModel(responses=list(replies))
         self.calls: list[tuple[str | None, float | None]] = []
 
-    def __call__(self, model, temperature):
+    def __call__(self, model, temperature, reasoning_effort=None):
         self.calls.append((model, temperature))
         return self.model
 

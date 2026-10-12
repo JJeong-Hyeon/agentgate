@@ -39,8 +39,8 @@ async def lifespan(app: FastAPI):
     app.state.catalog = ToolCatalog(mcp_servers)
     with open_checkpointer(settings.runtime_database_url) as checkpointer:
         compiler = WorkflowCompiler(
-            lambda model, temperature: create_chat_model(
-                settings, model=model, temperature=temperature
+            lambda model, temperature, reasoning_effort: create_chat_model(
+                settings, model=model, temperature=temperature, reasoning_effort=reasoning_effort
             ),
             build_gate(settings),
             mcp_servers=mcp_servers,

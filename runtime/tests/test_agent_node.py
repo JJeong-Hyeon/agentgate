@@ -88,7 +88,7 @@ def build(dsl: dict, llm: ScriptedChatModel, gate: PolicyGate, checkpointer=None
     client = AgentGateClient(
         "http://agentgate", "runtime-agent", transport=httpx.MockTransport(gate), runtime_token="t"
     )
-    compiler = WorkflowCompiler(lambda m, t: llm, client, mcp_servers={"local": ECHO_SERVER})
+    compiler = WorkflowCompiler(lambda *_: llm, client, mcp_servers={"local": ECHO_SERVER})
     graph = compiler.compile(workflow, checkpointer or InMemorySaver())
     state = {
         "task": "add things",
@@ -236,7 +236,7 @@ def test_resumed_execution_rebuilds_its_graph_from_saved_state():
     client = AgentGateClient(
         "http://agentgate", "runtime-agent", transport=httpx.MockTransport(gate)
     )
-    compiler = WorkflowCompiler(lambda m, t: llm, client, mcp_servers={"local": ECHO_SERVER})
+    compiler = WorkflowCompiler(lambda *_: llm, client, mcp_servers={"local": ECHO_SERVER})
     restored = WorkflowRunner(compiler, checkpointer).graph_for_execution("exec-1")
     result = restored.invoke(Command(resume={"decision": "APPROVED"}), CONFIG)
 
@@ -256,7 +256,7 @@ def test_function_names_are_valid_and_unique():
 def compile_only(dsl: dict, servers=None):
     client = AgentGateClient("http://agentgate", "runtime-agent", "k")
     compiler = WorkflowCompiler(
-        lambda m, t: None, client, mcp_servers=servers or {"local": ECHO_SERVER}
+        lambda *_: None, client, mcp_servers=servers or {"local": ECHO_SERVER}
     )
     return compiler.compile(Workflow.model_validate(dsl))
 
@@ -398,7 +398,7 @@ def test_runtime_default_mode_applies_when_the_definition_has_none():
         "http://agentgate", "runtime-agent", transport=httpx.MockTransport(PolicyGate())
     )
     compiler = WorkflowCompiler(
-        lambda m, t: llm, client, mcp_servers={"local": ECHO_SERVER}, tool_calling="JSON"
+        lambda *_: llm, client, mcp_servers={"local": ECHO_SERVER}, tool_calling="JSON"
     )
     graph = compiler.compile(workflow, InMemorySaver())
     state = {"task": "t", "workflow": workflow.model_dump(mode="json", by_alias=True)}
@@ -536,6 +536,29 @@ def test_model_name_comes_from_the_reply_or_the_definition():
     graph, state = build(agent_workflow(model="llama-3.3-70b"), llm, PolicyGate())
     [think] = [out["agent"] for step, out in agent_outputs(graph, state) if step == "helper.think"]
     assert think["llm"]["model"] == "llama-3.3-70b"
+
+
+def test_the_agents_reasoning_effort_goes_to_the_model_factory():
+    asked = []
+    llm = ScriptedChatModel.of("ok", "summary")
+
+    def factory(model, temperature, reasoning_effort):
+        asked.append(reasoning_effort)
+        return llm
+
+    workflow = attach_tool_schemas(
+        Workflow.model_validate(agent_workflow(reasoningEffort="none")), CATALOG
+    )
+    client = AgentGateClient(
+        "http://agentgate", "a", transport=httpx.MockTransport(PolicyGate()), runtime_token="t"
+    )
+    graph = WorkflowCompiler(factory, client, mcp_servers={"local": ECHO_SERVER}).compile(
+        workflow, InMemorySaver()
+    )
+    graph.invoke({"task": "t", "workflow": workflow.model_dump(mode="json", by_alias=True)}, CONFIG)
+
+    # The agent turn uses its definition's setting; the plain LLM node the runtime default.
+    assert asked == ["none", None]
 
 
 def test_denied_and_repaired_steps_are_traced():

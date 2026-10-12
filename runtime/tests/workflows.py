@@ -51,7 +51,7 @@ def compiler(
         "http://agentgate", "runtime-agent", "k", httpx.MockTransport(gate or FakeAgentGate())
     )
     return WorkflowCompiler(
-        lambda model, temperature: llm,
+        lambda *_: llm,
         gate_client,
         httpx.MockTransport(target or FakeTarget()),
         mcp_servers,

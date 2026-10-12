@@ -126,6 +126,7 @@ GET  /api/v1/agents/{id}/definition/versions/{version}  해당 버전
 - `maxSteps` 1~50 (생략 시 8), `temperature` 0~2, `toolCalling` `NATIVE` / `JSON` / 생략(Runtime 기본값), `outputSchema`는 JSON 객체
 - 같은 Tool 중복, 형식 오류는 400 `VALIDATION_FAILED`
 - `delegates`(선택, 최대 10): 이 Agent가 일을 맡길 수 있는 Agent와 권한. 위임은 행동 `AGENT:<agentId>`로 평가되며(정책이 없으면 기본 MEDIUM·허용, 승인이 필요하면 위임 권한을 `APPROVAL`로), 맡은 Agent는 자기 정의·권한·이름으로 Tool을 실행한다. 자기 자신, 없는 Agent, 정의 없는 Agent, 중복, 위임 순환, 3단계를 넘는 위임 체인은 400
+- `reasoningEffort`(선택): 추론 모델이 답 전에 생각하는 정도 — `none`(끄기, 빠름) / `minimal` / `low` / `medium` / `high`. 없으면 Runtime 기본값(`LLM_REASONING_EFFORT`)
 - `memory`(선택): 장기 기억 사용 권한. `{"read": "AUTO", "write": "APPROVAL", "recall": 3}`
   - `read`: 기억 검색(Tool `memory_search`, 행동 `MEMORY:SEARCH`), `write`: 기억 저장(Tool `memory_save`, 행동 `MEMORY:SAVE`). 값은 Tool 권한과 같다(`AUTO` / `APPROVAL` / `BLOCKED`)
   - `recall`(0~10, 기본 0): 실행 시작 시 작업 프롬프트로 관련 기억을 검색해 시스템 프롬프트에 넣을 개수. 1 이상이면 `read`는 `AUTO`여야 한다(400). 정책상 바로 허용되지 않으면 회상을 건너뛴다

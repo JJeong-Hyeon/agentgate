@@ -8,6 +8,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.util.List;
 import tools.jackson.databind.JsonNode;
@@ -31,7 +32,9 @@ public record AgentDefinition(
         // Agents this one may delegate to; null or empty → none.
         @Size(max = 10) List<@Valid @NotNull AgentDelegateDefinition> delegates,
         // Long-term memory access; null → none.
-        @Valid AgentMemoryDefinition memory
+        @Valid AgentMemoryDefinition memory,
+        // How much the model reasons before answering (none … high); null → the runtime's default.
+        @Pattern(regexp = "none|minimal|low|medium|high") String reasoningEffort
 ) {
     public static final int DEFAULT_MAX_STEPS = 8;
 
@@ -43,6 +46,6 @@ public record AgentDefinition(
                 .toList();
         return new AgentDefinition(description, model, temperature, systemPrompt, normalizedTools,
                 maxSteps == null ? DEFAULT_MAX_STEPS : maxSteps, outputSchema, toolCalling,
-                delegates == null ? List.of() : delegates, memory == null ? null : memory.normalized());
+                delegates == null ? List.of() : delegates, memory == null ? null : memory.normalized(), reasoningEffort);
     }
 }

@@ -116,7 +116,7 @@ def test_run_graph_reports_failure_and_reraises():
             raise RuntimeError("llm down")
 
     llm = Broken(responses=["x"])
-    graph = WorkflowCompiler(lambda model, temperature: llm).compile(
+    graph = WorkflowCompiler(lambda *_: llm).compile(
         Workflow.model_validate(SIMPLE), InMemorySaver()
     )
 

@@ -68,7 +68,7 @@ def build(dsl: dict, llm: ScriptedChatModel, gate: PolicyGate, checkpointer=None
     client = AgentGateClient(
         "http://agentgate", "runtime-agent", transport=httpx.MockTransport(gate), runtime_token="t"
     )
-    compiler = WorkflowCompiler(lambda m, t: llm, client, mcp_servers={"local": ECHO_SERVER})
+    compiler = WorkflowCompiler(lambda *_: llm, client, mcp_servers={"local": ECHO_SERVER})
     graph = compiler.compile(workflow, checkpointer or InMemorySaver())
     state = {"task": "team task", "workflow": workflow.model_dump(mode="json", by_alias=True)}
     return graph, state, compiler
@@ -212,7 +212,7 @@ def test_worker_steps_are_reported_under_the_workflow_node():
 def test_delegation_graphs_must_be_resolved_acyclic_and_shallow():
     def compile_only(dsl):
         client = AgentGateClient("http://agentgate", "runtime-agent", "k")
-        WorkflowCompiler(lambda m, t: None, client, mcp_servers={"local": ECHO_SERVER}).compile(
+        WorkflowCompiler(lambda *_: None, client, mcp_servers={"local": ECHO_SERVER}).compile(
             attach_tool_schemas(Workflow.model_validate(dsl), CATALOG)
         )
 

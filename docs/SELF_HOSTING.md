@@ -38,6 +38,7 @@ cp .env.example .env
 | `LLM_BASE_URL` / `LLM_MODEL` / `LLM_API_KEY` | 모델 서버. 다른 장비의 Ollama면 `http://<IP>:11434/v1`, 같은 서버에서 돌고 있으면 `http://host.docker.internal:<포트>/v1` |
 | `LLM_TOOL_CALLING` | Ollama의 Tool 지원 모델(qwen3 등)이나 `--enable-auto-tool-choice --tool-call-parser <parser>`로 띄운 vLLM이면 `native`, 아니면 `json` |
 | `LLM_TIMEOUT_SECONDS` | 모델 응답 하나를 기다리는 시간(초). 큰 모델·추론(thinking) 모델은 늘린다 |
+| `LLM_REASONING_EFFORT` | 추론 모델이 답 전에 생각하는 정도(`none` / `minimal` / `low` / `medium` / `high`). 비우면 보내지 않는다. Agent 정의에서 Agent별로 바꿀 수 있다 |
 | `EMBEDDING_BASE_URL` / `EMBEDDING_MODEL` / `EMBEDDING_API_KEY` | 선택. Agent 기억의 의미 검색용 임베딩 서버(OpenAI 호환 `/embeddings`, 예: Ollama의 `bge-m3`). 비우면 키워드 검색 |
 | `MEMORY_MIN_SCORE` | 의미 검색 결과로 인정할 최소 코사인 유사도. 모델마다 다르며 bge-m3는 약 0.45 |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` / `OTEL_EXPORTER_OTLP_HEADERS` / `OTEL_CAPTURE_CONTENT` | 선택. Agent 실행 trace를 OpenTelemetry로 내보낼 곳 ([`MONITORING.md`](MONITORING.md#agent-trace-opentelemetry)) |
@@ -88,7 +89,7 @@ curl http://<모델 서버 IP>:11434/v1/embeddings -H 'Content-Type: application
 ```
 
 - 다른 PC에서 `curl http://<모델 서버 IP>:11434/v1/models`가 **실패**해야 방화벽이 제대로 걸린 것이다.
-- qwen3 같은 추론 모델은 답 전에 생각(thinking)을 하므로 짧은 질문에도 수 초~수십 초가 걸린다. Ollama는 생각 내용을 답과 분리해 보내므로 답에는 섞이지 않는다. 빠른 응답이 필요한 Agent는 시스템 프롬프트 끝에 `/no_think`를 넣으면 생각을 건너뛴다.
+- qwen3 같은 추론 모델은 답 전에 생각(thinking)을 하므로 짧은 질문에도 수 초~수십 초가 걸린다(실측: qwen3:14b, DGX Spark에서 호출당 약 10~17초). `LLM_REASONING_EFFORT=none`이면 생각을 건너뛰어 호출당 약 1초로 줄어든다. 시스템 프롬프트의 `/no_think`는 Ollama의 OpenAI 호환 API에서는 효과가 없다. 복잡한 판단이 필요한 Agent만 정의에서 `low`~`high`로 올린다.
 
 ## 내부망 / 사설 인증서
 

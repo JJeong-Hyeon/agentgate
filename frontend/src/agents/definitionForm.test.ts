@@ -13,6 +13,7 @@ describe("definition form", () => {
       tools: [{ server: "notes", tool: "save_note", permission: "APPROVAL" as const, labels: ["PII", "EXT"] }],
       delegates: [{ agentId: "research", permission: "AUTO" as const }],
       memory: { read: "AUTO" as const, write: "APPROVAL" as const, recall: 3 },
+      reasoningEffort: "none" as const,
     };
 
     const form = toForm(definition);
@@ -30,6 +31,7 @@ describe("definition form", () => {
         model: null,
         temperature: null,
         toolCalling: null,
+        reasoningEffort: null,
         maxSteps: 8,
         outputSchema: null,
         tools: [],

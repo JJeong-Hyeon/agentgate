@@ -1,5 +1,11 @@
 // Editing an agent definition: the form's text fields and their conversion to the API shape.
-import type { AgentDefinition, AgentToolDefinition, ToolCallingMode, ToolPermission } from "../api/types";
+import type {
+  AgentDefinition,
+  AgentToolDefinition,
+  ReasoningEffort,
+  ToolCallingMode,
+  ToolPermission,
+} from "../api/types";
 
 export interface ToolChoice {
   server: string;
@@ -15,6 +21,7 @@ export interface DefinitionForm {
   model: string;
   temperature: string;
   toolCalling: "" | ToolCallingMode;
+  reasoningEffort: "" | ReasoningEffort;
   maxSteps: string;
   // JSON text; empty → free-text answers
   outputSchema: string;
@@ -42,6 +49,7 @@ export function emptyForm(): DefinitionForm {
     model: "",
     temperature: "",
     toolCalling: "",
+    reasoningEffort: "",
     maxSteps: "8",
     outputSchema: "",
     tools: {},
@@ -67,6 +75,7 @@ export function toForm(definition: AgentDefinition | null | undefined): Definiti
     model: definition.model ?? "",
     temperature: definition.temperature == null ? "" : String(definition.temperature),
     toolCalling: definition.toolCalling ?? "",
+    reasoningEffort: definition.reasoningEffort ?? "",
     maxSteps: definition.maxSteps == null ? "8" : String(definition.maxSteps),
     outputSchema: definition.outputSchema ? JSON.stringify(definition.outputSchema, null, 2) : "",
     tools,
@@ -130,6 +139,7 @@ export function fromForm(form: DefinitionForm): { definition: AgentDefinition } 
       model: blankToNull(form.model),
       temperature,
       toolCalling: form.toolCalling || null,
+      reasoningEffort: form.reasoningEffort || null,
       maxSteps,
       outputSchema,
       tools,
@@ -143,6 +153,14 @@ export function fromForm(form: DefinitionForm): { definition: AgentDefinition } 
 export function defaultPermission(annotations: Record<string, unknown> | null | undefined): ToolPermission {
   return annotations?.readOnlyHint === true ? "AUTO" : "APPROVAL";
 }
+
+export const REASONING_EFFORT_LABELS: Record<ReasoningEffort, string> = {
+  none: "끄기 (빠름)",
+  minimal: "최소",
+  low: "낮음",
+  medium: "보통",
+  high: "높음 (느림)",
+};
 
 export const PERMISSION_LABELS: Record<ToolPermission, string> = {
   AUTO: "자동 (정책에 따름)",

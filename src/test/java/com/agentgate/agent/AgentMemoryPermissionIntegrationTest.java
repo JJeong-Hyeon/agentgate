@@ -113,4 +113,19 @@ class AgentMemoryPermissionIntegrationTest {
                 .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("recall needs read AUTO")));
         define("{\"read\":\"AUTO\",\"write\":\"AUTO\",\"recall\":11}").andExpect(status().isBadRequest());
     }
+
+    @Test
+    void storesTheReasoningEffortAndRejectsUnknownValues() throws Exception {
+        mockMvc.perform(put("/api/v1/agents/{id}/definition", id)
+                        .with(httpBasic("test-admin", "test-password"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"systemPrompt\":\"x\",\"tools\":[],\"reasoningEffort\":\"none\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.definition.reasoningEffort").value("none"));
+        mockMvc.perform(put("/api/v1/agents/{id}/definition", id)
+                        .with(httpBasic("test-admin", "test-password"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"systemPrompt\":\"x\",\"tools\":[],\"reasoningEffort\":\"turbo\"}"))
+                .andExpect(status().isBadRequest());
+    }
 }
