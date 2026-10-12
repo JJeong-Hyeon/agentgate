@@ -77,21 +77,31 @@ class AgentGateClient:
             raise AgentGateError(f"AgentGate returned {response.status_code}: {response.text}")
         return Decision.model_validate(response.json())
 
-    def save_memory(self, agent_id: str, content: str, execution_id: str | None = None) -> dict:
-        """Store a memory for `agent_id` (runtime token only); returns the stored memory."""
+    def save_memory(
+        self,
+        agent_id: str,
+        content: str,
+        execution_id: str | None = None,
+        replaces: int | None = None,
+    ) -> dict:
+        """Store a memory for `agent_id` (runtime token only), optionally replacing an outdated one.
+
+        Returns AgentGate's result: {"memory", "duplicate", "replaced", "similar"}."""
         body = {"agentId": agent_id, "content": content, "executionId": execution_id}
-        return self._memory_call("/api/v1/runtime/memories", body, 201)
+        if replaces is not None:
+            body["replaces"] = replaces
+        return self._memory_call("/api/v1/runtime/memories", body, (200, 201))
 
     def search_memories(self, agent_id: str, query: str, limit: int = 5) -> list[dict]:
         """`agent_id`'s memories most relevant to `query` (runtime token only)."""
         body = {"agentId": agent_id, "query": query, "limit": limit}
-        return self._memory_call("/api/v1/runtime/memories/search", body, 200)
+        return self._memory_call("/api/v1/runtime/memories/search", body, (200,))
 
-    def _memory_call(self, path: str, body: dict, expected: int):
+    def _memory_call(self, path: str, body: dict, expected: tuple[int, ...]):
         try:
             response = self._client.post(path, json=body)
         except httpx.HTTPError as e:
             raise AgentGateError(f"AgentGate unreachable: {e}") from e
-        if response.status_code != expected:
+        if response.status_code not in expected:
             raise AgentGateError(f"AgentGate returned {response.status_code}: {response.text}")
         return response.json()

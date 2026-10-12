@@ -137,7 +137,16 @@ describe("AgentEditorPage", () => {
     }
     if (url.startsWith("/api/v1/tools")) return Response.json(CATALOG);
     if (url.startsWith("/api/v1/agents/note-agent/memories")) {
-      if (init?.method === "POST") return Response.json({ ...MEMORY, id: 12, content: "new fact" }, { status: 201 });
+      if (init?.method === "POST") {
+        const body = JSON.parse(String(init.body));
+        if (body.content === "Kim likes lattes") {
+          return Response.json({ memory: MEMORY, duplicate: true, replaced: null, similar: [] });
+        }
+        return Response.json(
+          { memory: { ...MEMORY, id: 12, content: body.content }, duplicate: false, replaced: null, similar: [] },
+          { status: 201 },
+        );
+      }
       if (init?.method === "DELETE") return new Response(null, { status: 204 });
       return Response.json(url.includes("query=") ? [{ ...MEMORY, matchedBy: "SEMANTIC", score: 0.8 }] : [MEMORY]);
     }
@@ -248,7 +257,11 @@ describe("AgentEditorPage", () => {
     await waitFor(() => expect(sent(fetchImpl, "POST")).toHaveLength(1));
     expect(sent(fetchImpl, "POST")[0]).toEqual({ url: "/api/v1/agents/note-agent/memories", body: { content: "new fact" } });
 
-    fireEvent.click(screen.getByRole("button", { name: "삭제" }));
+    fireEvent.change(screen.getByLabelText("새 기억"), { target: { value: "Kim likes lattes" } });
+    fireEvent.click(screen.getByRole("button", { name: "추가" }));
+    expect(await screen.findByText(/이미 있는 기억입니다 \(#11\)/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole("button", { name: "삭제" })[0]);
     await waitFor(() =>
       expect(
         fetchImpl.mock.calls.some(

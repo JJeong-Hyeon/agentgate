@@ -13,6 +13,7 @@ import type {
   Execution,
   IssuedApiKey,
   McpServer,
+  MemorySaveResult,
   McpServerInput,
   McpServerTools,
   Me,
@@ -193,7 +194,7 @@ export class AgentGateClient {
     return this.request(`/api/v1/agents/${encodeURIComponent(agentId)}/memories${search}`);
   }
 
-  addAgentMemory(agentId: string, content: string): Promise<AgentMemory> {
+  addAgentMemory(agentId: string, content: string): Promise<MemorySaveResult> {
     return this.request(`/api/v1/agents/${encodeURIComponent(agentId)}/memories`, {
       method: "POST",
       body: JSON.stringify({ content }),

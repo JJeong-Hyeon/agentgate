@@ -7,6 +7,7 @@ from langchain_core.messages import SystemMessage, ToolMessage
 
 from app.governance.agentgate_client import AgentGateClient, AgentGateError
 from app.nodes.agent import agent_trace
+from app.tools.memory import save_message
 from tests.fake_llm import ScriptedChatModel, calls
 from tests.test_agent_node import CONFIG, PolicyGate, agent_workflow, build
 
@@ -25,12 +26,20 @@ class MemoryGate(PolicyGate):
         if path == "/api/v1/runtime/memories/search":
             body = json.loads(request.content)
             self.searches.append(body)
-            found = [{"id": i, "content": m} for i, m in enumerate(self.memories[: body["limit"]])]
+            found = [
+                {"id": i + 1, "content": m} for i, m in enumerate(self.memories[: body["limit"]])
+            ]
             return httpx.Response(200, json=found)
         if path == "/api/v1/runtime/memories":
             body = json.loads(request.content)
             self.saved.append(body)
-            return httpx.Response(201, json={"id": 7, "content": body["content"]})
+            result = {
+                "memory": {"id": 7, "content": body["content"]},
+                "duplicate": False,
+                "replaced": body.get("replaces"),
+                "similar": [],
+            }
+            return httpx.Response(201, json=result)
         return super().__call__(request)
 
 
@@ -52,7 +61,7 @@ def test_recall_gives_the_agent_relevant_memories_before_its_first_turn():
     system = llm.log[0]["messages"][0]
     assert isinstance(system, SystemMessage)
     assert system.content.startswith("You are careful.")
-    assert "- Kim likes iced lattes\n- Refunds within 7 days" in system.content
+    assert "- [#1] Kim likes iced lattes\n- [#2] Refunds within 7 days" in system.content
     [search] = gate.searches
     assert search == {"agentId": "note-agent", "query": "Task: add things", "limit": 2}
     [evaluation] = gate.bodies
@@ -87,7 +96,7 @@ def test_start_trace_shows_the_recalled_memories():
                 traces.append(agent_trace(step, update))
 
     assert traces[0]["kind"] == "start"
-    assert traces[0]["memories"] == ["Kim likes lattes"]
+    assert traces[0]["memories"] == ["[#1] Kim likes lattes"]
     assert traces[0]["memory_status"] == "EXECUTED"
 
 
@@ -129,7 +138,37 @@ def test_the_agent_searches_its_memory():
 
     graph.invoke(state, CONFIG)
 
-    assert json.loads(llm.log[1]["messages"][-1].content) == ["Kim likes lattes"]
+    assert json.loads(llm.log[1]["messages"][-1].content) == [
+        {"id": 1, "content": "Kim likes lattes"}
+    ]
+
+
+def test_an_updated_fact_replaces_the_old_memory():
+    llm = ScriptedChatModel.of(
+        calls(("memory_save", {"content": "Standup moved to 2pm", "replaces": 1})), "ok", "summary"
+    )
+    gate = MemoryGate(["Standup is at 10am"])
+    graph, state = build(agent_workflow(**memory(recall=1)), llm, gate)
+
+    graph.invoke(state, CONFIG)
+
+    assert gate.saved[0]["replaces"] == 1
+    assert llm.log[1]["messages"][-1].content == "Saved as memory #7, replacing #1."
+
+
+def test_save_messages_tell_the_agent_about_repeats_and_similar_memories():
+    duplicate = {"memory": {"id": 2}, "duplicate": True, "replaced": None, "similar": []}
+    assert save_message(duplicate) == "Already remembered as memory #2; nothing new was saved."
+
+    similar = {
+        "memory": {"id": 9},
+        "duplicate": False,
+        "replaced": None,
+        "similar": [{"id": 4, "content": "Standup is at 10am"}],
+    }
+    message = save_message(similar)
+    assert message.startswith("Saved as memory #9. Similar memories: [#4] Standup is at 10am.")
+    assert "replaces=<that id>" in message
 
 
 def test_saving_waits_for_approval_when_required():

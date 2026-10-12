@@ -102,8 +102,8 @@ class MemoryIntegrationTest {
         runtime("/api/v1/runtime/memories", """
                 {"agentId":"support-agent","content":"%s","executionId":"exec-1"}""".formatted(content))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.source").value("AGENT"))
-                .andExpect(jsonPath("$.executionId").value("exec-1"));
+                .andExpect(jsonPath("$.memory.source").value("AGENT"))
+                .andExpect(jsonPath("$.memory.executionId").value("exec-1"));
     }
 
     private ResultActions search(String query) throws Exception {
@@ -184,10 +184,10 @@ class MemoryIntegrationTest {
         String created = as("test-admin", "test-password", post("/api/v1/agents/support-agent/memories")
                 .contentType(MediaType.APPLICATION_JSON).content("{\"content\":\"VIP 고객은 라떼 쿠폰을 받는다\"}"))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.source").value("USER"))
-                .andExpect(jsonPath("$.createdBy").value("test-admin"))
+                .andExpect(jsonPath("$.memory.source").value("USER"))
+                .andExpect(jsonPath("$.memory.createdBy").value("test-admin"))
                 .andReturn().getResponse().getContentAsString();
-        long id = Long.parseLong(created.replaceAll(".*\"id\":(\\d+).*", "$1"));
+        long id = Long.parseLong(created.replaceAll(".*\"memory\":\\{\"id\":(\\d+).*", "$1"));
 
         as("test-admin", "test-password", get("/api/v1/agents/support-agent/memories"))
                 .andExpect(jsonPath("$.length()").value(2))
@@ -213,5 +213,74 @@ class MemoryIntegrationTest {
                 .andExpect(status().isForbidden());
         as("viewer", "correct-horse-1", delete("/api/v1/agents/support-agent/memories/1"))
                 .andExpect(status().isForbidden());
+    }
+
+    private ResultActions save(String body) throws Exception {
+        return runtime("/api/v1/runtime/memories", body);
+    }
+
+    private long idOf(ResultActions result) throws Exception {
+        return Long.parseLong(result.andReturn().getResponse().getContentAsString()
+                .replaceAll(".*\"memory\":\\{\"id\":(\\d+).*", "$1"));
+    }
+
+    @Test
+    void sameTextIsNotStoredTwice() throws Exception {
+        long first = idOf(save("{\"agentId\":\"support-agent\",\"content\":\"회의록은 노션 팀 위키에 올린다.\"}")
+                .andExpect(status().isCreated()));
+
+        save("{\"agentId\":\"support-agent\",\"content\":\"  회의록은 노션 팀위키에 올린다 \"}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.duplicate").value(true))
+                .andExpect(jsonPath("$.memory.id").value(first));
+
+        assertThat(jdbc.queryForObject("select count(*) from agent_memories", Long.class)).isEqualTo(1L);
+    }
+
+    @Test
+    void anUpdatedFactReplacesTheOldOne() throws Exception {
+        long old = idOf(save("{\"agentId\":\"support-agent\",\"content\":\"팀 커피 타임은 오전 10시다\"}"));
+
+        long updated = idOf(save("{\"agentId\":\"support-agent\",\"content\":\"팀 커피 타임은 오후 2시다\",\"replaces\":%d}"
+                .formatted(old))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.replaced").value(old))
+                .andExpect(jsonPath("$.similar").isEmpty()));
+
+        // The old memory stays for the record but is no longer searched, recalled or listed.
+        assertThat(jdbc.queryForObject("select superseded_by from agent_memories where id = ?", Long.class, old))
+                .isEqualTo(updated);
+        search("커피").andExpect(jsonPath("$.length()").value(1)).andExpect(jsonPath("$[0].id").value(updated));
+        as("test-admin", "test-password", get("/api/v1/agents/support-agent/memories"))
+                .andExpect(jsonPath("$.length()").value(1));
+        // Replacing it again is not possible: it is no longer active.
+        save("{\"agentId\":\"support-agent\",\"content\":\"x\",\"replaces\":%d}".formatted(old))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void savingReportsSimilarMemoriesSoTheAgentCanDecide() throws Exception {
+        long latte = idOf(save("{\"agentId\":\"support-agent\",\"content\":\"김대리는 아이스 라떼를 좋아한다\"}"));
+        save("{\"agentId\":\"support-agent\",\"content\":\"환불은 7일 이내\"}");
+
+        save("{\"agentId\":\"support-agent\",\"content\":\"김대리는 따뜻한 카페 라떼를 좋아한다\"}")
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.duplicate").value(false))
+                .andExpect(jsonPath("$.similar.length()").value(1))
+                .andExpect(jsonPath("$.similar[0].id").value(latte));
+    }
+
+    @Test
+    void replacingWithTextAlreadyRememberedKeepsTheExistingOne() throws Exception {
+        long kept = idOf(save("{\"agentId\":\"support-agent\",\"content\":\"회의록은 노션에 올린다\"}"));
+        long old = idOf(save("{\"agentId\":\"support-agent\",\"content\":\"회의록은 메일로 공유한다\"}"));
+
+        save("{\"agentId\":\"support-agent\",\"content\":\"회의록은 노션에 올린다\",\"replaces\":%d}".formatted(old))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.duplicate").value(true))
+                .andExpect(jsonPath("$.memory.id").value(kept))
+                .andExpect(jsonPath("$.replaced").value(old));
+        assertThat(jdbc.queryForObject("select superseded_by from agent_memories where id = ?", Long.class, old))
+                .isEqualTo(kept);
     }
 }

@@ -197,8 +197,10 @@ DELETE /api/v1/agents/{agentId}/memories/{id}             → 204 (ADMIN)
 - 응답: `id`, `agentId`, `content`(최대 4000자), `source`(`AGENT`: 실행 중 Agent가 저장 / `USER`: 콘솔에서 추가), `executionId`, `createdBy`, `createdAt`, 검색 시 `score`·`matchedBy`(`SEMANTIC` / `KEYWORD`)
 - 검색: 임베딩 모델(`AGENTGATE_EMBEDDING_BASE_URL` + `AGENTGATE_EMBEDDING_MODEL`, OpenAI 호환 `/embeddings`)과 PostgreSQL pgvector 확장이 있으면 의미 검색(코사인 유사도 `AGENTGATE_MEMORY_MIN_SCORE` 이상)을 하고, 부족한 만큼 키워드(부분 일치, "고객"이 "고객이"와 일치) 결과로 채운다. 둘 중 하나라도 없거나 임베딩 서버가 응답하지 않으면 키워드 검색만 한다
 - 임베딩 없이 저장된 기억(서버 장애, 모델 설정 전)과 다른 모델로 임베딩된 기억은 5분마다 현재 모델로 다시 임베딩된다
+- 저장 응답: `{"memory", "duplicate", "replaced", "similar"}`. 공백·문장부호·대소문자만 다른 **같은 문장**이 이미 있으면 새로 만들지 않고 기존 기억을 돌려준다(`duplicate: true`, 200). 새로 저장하면 201
+- `similar`: 의미가 비슷한 기존 기억(코사인 유사도 `AGENTGATE_MEMORY_SIMILAR_SCORE`, 기본 0.85 이상, 최대 3개). 유사도로는 반복과 변경을 구분할 수 없어(예: bge-m3에서 같은 내용 0.964, 회의 시간 변경 0.974) 자동으로 합치지 않고 판단을 맡긴다
 
-Runtime 전용 (`X-Runtime-Token`): `POST /api/v1/runtime/memories` `{"agentId","content","executionId"}` → 201, `POST /api/v1/runtime/memories/search` `{"agentId","query","limit"(1~20, 기본 5)}`.
+Runtime 전용 (`X-Runtime-Token`): `POST /api/v1/runtime/memories` `{"agentId","content","executionId","replaces"}` → 201 / 200(같은 문장). `replaces`(선택)는 이 기억이 대체하는 옛 기억 id로, 옛 기억은 삭제되지 않고 "대체됨"으로 남아 검색·회상·목록에서 빠진다(활성 기억이 아니면 404). `POST /api/v1/runtime/memories/search` `{"agentId","query","limit"(1~20, 기본 5)}`.
 
 ### 대시보드 (모든 역할)
 

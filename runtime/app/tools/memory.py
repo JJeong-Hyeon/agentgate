@@ -35,11 +35,20 @@ SEARCH_PARAMETERS = {
 SAVE_FUNCTION = "memory_save"
 SAVE_DESCRIPTION = (
     "Save a fact to your long-term memory so later runs can recall it. Save durable, reusable "
-    "facts (preferences, decisions, outcomes), one per call, written to stand on their own."
+    "facts (preferences, decisions, outcomes), one per call, written to stand on their own. "
+    "Memories you were given are shown as [#id]. If the fact is already among them, do not save "
+    "it again. If it updates or contradicts one, pass that id as `replaces` so the old one is "
+    "no longer recalled."
 )
 SAVE_PARAMETERS = {
     "type": "object",
-    "properties": {"content": {"type": "string", "description": "The fact to remember."}},
+    "properties": {
+        "content": {"type": "string", "description": "The fact to remember."},
+        "replaces": {
+            "type": "integer",
+            "description": "Id of an earlier memory this fact updates or corrects.",
+        },
+    },
     "required": ["content"],
 }
 
@@ -65,7 +74,7 @@ class MemorySearchTool(GovernedTool):
             found = self._gate.search_memories(self.agent_id, query, SEARCH_LIMIT)
         except AgentGateError as e:
             return ToolResult(**self._base(authorized), status="FAILED", error=str(e))
-        memories = [m["content"] for m in found]
+        memories = [{"id": m["id"], "content": m["content"]} for m in found]
         body = json.dumps(memories, ensure_ascii=False) if memories else "No memories found."
         return ToolResult(**self._base(authorized), status="EXECUTED", response_body=body)
 
@@ -81,15 +90,42 @@ class MemorySaveTool(GovernedTool):
             return ToolResult(
                 **self._base(authorized), status="FAILED", error="content is required"
             )
+        replaces = (payload or {}).get("replaces")
+        if replaces is not None and not isinstance(replaces, int):
+            try:
+                replaces = int(replaces)
+            except (TypeError, ValueError):
+                return ToolResult(
+                    **self._base(authorized), status="FAILED", error="replaces must be a memory id"
+                )
         try:
-            saved = self._gate.save_memory(self.agent_id, content, _execution_id())
+            result = self._gate.save_memory(self.agent_id, content, _execution_id(), replaces)
         except AgentGateError as e:
             return ToolResult(**self._base(authorized), status="FAILED", error=str(e))
         return ToolResult(
-            **self._base(authorized),
-            status="EXECUTED",
-            response_body=f"Saved as memory #{saved['id']}.",
+            **self._base(authorized), status="EXECUTED", response_body=save_message(result)
         )
+
+
+def save_message(result: dict) -> str:
+    """What the agent is told about a save, so it can fix a repeat or an outdated memory."""
+    memory_id = result["memory"]["id"]
+    replaced = result.get("replaced")
+    if result.get("duplicate"):
+        message = f"Already remembered as memory #{memory_id}; nothing new was saved."
+        if replaced is not None:
+            message += f" Memory #{replaced} is replaced by it."
+        return message
+    message = f"Saved as memory #{memory_id}"
+    message += f", replacing #{replaced}." if replaced is not None else "."
+    similar = result.get("similar") or []
+    if similar:
+        listed = "; ".join(f"[#{m['id']}] {m['content'][:MAX_RECALLED_CHARS]}" for m in similar)
+        message += (
+            f" Similar memories: {listed}. If #{memory_id} repeats or updates one of them, call "
+            f"memory_save again with the same content and replaces=<that id>."
+        )
+    return message
 
 
 def recall(
@@ -114,7 +150,7 @@ def recall(
         found = tool._gate.search_memories(tool.agent_id, task[:MAX_QUERY_CHARS], limit)
     except AgentGateError as e:
         return [], ToolResult(**tool._base(authorized), status="FAILED", error=str(e))
-    memories = [m["content"][:MAX_RECALLED_CHARS] for m in found]
+    memories = [f"[#{m['id']}] {m['content'][:MAX_RECALLED_CHARS]}" for m in found]
     body = json.dumps(memories, ensure_ascii=False)
     return memories, ToolResult(**tool._base(authorized), status="EXECUTED", response_body=body)
 

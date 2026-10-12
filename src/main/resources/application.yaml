@@ -51,6 +51,8 @@ agentgate:
       api-key: ${AGENTGATE_EMBEDDING_API_KEY:}
     # 의미 검색 결과로 인정할 최소 코사인 유사도. 모델마다 분포가 달라 조정이 필요할 수 있다.
     min-score: ${AGENTGATE_MEMORY_MIN_SCORE:0.3}
+    # 저장할 때 이 이상 비슷한 기존 기억을 Agent에게 알려 대체할지 판단하게 한다(자동 병합은 하지 않음).
+    similar-score: ${AGENTGATE_MEMORY_SIMILAR_SCORE:0.85}
     backfill-delay: PT5M
   runtime:
     # Python agent runtime (runtime/). 비워두면 승인 결정 후 실행 재개 호출을 하지 않는다.

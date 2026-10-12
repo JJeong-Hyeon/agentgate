@@ -84,11 +84,13 @@ export function MemoryBrowser({ agentId }: { agentId: string }) {
   const memories = useAsync(useCallback(() => client.listAgentMemories(agentId, searched), [client, agentId, searched]));
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function change(action: () => Promise<unknown>) {
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
       await action();
       memories.reload();
@@ -101,8 +103,11 @@ export function MemoryBrowser({ agentId }: { agentId: string }) {
 
   const add = () =>
     change(async () => {
-      await client.addAgentMemory(agentId, draft.trim());
+      const result = await client.addAgentMemory(agentId, draft.trim());
       setDraft("");
+      if (result.duplicate) setNotice(`이미 있는 기억입니다 (#${result.memory.id}). 새로 추가하지 않았습니다.`);
+      else if (result.similar.length > 0)
+        setNotice(`비슷한 기억이 있습니다: ${result.similar.map((m) => `#${m.id}`).join(", ")}. 필요 없으면 삭제하세요.`);
     });
   const forget = (memory: AgentMemory) => change(() => client.deleteAgentMemory(agentId, memory.id));
 
@@ -141,6 +146,7 @@ export function MemoryBrowser({ agentId }: { agentId: string }) {
         </div>
       )}
       {error && <p className="error">{error}</p>}
+      {notice && <p className="muted">{notice}</p>}
       {memories.error && <p className="error">{memories.error.message}</p>}
       {memories.data?.length === 0 && (
         <p className="muted">{searched ? "검색 결과가 없습니다." : "저장된 기억이 없습니다."}</p>
@@ -148,7 +154,9 @@ export function MemoryBrowser({ agentId }: { agentId: string }) {
       <ul className="memories">
         {memories.data?.map((memory) => (
           <li key={memory.id} className="memory">
-            <p>{memory.content}</p>
+            <p>
+              <span className="muted mono">#{memory.id}</span> {memory.content}
+            </p>
             <div className="row muted">
               <span>
                 {memory.source === "USER" ? `${memory.createdBy ?? "?"} 추가` : "Agent 저장"}
