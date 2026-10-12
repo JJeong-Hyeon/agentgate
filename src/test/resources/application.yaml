@@ -16,6 +16,10 @@ spring:
   cache:
     type: simple
 
+server:
+  # Same as the main application.yaml, which this file replaces in tests.
+  forward-headers-strategy: native
+
 agentgate:
   admin:
     username: test-admin

@@ -40,6 +40,12 @@ variable "admin_password" {
   sensitive   = true
 }
 
+variable "certificate_arn" {
+  description = "ACM certificate ARN for the console domain. Set to serve HTTPS on 443 and redirect HTTP to it; empty serves HTTP only"
+  type        = string
+  default     = ""
+}
+
 data "aws_vpc" "default" {
   default = true
 }
