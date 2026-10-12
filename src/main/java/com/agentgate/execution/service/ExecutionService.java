@@ -13,6 +13,7 @@ import com.agentgate.execution.dto.NodeExecutionResponse;
 import com.agentgate.execution.repository.ExecutionRepository;
 import com.agentgate.execution.repository.NodeExecutionRepository;
 import com.agentgate.observability.AgentGateMetrics;
+import com.agentgate.observability.AgentStep;
 import com.agentgate.runtime.RuntimeClient;
 import com.agentgate.workflow.dto.WorkflowVersionResponse;
 import com.agentgate.workflow.service.WorkflowService;
@@ -108,7 +109,9 @@ public class ExecutionService {
             }
             case NODE_COMPLETED -> {
                 node.completed(event.output(), at);
-                metrics.agentStep(event.output());
+                AgentStep step = AgentStep.parse(event.output(), objectMapper);
+                node.recordCost(step);
+                metrics.agentStep(step);
             }
             case NODE_WAITING -> node.waiting(event.approvalId());
             case NODE_FAILED -> node.failed(event.error(), at);

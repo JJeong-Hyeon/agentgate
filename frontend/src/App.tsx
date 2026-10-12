@@ -10,6 +10,7 @@ import { BuilderPage } from "./builder/BuilderPage";
 import { ExecutionPage } from "./execution/ExecutionPage";
 import { AccountPage } from "./pages/AccountPage";
 import { ApprovalsPage } from "./pages/ApprovalsPage";
+import { DashboardPage } from "./pages/DashboardPage";
 import { ExecutionsPage } from "./pages/ExecutionsPage";
 import { LoginPage } from "./pages/LoginPage";
 import { WorkflowsPage } from "./pages/WorkflowsPage";
@@ -18,7 +19,7 @@ import { WorkflowsPage } from "./pages/WorkflowsPage";
 function RequireRole({ roles, children }: { roles: Role[]; children: ReactElement }) {
   const { me, meLoading, hasRole } = useAuth();
   if (meLoading || !me) return null;
-  if (!hasRole(...roles)) return <Navigate to="/workflows" replace />;
+  if (!hasRole(...roles)) return <Navigate to="/" replace />;
   return children;
 }
 
@@ -29,6 +30,9 @@ function Layout() {
       <header className="topbar">
         <span className="brand">AgentGate</span>
         <nav>
+          <NavLink to="/" end>
+            대시보드
+          </NavLink>
           <NavLink to="/workflows">Workflows</NavLink>
           <NavLink to="/executions">Executions</NavLink>
           <NavLink to="/approvals">Approvals</NavLink>
@@ -58,6 +62,7 @@ export function App() {
     <BrowserRouter>
       <Routes>
         <Route element={<Layout />}>
+          <Route path="/" element={<DashboardPage />} />
           <Route path="/workflows" element={<WorkflowsPage />} />
           <Route path="/workflows/new" element={<BuilderPage />} />
           <Route path="/workflows/:workflowId/edit" element={<BuilderPage />} />
@@ -76,7 +81,7 @@ export function App() {
             }
           />
           <Route path="/account" element={<AccountPage />} />
-          <Route path="*" element={<Navigate to="/workflows" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
     </BrowserRouter>

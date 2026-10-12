@@ -1,5 +1,6 @@
 package com.agentgate.execution.domain;
 
+import com.agentgate.observability.AgentStep;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -60,6 +61,23 @@ public class NodeExecution {
 
     private Instant finishedAt;
 
+    // What the step cost, when it was an agent's model turn or tool run (see AgentStep).
+    @Column(length = 200)
+    private String llmModel;
+
+    private Long llmLatencyMs;
+
+    private Long inputTokens;
+
+    private Long outputTokens;
+
+    private String toolName;
+
+    @Column(length = 32)
+    private String toolStatus;
+
+    private Long toolDurationMs;
+
     public NodeExecution(Execution execution, String taskId, String nodeId, String step) {
         this.execution = execution;
         this.taskId = taskId;
@@ -77,6 +95,16 @@ public class NodeExecution {
         this.status = NodeStatus.COMPLETED;
         this.output = Execution.truncate(output);
         this.finishedAt = at;
+    }
+
+    public void recordCost(AgentStep step) {
+        this.llmModel = step.llmModel();
+        this.llmLatencyMs = step.llmLatencyMs();
+        this.inputTokens = step.inputTokens();
+        this.outputTokens = step.outputTokens();
+        this.toolName = step.toolName();
+        this.toolStatus = step.toolStatus();
+        this.toolDurationMs = step.toolDurationMs();
     }
 
     public void waiting(Long approvalId) {

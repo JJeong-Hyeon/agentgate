@@ -19,6 +19,7 @@ public class SecurityConfig {
 
     // Console APIs behind sign-in; specific rules above take precedence.
     private static final String[] CONSOLE_RESOURCES = {
+            "/api/v1/dashboard",
             "/api/v1/agents", "/api/v1/agents/**",
             "/api/v1/policies", "/api/v1/policies/**",
             "/api/v1/approvals", "/api/v1/approvals/**",

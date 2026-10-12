@@ -33,9 +33,13 @@ class AgentGateMetricsTest {
     private final ApprovalRequestRepository approvals = mock(ApprovalRequestRepository.class);
     private AgentGateMetrics metrics;
 
+    private static AgentStep step(String output) {
+        return AgentStep.parse(output, JsonMapper.builder().build());
+    }
+
     @BeforeEach
     void setUp() {
-        metrics = new AgentGateMetrics(registry, JsonMapper.builder().build(), approvals);
+        metrics = new AgentGateMetrics(registry, approvals);
     }
 
     @Test
@@ -73,12 +77,12 @@ class AgentGateMetricsTest {
 
     @Test
     void recordsModelCallsTokensAndToolRunsFromAgentSteps() {
-        metrics.agentStep("""
+        metrics.agentStep(step("""
                 {"agent":{"kind":"tool_calls","agent":"note-agent","llm":{"model":"qwen3-32b","latency_ms":1500},
-                 "tokens":{"input":120,"output":15},"calls":[]}}""");
-        metrics.agentStep("""
+                 "tokens":{"input":120,"output":15},"calls":[]}}"""));
+        metrics.agentStep(step("""
                 {"agent":{"kind":"result","agent":"note-agent","tool":"helper:notes/save_note","status":"EXECUTED",
-                 "duration_ms":250}}""");
+                 "duration_ms":250}}"""));
 
         Timer llm = registry.get("agentgate.llm.latency").tags("model", "qwen3-32b", "agent", "note-agent").timer();
         assertThat(llm.totalTime(TimeUnit.MILLISECONDS)).isEqualTo(1500);
@@ -90,32 +94,27 @@ class AgentGateMetricsTest {
 
     @Test
     void ignoresOutputsThatAreNotAgentSteps() {
-        metrics.agentStep("{\"plan\":\"1. step\"}");
-        metrics.agentStep("{\"agent\":{\"kind\":\"start\",\"prompt\":\"cut off");
-        metrics.agentStep(null);
+        metrics.agentStep(step("{\"plan\":\"1. step\"}"));
+        metrics.agentStep(step("{\"agent\":{\"kind\":\"start\",\"prompt\":\"cut off"));
+        metrics.agentStep(step(null));
 
         assertThat(registry.find("agentgate.llm.latency").timers()).isEmpty();
         assertThat(registry.find("agentgate.tool.duration").timers()).isEmpty();
     }
 
-    @Test
-    void toolNamesDropTheNodePrefix() {
-        assertThat(AgentGateMetrics.toolName("lead:agent/research")).isEqualTo("agent/research");
-        assertThat(AgentGateMetrics.toolName("")).isEqualTo("unknown");
-    }
 
     @Test
     void prometheusNamesMatchTheGrafanaDashboard() throws Exception {
         PrometheusMeterRegistry prometheus = new PrometheusMeterRegistry(PrometheusConfig.DEFAULT);
-        AgentGateMetrics exported = new AgentGateMetrics(prometheus, JsonMapper.builder().build(), approvals);
+        AgentGateMetrics exported = new AgentGateMetrics(prometheus, approvals);
         exported.decision(ActionStatus.ALLOWED, DecisionBasis.POLICY, RiskLevel.LOW);
         ApprovalRequest approval = new ApprovalRequest("a", "SEND", null, List.of(), RiskLevel.HIGH);
         approval.approve("kim");
         ReflectionTestUtils.setField(approval, "createdAt", approval.getDecidedAt());
         exported.approvalDecided(approval);
-        exported.agentStep("""
-                {"agent":{"kind":"answer","agent":"a","llm":{"model":"m","latency_ms":5},"tokens":{"input":1,"output":1}}}""");
-        exported.agentStep("{\"agent\":{\"kind\":\"result\",\"tool\":\"n:s/t\",\"status\":\"EXECUTED\",\"duration_ms\":1}}");
+        exported.agentStep(step("""
+                {"agent":{"kind":"answer","agent":"a","llm":{"model":"m","latency_ms":5},"tokens":{"input":1,"output":1}}}"""));
+        exported.agentStep(step("{\"agent\":{\"kind\":\"result\",\"tool\":\"n:s/t\",\"status\":\"EXECUTED\",\"duration_ms\":1}}"));
         String scrape = prometheus.scrape();
 
         String dashboard = Files.readString(Path.of("infra/grafana/agentgate-dashboard.json"));
