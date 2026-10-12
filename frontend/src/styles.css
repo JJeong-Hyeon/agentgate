@@ -739,3 +739,25 @@ fieldset.mode {
   font-size: 12px;
   margin-top: 4px;
 }
+
+.insights {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+.insights dd {
+  margin: 2px 0 0;
+  font-weight: 600;
+}
+.governance-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.governance-table th,
+.governance-table td {
+  text-align: left;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}

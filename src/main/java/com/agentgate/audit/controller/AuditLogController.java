@@ -23,9 +23,11 @@ public class AuditLogController {
 
     @GetMapping
     public ResponseEntity<List<AuditLogResponse>> list(@RequestParam(required = false) String agentId,
+                                                         @RequestParam(required = false) String executionId,
                                                          @RequestParam(required = false) ActionStatus status,
-                                                         @RequestParam(required = false) RiskLevel riskLevel) {
-        return ResponseEntity.ok(auditLogService.list(agentId, status, riskLevel));
+                                                         @RequestParam(required = false) RiskLevel riskLevel,
+                                                         @RequestParam(required = false) Integer limit) {
+        return ResponseEntity.ok(auditLogService.list(agentId, executionId, status, riskLevel, limit));
     }
 
     @GetMapping("/{id}")

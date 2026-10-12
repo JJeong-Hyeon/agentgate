@@ -284,4 +284,95 @@ describe("ExecutionPage", () => {
     expect(screen.getByText("research v2")).toBeInTheDocument();
     expect(screen.getByText("saved")).toBeInTheDocument();
   });
+
+  it("sums up where the time went and lists AgentGate's decisions", async () => {
+    const finished: Execution = {
+      ...running,
+      status: "COMPLETED",
+      finishedAt: "2026-01-01T00:01:05Z",
+      nodes: [
+        {
+          taskId: "b1",
+          nodeId: "plan",
+          step: "plan.think",
+          status: "COMPLETED",
+          output: JSON.stringify({
+            agent: {
+              kind: "tool_calls",
+              step: 1,
+              llm: { model: "qwen3-32b", latency_ms: 1500 },
+              calls: [{ tool: "notes__save_note", arguments: {} }],
+            },
+          }),
+        },
+        {
+          taskId: "b2",
+          nodeId: "plan",
+          step: "plan.execute",
+          status: "COMPLETED",
+          output: JSON.stringify({
+            agent: { kind: "result", tool: "plan:notes/save_note", status: "EXECUTED", duration_ms: 250, content: "ok" },
+          }),
+        },
+        {
+          taskId: "b3",
+          nodeId: "plan",
+          step: "plan.think",
+          status: "COMPLETED",
+          output: JSON.stringify({ agent: { kind: "answer", step: 2, llm: { model: "qwen3-32b", latency_ms: 700 }, answer: "Done." } }),
+        },
+      ],
+    };
+    const audit = {
+      agentId: "note-agent",
+      target: null,
+      labels: [],
+      delegatedBy: null,
+      executionId: "e1",
+      basis: "POLICY",
+    };
+    sessionStorage.setItem("agentgate.credentials", JSON.stringify({ username: "admin", password: "pw" }));
+    const fetchImpl = vi.fn(
+      withMe(async (url) => {
+        if (url.endsWith("/stream")) return streamResponse([sse("snapshot", finished)]);
+        if (url.includes("/versions/2")) return Response.json({ version: 2, dsl: DSL });
+        if (url === "/api/v1/audit-logs?executionId=e1&limit=1000") {
+          return Response.json([
+            { ...audit, id: 2, action: "MCP:notes:wipe", riskLevel: "BLOCKED", status: "BLOCKED", approvalId: null, createdAt: "2026-01-01T00:00:30Z" },
+            { ...audit, id: 1, action: "MCP:notes:save_note", riskLevel: "HIGH", status: "APPROVAL_REQUIRED", approvalId: 9, createdAt: "2026-01-01T00:00:10Z" },
+          ]);
+        }
+        if (url === "/api/v1/approvals?executionId=e1") {
+          return Response.json([
+            { id: 9, status: "APPROVED", decidedBy: "kim", createdAt: "2026-01-01T00:00:10Z", decidedAt: "2026-01-01T00:00:40Z" },
+          ]);
+        }
+        return new Response("{}", { status: 404 });
+      }),
+    );
+    render(
+      <AuthProvider fetchImpl={fetchImpl as unknown as typeof fetch}>
+        <MemoryRouter initialEntries={["/executions/e1"]}>
+          <Routes>
+            <Route path="/executions/:executionId" element={<ExecutionPage />} />
+          </Routes>
+        </MemoryRouter>
+      </AuthProvider>,
+    );
+
+    const insights = await screen.findByLabelText("실행 분석");
+    await waitFor(() => expect(insights).toHaveTextContent("#9 승인됨 (kim, 30.0s)"));
+    expect(insights).toHaveTextContent("총 소요1m 5s");
+    expect(insights).toHaveTextContent("LLM 호출2회 · 2.2s");
+    expect(insights).toHaveTextContent("Tool 실행1회 · 250ms");
+    expect(insights).toHaveTextContent("0 / 1 / 1");
+    expect(insights).toHaveTextContent("승인 대기1건 · 30.0s");
+    // Oldest decision first.
+    const actions = [...insights.querySelectorAll("td.mono")].map((td) => td.textContent);
+    expect(actions).toEqual(["MCP:notes:save_note", "MCP:notes:wipe"]);
+    expect(screen.getAllByText(/qwen3-32b 1.5s/)).toHaveLength(1);
+    // The tool step shows how long the tool ran.
+    expect(document.querySelector(".timeline")).toHaveTextContent("실행됨 · 250ms");
+  });
 });
+

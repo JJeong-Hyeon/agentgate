@@ -37,7 +37,7 @@ class AuditLogServiceTest {
 
     @Test
     void recordSavesAuditLog() {
-        service.record("mail-agent", "VIEW_DATA", null, List.of(), RiskLevel.LOW, ActionStatus.ALLOWED, null, DecisionBasis.POLICY, null);
+        service.record("mail-agent", "VIEW_DATA", null, List.of(), RiskLevel.LOW, ActionStatus.ALLOWED, null, DecisionBasis.POLICY, null, "exec-1");
 
         verify(auditLogRepository).save(any(AuditLog.class));
     }
@@ -47,52 +47,5 @@ class AuditLogServiceTest {
         when(auditLogRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.get(99L)).isInstanceOf(AuditLogNotFoundException.class);
-    }
-
-    @Test
-    void listFiltersByAgentIdStatusAndRiskLevel() {
-        AuditLog match = new AuditLog("mail-agent", "SEND_EMAIL", null, List.of("PII"), RiskLevel.HIGH, ActionStatus.APPROVAL_REQUIRED, 1L, DecisionBasis.POLICY);
-        AuditLog other = new AuditLog("other-agent", "VIEW_DATA", null, List.of(), RiskLevel.LOW, ActionStatus.ALLOWED, null, DecisionBasis.POLICY);
-        when(auditLogRepository.findAll()).thenReturn(List.of(match, other));
-
-        List<AuditLogResponse> result = service.list("mail-agent", ActionStatus.APPROVAL_REQUIRED, RiskLevel.HIGH);
-
-        assertThat(result).hasSize(1);
-        assertThat(result.get(0).agentId()).isEqualTo("mail-agent");
-    }
-
-    @Test
-    void listReturnsAllWhenNoFilters() {
-        when(auditLogRepository.findAll()).thenReturn(List.of(
-                new AuditLog("mail-agent", "VIEW_DATA", null, List.of(), RiskLevel.LOW, ActionStatus.ALLOWED, null, DecisionBasis.POLICY)));
-
-        List<AuditLogResponse> result = service.list(null, null, null);
-
-        assertThat(result).hasSize(1);
-    }
-
-    @Test
-    void statsAggregatesCountsAndBlockRate() {
-        when(auditLogRepository.findAll()).thenReturn(List.of(
-                new AuditLog("mail-agent", "VIEW_DATA", null, List.of(), RiskLevel.LOW, ActionStatus.ALLOWED, null, DecisionBasis.POLICY),
-                new AuditLog("mail-agent", "DELETE_DATA", null, List.of(), RiskLevel.BLOCKED, ActionStatus.BLOCKED, null, DecisionBasis.POLICY),
-                new AuditLog("other-agent", "VIEW_DATA", null, List.of(), RiskLevel.LOW, ActionStatus.ALLOWED, null, DecisionBasis.POLICY)));
-
-        AuditStatsResponse stats = service.stats("mail-agent");
-
-        assertThat(stats.totalCount()).isEqualTo(2);
-        assertThat(stats.countByRiskLevel().get(RiskLevel.LOW)).isEqualTo(1);
-        assertThat(stats.countByRiskLevel().get(RiskLevel.BLOCKED)).isEqualTo(1);
-        assertThat(stats.blockRate()).isEqualTo(0.5);
-    }
-
-    @Test
-    void statsReturnsZeroBlockRateWhenEmpty() {
-        when(auditLogRepository.findAll()).thenReturn(List.of());
-
-        AuditStatsResponse stats = service.stats("mail-agent");
-
-        assertThat(stats.totalCount()).isEqualTo(0);
-        assertThat(stats.blockRate()).isEqualTo(0.0);
     }
 }

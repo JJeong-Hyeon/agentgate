@@ -36,13 +36,14 @@ class AuditLogControllerTest {
 
     @Test
     void listReturnsAuditLogs() throws Exception {
-        when(auditLogService.list(isNull(), isNull(), isNull())).thenReturn(List.of(
+        when(auditLogService.list(isNull(), eq("exec-1"), isNull(), isNull(), eq(50))).thenReturn(List.of(
                 new AuditLogResponse(1L, "mail-agent", "VIEW_DATA", null, List.of(),
-                        RiskLevel.LOW, ActionStatus.ALLOWED, null, DecisionBasis.POLICY, null, Instant.now())));
+                        RiskLevel.LOW, ActionStatus.ALLOWED, null, DecisionBasis.POLICY, null, "exec-1", Instant.now())));
 
-        mockMvc.perform(get("/api/v1/audit-logs"))
+        mockMvc.perform(get("/api/v1/audit-logs").param("executionId", "exec-1").param("limit", "50"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].agentId").value("mail-agent"));
+                .andExpect(jsonPath("$[0].agentId").value("mail-agent"))
+                .andExpect(jsonPath("$[0].executionId").value("exec-1"));
     }
 
     @Test
@@ -58,7 +59,7 @@ class AuditLogControllerTest {
     void getReturnsAuditLog() throws Exception {
         when(auditLogService.get(eq(1L))).thenReturn(
                 new AuditLogResponse(1L, "mail-agent", "SEND_EMAIL", null, List.of("PII"),
-                        RiskLevel.HIGH, ActionStatus.APPROVAL_REQUIRED, 5L, DecisionBasis.POLICY, null, Instant.now()));
+                        RiskLevel.HIGH, ActionStatus.APPROVAL_REQUIRED, 5L, DecisionBasis.POLICY, null, null, Instant.now()));
 
         mockMvc.perform(get("/api/v1/audit-logs/1"))
                 .andExpect(status().isOk())

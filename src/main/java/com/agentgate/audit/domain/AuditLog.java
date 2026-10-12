@@ -20,6 +20,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.AccessLevel;
+import org.hibernate.annotations.BatchSize;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -40,6 +41,7 @@ public class AuditLog {
     private String target;
 
     @ElementCollection(fetch = FetchType.EAGER)
+    @BatchSize(size = 100)
     @CollectionTable(name = "audit_log_labels", joinColumns = @JoinColumn(name = "audit_log_id"))
     private List<String> labels = new ArrayList<>();
 
@@ -58,6 +60,10 @@ public class AuditLog {
     @Column(length = 500)
     private String delegatedBy;
 
+    // Runtime execution the decision was made in; null for agents calling on their own.
+    @Column(length = 64)
+    private String executionId;
+
     private Instant createdAt;
 
     public AuditLog(String agentId, String action, String target, List<String> labels,
@@ -67,6 +73,13 @@ public class AuditLog {
 
     public AuditLog(String agentId, String action, String target, List<String> labels,
                     RiskLevel riskLevel, ActionStatus status, Long approvalId, DecisionBasis basis, String delegatedBy) {
+        this(agentId, action, target, labels, riskLevel, status, approvalId, basis, delegatedBy, null);
+    }
+
+    public AuditLog(String agentId, String action, String target, List<String> labels,
+                    RiskLevel riskLevel, ActionStatus status, Long approvalId, DecisionBasis basis, String delegatedBy,
+                    String executionId) {
+        this.executionId = executionId;
         this.delegatedBy = delegatedBy;
         this.agentId = agentId;
         this.action = action;

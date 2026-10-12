@@ -76,7 +76,7 @@ def add_tool(
 
     def execute(state: dict) -> dict:
         authorized = ToolResult(**state["pending_tool"])
-        return finish(tool.execute(build_payload(state), authorized))
+        return finish(tool.execute_timed(build_payload(state), authorized))
 
     graph.add_node(name, gate, destinations=(execute_node, approval_node, *next_nodes, END))
     graph.add_node(approval_node, await_approval, destinations=(execute_node, *next_nodes, END))

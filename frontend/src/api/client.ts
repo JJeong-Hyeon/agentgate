@@ -6,6 +6,7 @@ import type {
   AgentMemory,
   ApiErrorBody,
   Approval,
+  AuditLog,
   CreatedAgent,
   Execution,
   IssuedApiKey,
@@ -123,8 +124,17 @@ export class AgentGateClient {
     return this.request(`/api/v1/executions${query}`);
   }
 
-  listApprovals(status?: Approval["status"]): Promise<Approval[]> {
-    return this.request(`/api/v1/approvals${status ? `?status=${status}` : ""}`);
+  listApprovals(status?: Approval["status"], executionId?: string): Promise<Approval[]> {
+    const params = new URLSearchParams();
+    if (status) params.set("status", status);
+    if (executionId) params.set("executionId", executionId);
+    const query = params.toString();
+    return this.request(`/api/v1/approvals${query ? `?${query}` : ""}`);
+  }
+
+  /** Governance decisions made during an execution, newest first. */
+  listExecutionAuditLogs(executionId: string): Promise<AuditLog[]> {
+    return this.request(`/api/v1/audit-logs?executionId=${encodeURIComponent(executionId)}&limit=1000`);
   }
 
   /** `decidedBy` is always the signed-in user; the server ignores any body value. */
