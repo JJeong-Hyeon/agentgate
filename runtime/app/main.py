@@ -11,6 +11,7 @@ from app.governance.agentgate_client import AgentGateClient
 from app.graph.checkpointer import open_checkpointer
 from app.llm import LlmHealth, check_llm_health, create_chat_model
 from app.runner import WorkflowRunner
+from app.telemetry import setup_tracing
 from app.tools.catalog import ToolCatalog
 from app.tools.mcp import load_mcp_servers
 from app.tools.registry import AgentGateServers, McpServerRegistry
@@ -28,6 +29,7 @@ def build_gate(settings: Settings) -> AgentGateClient:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
+    setup_tracing(settings.otel_capture_content)
     registered = (
         AgentGateServers(settings.agentgate_base_url, settings.runtime_token)
         if settings.runtime_token

@@ -63,6 +63,9 @@ services:
       LLM_MODEL: ${LLM_MODEL:?set LLM_MODEL in .env}
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_TOOL_CALLING: ${LLM_TOOL_CALLING:-native}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      OTEL_EXPORTER_OTLP_HEADERS: ${OTEL_EXPORTER_OTLP_HEADERS:-}
+      OTEL_CAPTURE_CONTENT: ${OTEL_CAPTURE_CONTENT:-false}
     extra_hosts:
       - 'host.docker.internal:host-gateway'
     depends_on:

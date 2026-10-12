@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     runtime_token: str = ""
     # JSON file with MCP servers ({"mcpServers": {...}}); empty → no MCP tools available.
     mcp_config_path: str = ""
+    # Export prompts and answers on trace spans (OpenTelemetry, when an OTLP endpoint is set).
+    otel_capture_content: bool = False
 
 
 @lru_cache
