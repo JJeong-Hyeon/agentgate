@@ -2,9 +2,11 @@ package com.agentgate.agent.service;
 
 import com.agentgate.agent.domain.Agent;
 import com.agentgate.agent.domain.AgentDefinitionVersion;
+import com.agentgate.agent.domain.ToolPermission;
 import com.agentgate.agent.dto.AgentDefinition;
 import com.agentgate.agent.dto.AgentDefinitionResponse;
 import com.agentgate.agent.dto.AgentDelegateDefinition;
+import com.agentgate.agent.dto.AgentMemoryDefinition;
 import com.agentgate.agent.dto.AgentToolDefinition;
 import com.agentgate.agent.repository.AgentDefinitionVersionRepository;
 import com.agentgate.agent.repository.AgentRepository;
@@ -136,6 +138,11 @@ public class AgentDefinitionService {
         }
         if (definition.outputSchema() != null && !definition.outputSchema().isObject()) {
             throw new InvalidAgentDefinitionException("outputSchema: must be a JSON Schema object");
+        }
+        AgentMemoryDefinition memory = definition.memory();
+        if (memory != null && memory.recall() != null && memory.recall() > 0 && memory.read() != ToolPermission.AUTO) {
+            // Recall runs before the model's first turn; there is no tool call to pause for an approval.
+            throw new InvalidAgentDefinitionException("memory: recall needs read AUTO");
         }
     }
 

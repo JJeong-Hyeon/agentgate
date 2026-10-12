@@ -100,15 +100,21 @@ public class AgentActionService {
         return new Decision(policy.riskLevel(), policy.status(), DecisionBasis.POLICY);
     }
 
-    /** What the definition allows for the action: one of its tools, or a delegation to another agent. */
+    /** What the definition allows for the action: one of its tools, a delegation to another agent, or memory. */
     private Optional<Grant> findGrant(Agent agent, int version, String action) {
         AgentDefinition definition = agentDefinitionService.definition(agent, version);
         Optional<Grant> tool = definition.tools().stream()
                 .filter(t -> t.action().equals(action))
                 .findFirst()
                 .map(t -> new Grant(t.permission(), t.labels() == null ? List.of() : t.labels()));
-        if (tool.isPresent() || definition.delegates() == null) {
+        if (tool.isPresent()) {
             return tool;
+        }
+        if (definition.memory() != null && definition.memory().permissionFor(action) != null) {
+            return Optional.of(new Grant(definition.memory().permissionFor(action), List.of()));
+        }
+        if (definition.delegates() == null) {
+            return Optional.empty();
         }
         return definition.delegates().stream()
                 .filter(d -> d.action().equals(action))
