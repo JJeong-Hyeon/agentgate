@@ -1,0 +1,17 @@
+.git
+.gradle
+.idea
+*.iml
+build
+docs
+e2e
+infra
+deploy
+scripts
+runtime
+!runtime/examples
+frontend/node_modules
+frontend/dist
+frontend/tsconfig.tsbuildinfo
+CLAUDE.md
+**/.env
