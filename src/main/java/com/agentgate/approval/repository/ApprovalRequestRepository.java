@@ -16,5 +16,7 @@ public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequest
 
     List<ApprovalRequest> findByStatusAndCreatedAtBefore(ApprovalStatus status, Instant cutoff);
 
+    List<ApprovalRequest> findByStatusAndApproverNotifiedAtIsNullAndCreatedAtBefore(ApprovalStatus status, Instant cutoff);
+
     List<ApprovalRequest> findByExecutionIdIsNotNullAndStatusNotAndRuntimeNotifiedAtIsNull(ApprovalStatus status);
 }

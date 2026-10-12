@@ -68,6 +68,10 @@ AGENTGATE_RUNTIME_BASE_URL=http://<runtime_private_ip>:8000
 AGENTGATE_RUNTIME_TOKEN=<임의의 긴 문자열, Runtime의 RUNTIME_TOKEN과 동일>
 AGENTGATE_SECRET_KEY=<openssl rand -base64 32 결과. DB에 저장하는 인증정보(MCP 서버 헤더 등) 암호화 키, 바꾸면 기존 값을 읽을 수 없음>
 AGENTGATE_APPROVAL_TTL=PT24H  # 선택. 이 시간 동안 결정되지 않은 승인 요청은 EXPIRED 처리(ISO-8601 기간)
+AGENTGATE_PUBLIC_URL=http://<alb_dns_name>  # 선택. 알림에 넣을 콘솔 링크의 기준 주소
+AGENTGATE_NOTIFY_WEBHOOK_URL=<Slack/Mattermost/Dooray Incoming Webhook URL>  # 선택. 비우면 승인 알림 없음
+AGENTGATE_NOTIFY_WEBHOOK_FORMAT=SLACK  # 선택. SLACK({"text"}) 또는 JSON(승인 요청 전체)
+AGENTGATE_NOTIFY_WEBHOOK_SECRET=<임의의 문자열>  # 선택. JSON 포맷의 X-AgentGate-Signature(HMAC-SHA256) 서명 키
 EOF
 ```
 

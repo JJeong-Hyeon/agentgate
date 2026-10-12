@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 import com.agentgate.approval.domain.ApprovalRequest;
 import com.agentgate.approval.domain.ApprovalStatus;
 import com.agentgate.approval.dto.ApprovalResponse;
+import com.agentgate.approval.notification.ApprovalRequestedEvent;
 import com.agentgate.approval.repository.ApprovalRequestRepository;
 import com.agentgate.approval.runtime.ApprovalDecidedEvent;
 import com.agentgate.common.exception.ApprovalNotFoundException;
@@ -50,6 +51,7 @@ class ApprovalServiceTest {
         assertThat(result.getAgentId()).isEqualTo("mail-agent");
         assertThat(result.getStatus()).isEqualTo(ApprovalStatus.PENDING);
         assertThat(result.getExecutionId()).isEqualTo("exec-1");
+        verify(eventPublisher).publishEvent(new ApprovalRequestedEvent(result.getId()));
     }
 
     @Test

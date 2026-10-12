@@ -26,6 +26,17 @@ agentgate:
     # PENDING 상태로 이 시간이 지난 승인 요청은 EXPIRED 처리되고, 대기 중인 실행은 거절과 동일하게 진행된다.
     ttl: ${AGENTGATE_APPROVAL_TTL:PT24H}
     expiry-check-delay: PT1M
+  # 콘솔의 외부 접속 주소(예: https://agentgate.example.com). 알림에 승인 화면 링크를 넣을 때 쓴다.
+  public-url: ${AGENTGATE_PUBLIC_URL:}
+  notifications:
+    webhook:
+      # 승인 요청이 생기면 이 주소로 알림을 보낸다. 비워두면 알림을 보내지 않는다.
+      url: ${AGENTGATE_NOTIFY_WEBHOOK_URL:}
+      # SLACK: {"text": ...} (Slack/Mattermost/Dooray) / JSON: 승인 요청 전체
+      format: ${AGENTGATE_NOTIFY_WEBHOOK_FORMAT:SLACK}
+      # JSON 포맷에서 설정하면 본문의 HMAC-SHA256을 X-AgentGate-Signature: sha256=<hex>로 보낸다.
+      secret: ${AGENTGATE_NOTIFY_WEBHOOK_SECRET:}
+    retry-delay: PT30S
   runtime:
     # Python agent runtime (runtime/). 비워두면 승인 결정 후 실행 재개 호출을 하지 않는다.
     base-url: ${AGENTGATE_RUNTIME_BASE_URL:}
