@@ -77,6 +77,12 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.NOT_FOUND, "APPROVAL_NOT_FOUND", ex.getMessage(), request);
     }
 
+    @ExceptionHandler(InvalidDashboardPeriodException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidDashboardPeriod(InvalidDashboardPeriodException ex,
+                                                                      HttpServletRequest request) {
+        return build(HttpStatus.BAD_REQUEST, "INVALID_PERIOD", ex.getMessage(), request);
+    }
+
     @ExceptionHandler(MemoryNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleMemoryNotFound(MemoryNotFoundException ex, HttpServletRequest request) {
         return build(HttpStatus.NOT_FOUND, "MEMORY_NOT_FOUND", ex.getMessage(), request);

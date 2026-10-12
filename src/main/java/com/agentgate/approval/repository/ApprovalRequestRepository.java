@@ -12,6 +12,10 @@ public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequest
 
     long countByStatus(ApprovalStatus status);
 
+    List<ApprovalRequest> findTop5ByStatusOrderByCreatedAtAsc(ApprovalStatus status);
+
+    List<ApprovalRequest> findByDecidedAtGreaterThanEqual(Instant since);
+
     List<ApprovalRequest> findByExecutionId(String executionId);
 
     List<ApprovalRequest> findByStatusAndExecutionId(ApprovalStatus status, String executionId);

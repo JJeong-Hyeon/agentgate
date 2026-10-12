@@ -3,6 +3,7 @@ package com.agentgate.audit.repository;
 import com.agentgate.audit.domain.AuditLog;
 import com.agentgate.risk.ActionStatus;
 import com.agentgate.risk.RiskLevel;
+import java.time.Instant;
 import java.util.List;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -22,6 +23,15 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
     List<AuditLog> search(@Param("agentId") String agentId, @Param("executionId") String executionId,
                           @Param("status") ActionStatus status, @Param("riskLevel") RiskLevel riskLevel,
                           Pageable page);
+
+    @Query("select a.status, count(a) from AuditLog a where a.createdAt >= :since group by a.status")
+    List<Object[]> countByStatusSince(@Param("since") Instant since);
+
+    @Query("""
+            select a.action, count(a) from AuditLog a
+            where a.status = com.agentgate.risk.ActionStatus.BLOCKED and a.createdAt >= :since
+            group by a.action order by count(a) desc""")
+    List<Object[]> topBlockedActionsSince(@Param("since") Instant since, Pageable page);
 
     @Query("""
             select a.riskLevel, count(a) from AuditLog a

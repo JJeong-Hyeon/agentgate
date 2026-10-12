@@ -200,6 +200,18 @@ DELETE /api/v1/agents/{agentId}/memories/{id}             → 204 (ADMIN)
 
 Runtime 전용 (`X-Runtime-Token`): `POST /api/v1/runtime/memories` `{"agentId","content","executionId"}` → 201, `POST /api/v1/runtime/memories/search` `{"agentId","query","limit"(1~20, 기본 5)}`.
 
+### 대시보드 (모든 역할)
+
+```
+GET /api/v1/dashboard?period=24h     또는 7d (그 외 400 INVALID_PERIOD)
+```
+
+- `executions`: 기간 내 시작한 실행의 결과별 건수(`byStatus`), 지금 진행 중(`running`)·승인 대기(`waitingApproval`), 끝난 실행의 평균 소요(`avgDurationMs`), 시간(24h)·일(7d)별 건수(`buckets`)
+- `approvals`: 지금 대기 중(`pending`)과 오래된 순 5건(`oldestPending`), 기간 내 결정의 결과별 건수(`decided`)와 평균 대기(`avgWaitMs`)
+- `governance`: 기간 내 판정 수(`total` / `allowed` / `approvalRequired` / `blocked`), 차단율, 많이 차단된 행동 5개(`topBlocked`)
+- `models`: 모델별 Agent 호출 수, 평균 응답 시간, 입력/출력 토큰 (단계마다 저장된 값이라 재시작해도 유지)
+- `recentProblems`: 기간 내 실패·중단된 최근 실행 5건
+
 ### Audit Log (모든 역할)
 
 모든 행동 평가 결과(판정·근거·위험도)가 남는다.

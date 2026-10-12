@@ -8,6 +8,8 @@ import type {
   Approval,
   AuditLog,
   CreatedAgent,
+  Dashboard,
+  DashboardPeriod,
   Execution,
   IssuedApiKey,
   McpServer,
@@ -47,6 +49,10 @@ export class AgentGateClient {
   constructor(credentials: Credentials, fetchImpl: typeof fetch = fetch.bind(globalThis)) {
     this.credentials = credentials;
     this.fetchImpl = fetchImpl;
+  }
+
+  getDashboard(period: DashboardPeriod): Promise<Dashboard> {
+    return this.request(`/api/v1/dashboard?period=${period}`);
   }
 
   listWorkflows(): Promise<WorkflowSummary[]> {

@@ -288,3 +288,58 @@ export interface ApiErrorBody {
   message: string;
   errors?: { path: string; message: string; nodeId?: string | null }[];
 }
+
+export type DashboardPeriod = "24h" | "7d";
+
+export interface DashboardBucket {
+  start: string;
+  total: number;
+  completed: number;
+  stopped: number;
+  failed: number;
+}
+
+export interface ModelUsage {
+  model: string | null;
+  calls: number;
+  avgLatencyMs: number | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
+}
+
+// The console's operations overview for one period (GET /api/v1/dashboard).
+export interface Dashboard {
+  period: DashboardPeriod;
+  since: string;
+  executions: {
+    total: number;
+    byStatus: Record<string, number>;
+    running: number;
+    waitingApproval: number;
+    avgDurationMs: number | null;
+    buckets: DashboardBucket[];
+  };
+  approvals: {
+    pending: number;
+    oldestPending: {
+      id: number;
+      agentId: string;
+      action: string;
+      riskLevel: RiskLevel;
+      executionId: string | null;
+      createdAt: string;
+    }[];
+    decided: Record<string, number>;
+    avgWaitMs: number | null;
+  };
+  governance: {
+    total: number;
+    allowed: number;
+    approvalRequired: number;
+    blocked: number;
+    blockRate: number;
+    topBlocked: { action: string; count: number }[];
+  };
+  models: ModelUsage[];
+  recentProblems: { executionId: string; workflowId: string; status: string; error: string | null; createdAt: string }[];
+}

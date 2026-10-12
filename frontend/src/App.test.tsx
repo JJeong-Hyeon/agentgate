@@ -22,7 +22,7 @@ describe("App", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("올바르지 않습니다");
   });
 
-  it("logs in and lists workflows", async () => {
+  it("logs in to the dashboard and moves to workflows", async () => {
     const fetchImpl = vi.fn(
       withMe(async (url) => {
         if (url === "/api/v1/workflows")
@@ -34,6 +34,9 @@ describe("App", () => {
 
     fireEvent.change(screen.getByLabelText("비밀번호"), { target: { value: "pw" } });
     fireEvent.click(screen.getByRole("button", { name: "로그인" }));
+
+    expect(await screen.findByRole("heading", { name: "대시보드" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("link", { name: "Workflows" }));
 
     expect(await screen.findByText("Research")).toBeInTheDocument();
     expect(screen.getByText("research · v2")).toBeInTheDocument();
