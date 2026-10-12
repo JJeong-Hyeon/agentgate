@@ -11,6 +11,7 @@ import com.agentgate.audit.dto.AuditLogResponse;
 import com.agentgate.audit.dto.AuditStatsResponse;
 import com.agentgate.audit.repository.AuditLogRepository;
 import com.agentgate.common.exception.AuditLogNotFoundException;
+import com.agentgate.observability.AgentGateMetrics;
 import com.agentgate.risk.ActionStatus;
 import com.agentgate.risk.DecisionBasis;
 import com.agentgate.risk.RiskLevel;
@@ -28,11 +29,14 @@ class AuditLogServiceTest {
     @Mock
     private AuditLogRepository auditLogRepository;
 
+    @Mock
+    private AgentGateMetrics metrics;
+
     private AuditLogService service;
 
     @BeforeEach
     void setUp() {
-        service = new AuditLogService(auditLogRepository);
+        service = new AuditLogService(auditLogRepository, metrics);
     }
 
     @Test
@@ -40,6 +44,7 @@ class AuditLogServiceTest {
         service.record("mail-agent", "VIEW_DATA", null, List.of(), RiskLevel.LOW, ActionStatus.ALLOWED, null, DecisionBasis.POLICY, null, "exec-1");
 
         verify(auditLogRepository).save(any(AuditLog.class));
+        verify(metrics).decision(ActionStatus.ALLOWED, DecisionBasis.POLICY, RiskLevel.LOW);
     }
 
     @Test

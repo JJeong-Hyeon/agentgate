@@ -12,6 +12,7 @@ import com.agentgate.execution.dto.ExecutionStartRequest;
 import com.agentgate.execution.dto.NodeExecutionResponse;
 import com.agentgate.execution.repository.ExecutionRepository;
 import com.agentgate.execution.repository.NodeExecutionRepository;
+import com.agentgate.observability.AgentGateMetrics;
 import com.agentgate.runtime.RuntimeClient;
 import com.agentgate.workflow.dto.WorkflowVersionResponse;
 import com.agentgate.workflow.service.WorkflowService;
@@ -35,11 +36,12 @@ public class ExecutionService {
     private final AgentResolver agentResolver;
     private final ObjectMapper objectMapper;
     private final TransactionTemplate transactionTemplate;
+    private final AgentGateMetrics metrics;
 
     public ExecutionService(ExecutionRepository executionRepository, NodeExecutionRepository nodeExecutionRepository,
                             WorkflowService workflowService, RuntimeClient runtimeClient,
                             AgentResolver agentResolver, ObjectMapper objectMapper,
-                            PlatformTransactionManager transactionManager) {
+                            PlatformTransactionManager transactionManager, AgentGateMetrics metrics) {
         this.executionRepository = executionRepository;
         this.nodeExecutionRepository = nodeExecutionRepository;
         this.workflowService = workflowService;
@@ -47,6 +49,7 @@ public class ExecutionService {
         this.agentResolver = agentResolver;
         this.objectMapper = objectMapper;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.metrics = metrics;
     }
 
     /**
@@ -103,17 +106,27 @@ public class ExecutionService {
                 node.started(at);
                 execution.running();
             }
-            case NODE_COMPLETED -> node.completed(event.output(), at);
+            case NODE_COMPLETED -> {
+                node.completed(event.output(), at);
+                metrics.agentStep(event.output());
+            }
             case NODE_WAITING -> node.waiting(event.approvalId());
             case NODE_FAILED -> node.failed(event.error(), at);
             case EXECUTION_WAITING -> execution.waitingForApproval(event.approvalId());
-            case EXECUTION_COMPLETED -> execution.completed(at);
-            case EXECUTION_STOPPED -> execution.stopped(event.error(), at);
+            case EXECUTION_COMPLETED -> {
+                execution.completed(at);
+                metrics.executionFinished(execution);
+            }
+            case EXECUTION_STOPPED -> {
+                execution.stopped(event.error(), at);
+                metrics.executionFinished(execution);
+            }
             case EXECUTION_FAILED -> {
                 execution.failed(event.error(), at);
                 // The runtime stops before reporting the failed step itself.
                 nodeExecutionRepository.findByExecutionAndStatus(execution, NodeStatus.RUNNING)
                         .forEach(running -> running.failed(event.error(), at));
+                metrics.executionFinished(execution);
             }
         }
         return ExecutionResponse.from(execution, node == null ? null : List.of(NodeExecutionResponse.from(node)));

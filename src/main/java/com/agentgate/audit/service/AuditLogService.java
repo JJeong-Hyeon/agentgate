@@ -5,6 +5,7 @@ import com.agentgate.audit.dto.AuditLogResponse;
 import com.agentgate.audit.dto.AuditStatsResponse;
 import com.agentgate.audit.repository.AuditLogRepository;
 import com.agentgate.common.exception.AuditLogNotFoundException;
+import com.agentgate.observability.AgentGateMetrics;
 import com.agentgate.risk.ActionStatus;
 import com.agentgate.risk.DecisionBasis;
 import com.agentgate.risk.RiskLevel;
@@ -21,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AuditLogService {
 
     private final AuditLogRepository auditLogRepository;
+    private final AgentGateMetrics metrics;
 
     /** Most entries a list returns; the console shows the newest. */
     public static final int MAX_LIMIT = 1000;
@@ -32,6 +34,7 @@ public class AuditLogService {
                        String delegatedBy, String executionId) {
         auditLogRepository.save(new AuditLog(agentId, action, target, labels, riskLevel, status, approvalId, basis,
                 delegatedBy, executionId));
+        metrics.decision(status, basis, riskLevel);
     }
 
     public AuditLogResponse get(Long id) {
