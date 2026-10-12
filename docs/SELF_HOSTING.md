@@ -42,6 +42,7 @@ cp .env.example .env
 | `EMBEDDING_BASE_URL` / `EMBEDDING_MODEL` / `EMBEDDING_API_KEY` | 선택. Agent 기억의 의미 검색용 임베딩 서버(OpenAI 호환 `/embeddings`, 예: Ollama의 `bge-m3`). 비우면 키워드 검색 |
 | `MEMORY_MIN_SCORE` | 의미 검색 결과로 인정할 최소 코사인 유사도. 모델마다 다르며 bge-m3는 약 0.45 |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` / `OTEL_EXPORTER_OTLP_HEADERS` / `OTEL_CAPTURE_CONTENT` | 선택. Agent 실행 trace를 OpenTelemetry로 내보낼 곳 ([`MONITORING.md`](MONITORING.md#agent-trace-opentelemetry)) |
+| `GRAFANA_ADMIN_PASSWORD` / `PROMETHEUS_RETENTION` | 선택. 모니터링 프로필(아래)의 Grafana 관리자 비밀번호, Prometheus 보존 기간(기본 `30d`) |
 | `AGENTGATE_APPROVAL_TTL` | 선택. 결정되지 않은 승인 요청을 만료시키는 시간 (기본 `PT24H`) |
 | `AGENTGATE_NOTIFY_WEBHOOK_*` | 선택. 승인 요청 알림 웹훅 ([`API_SPEC.md`](API_SPEC.md) 승인 처리 참고) |
 
@@ -90,6 +91,19 @@ curl http://<모델 서버 IP>:11434/v1/embeddings -H 'Content-Type: application
 
 - 다른 PC에서 `curl http://<모델 서버 IP>:11434/v1/models`가 **실패**해야 방화벽이 제대로 걸린 것이다.
 - qwen3 같은 추론 모델은 답 전에 생각(thinking)을 하므로 짧은 질문에도 수 초~수십 초가 걸린다(실측: qwen3:14b, DGX Spark에서 호출당 약 10~17초). `LLM_REASONING_EFFORT=none`이면 생각을 건너뛰어 호출당 약 1초로 줄어든다. 시스템 프롬프트의 `/no_think`는 Ollama의 OpenAI 호환 API에서는 효과가 없다. 복잡한 판단이 필요한 Agent만 정의에서 `low`~`high`로 올린다.
+
+## 모니터링 (선택: Prometheus + Grafana)
+
+콘솔의 대시보드로 충분하지 않고 장기 추세나 알림이 필요하면 모니터링 프로필을 켠다.
+
+```bash
+docker compose --profile monitoring up -d
+```
+
+- `https://<AGENTGATE_DOMAIN>/grafana`에서 `admin` / `GRAFANA_ADMIN_PASSWORD`로 로그인한다. 비워 두면 `admin`이고 첫 로그인 때 바꾸라고 한다.
+- Prometheus 데이터소스와 "AgentGate" 대시보드(`infra/grafana/agentgate-dashboard.json`)가 자동으로 등록된다. 지표 설명과 알림 예시는 [`MONITORING.md`](MONITORING.md).
+- Prometheus는 compose 네트워크 안에서만 `app:8080/actuator/prometheus`를 수집하며 외부에 포트를 열지 않는다.
+- 이후 `docker compose up -d`, `docker compose down`에도 `--profile monitoring`을 붙여야 모니터링 서비스까지 함께 다뤄진다.
 
 ## 내부망 / 사설 인증서
 

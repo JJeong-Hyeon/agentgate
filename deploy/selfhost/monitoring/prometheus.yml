@@ -1,0 +1,8 @@
+# Scrapes AgentGate inside the compose network (the metrics endpoint is not exposed through Caddy).
+global:
+  scrape_interval: 15s
+scrape_configs:
+  - job_name: agentgate
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['app:8080']

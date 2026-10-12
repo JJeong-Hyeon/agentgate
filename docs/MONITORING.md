@@ -1,5 +1,7 @@
 # 모니터링 (Prometheus + Grafana)
 
+> 사내 서버 셀프호스트는 `docker compose --profile monitoring up -d` 한 줄로 Prometheus + Grafana와 대시보드까지 함께 뜬다 ([`SELF_HOSTING.md`](SELF_HOSTING.md#모니터링-선택-prometheus--grafana)). 아래는 AWS 구성 기준이다.
+
 리소스 프로그램에서 받은 Grafana는 Data Source 설정 권한이 없어 사용하지 않는다. 대신 `infra/monitoring.tf`로 만든 EC2 #2에 Prometheus+Grafana를 직접 셀프호스팅한다. 실제 계정/서버 접속 정보는 각자 진행 — 비밀번호를 코드/문서에 커밋하지 않는다.
 
 ## Monitoring EC2 (Prometheus + Grafana)
