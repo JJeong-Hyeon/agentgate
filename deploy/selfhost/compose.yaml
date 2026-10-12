@@ -45,6 +45,9 @@ services:
       AGENTGATE_EMBEDDING_MODEL: ${EMBEDDING_MODEL:-}
       AGENTGATE_EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
       AGENTGATE_MEMORY_MIN_SCORE: ${MEMORY_MIN_SCORE:-0.3}
+    # Embedding servers on this host or behind scripts/model-tunnel.sh (Linux needs the explicit mapping).
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
     depends_on:
       postgres:
         condition: service_healthy

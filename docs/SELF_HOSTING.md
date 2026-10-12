@@ -63,9 +63,27 @@ docker compose ps        # 모두 Up이면 정상
 
 ## 모델 서버를 별도 장비로 (Ollama)
 
-GPU 장비(예: DGX Spark)는 모델만 돌리고 AgentGate는 다른 서버에 두는 구성이다. Runtime(채팅)과 AgentGate(임베딩)가 모두 모델 서버를 호출한다.
+GPU 장비(예: DGX Spark)는 모델만 돌리고 AgentGate는 다른 서버에 두는 구성이다. Runtime(채팅)과 AgentGate(임베딩)가 모두 모델 서버를 호출한다. 연결 방법은 두 가지다.
 
-모델 서버에서 (sudo 필요):
+### A. SSH 터널 (모델 서버를 바꾸지 않음, 공용 장비에 권장)
+
+모델 서버의 Ollama는 그대로 `127.0.0.1`에서만 받고, AgentGate 서버가 SSH로 포트를 끌어온다. 모델 서버에는 SSH 계정(키 인증)만 있으면 되고 sudo·방화벽 변경이 필요 없다.
+
+```bash
+ssh-copy-id <계정>@<모델 서버 IP>                                    # 한 번만
+scripts/model-tunnel.sh start <계정>@<모델 서버 IP> 11434 11435      # 채팅 / 임베딩 포트
+scripts/model-tunnel.sh status <계정>@<모델 서버 IP>
+```
+
+`.env`에서는 `http://host.docker.internal:<포트>/v1`로 연결한다.
+
+- Linux 서버에서는 컨테이너가 접속할 수 있게 Docker 브리지 주소에 연다: `BIND_ADDRESS=172.17.0.1 scripts/model-tunnel.sh start ...` (사내망의 다른 장비에는 열리지 않는다).
+- 터널은 재부팅하면 끊긴다. 서버 기동 시 자동으로 열려면 systemd 서비스나 crontab `@reboot`에 `start` 명령을 등록한다.
+- 공용 Ollama에 모델을 추가할 권한이 없으면, 자기 계정으로 별도 Ollama를 띄워 임베딩용으로 쓸 수 있다: `OLLAMA_HOST=127.0.0.1:11435 OLLAMA_MODELS=~/.ollama-mine/models ollama serve` 후 `OLLAMA_HOST=127.0.0.1:11435 ollama pull bge-m3`.
+
+### B. 모델 서버를 사내망에 공개 (전용 장비일 때)
+
+모델 서버에서 (sudo 필요, **장비 전체에 적용**되므로 여러 사람이 쓰는 장비라면 관리자와 상의):
 
 ```bash
 ollama pull bge-m3                      # 기억 검색용 임베딩 (채팅 모델은 이미 받아 둔 것을 사용)
