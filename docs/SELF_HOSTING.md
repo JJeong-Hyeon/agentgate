@@ -6,11 +6,11 @@
 브라우저 ──HTTPS──▶ Caddy :443 ──▶ app :8080 (AgentGate API + 콘솔)
                                      │  ▲
                                      ▼  │
-                                  runtime :8000 (LangGraph) ──▶ 사내 LLM 서버 (OpenAI 호환, 예: vLLM)
+                                  runtime :8000 (LangGraph) ──▶ 모델 서버 (OpenAI 호환: Ollama / vLLM)
                      app, runtime ──▶ postgres (AgentGate 데이터 + checkpoint), redis (정책 캐시)
 ```
 
-[`deploy/selfhost/compose.yaml`](../deploy/selfhost/compose.yaml)이 위 구성을 한 번에 띄운다. 모델 서버는 포함하지 않는다. 이미 운영 중인 OpenAI 호환 서버(예: NVIDIA DGX Spark의 vLLM)를 `LLM_BASE_URL`로 연결한다.
+[`deploy/selfhost/compose.yaml`](../deploy/selfhost/compose.yaml)이 위 구성을 한 번에 띄운다. 모델 서버는 포함하지 않는다. 이미 운영 중인 OpenAI 호환 서버(예: NVIDIA DGX Spark의 Ollama 또는 vLLM)를 `LLM_BASE_URL`로 연결한다. 모델 서버를 별도 장비로 두는 경우는 [아래](#모델-서버를-별도-장비로-ollama)를 참고한다.
 
 ## 요구 사항
 
@@ -35,9 +35,11 @@ cp .env.example .env
 | `POSTGRES_PASSWORD` | DB 비밀번호. Runtime의 DB URL에도 들어가므로 영문·숫자만 (`openssl rand -hex 32`) |
 | `RUNTIME_TOKEN` | AgentGate ↔ Runtime 공유 토큰 (`openssl rand -hex 32`) |
 | `AGENTGATE_SECRET_KEY` | DB에 저장하는 인증정보(MCP 서버 헤더) 암호화 키 (`openssl rand -base64 32`). 잃어버리면 저장된 헤더를 다시 입력해야 하므로 따로 백업 |
-| `LLM_BASE_URL` / `LLM_MODEL` / `LLM_API_KEY` | 모델 서버. 같은 서버에서 돌고 있으면 `http://host.docker.internal:<포트>/v1` |
-| `LLM_TOOL_CALLING` | vLLM을 `--enable-auto-tool-choice --tool-call-parser <parser>`로 띄웠으면 `native`, 아니면 `json` |
-| `EMBEDDING_BASE_URL` / `EMBEDDING_MODEL` / `EMBEDDING_API_KEY` | 선택. Agent 기억의 의미 검색용 임베딩 서버(OpenAI 호환 `/embeddings`, 예: vLLM으로 `BAAI/bge-m3` 서빙). 비우면 키워드 검색 |
+| `LLM_BASE_URL` / `LLM_MODEL` / `LLM_API_KEY` | 모델 서버. 다른 장비의 Ollama면 `http://<IP>:11434/v1`, 같은 서버에서 돌고 있으면 `http://host.docker.internal:<포트>/v1` |
+| `LLM_TOOL_CALLING` | Ollama의 Tool 지원 모델(qwen3 등)이나 `--enable-auto-tool-choice --tool-call-parser <parser>`로 띄운 vLLM이면 `native`, 아니면 `json` |
+| `LLM_TIMEOUT_SECONDS` | 모델 응답 하나를 기다리는 시간(초). 큰 모델·추론(thinking) 모델은 늘린다 |
+| `EMBEDDING_BASE_URL` / `EMBEDDING_MODEL` / `EMBEDDING_API_KEY` | 선택. Agent 기억의 의미 검색용 임베딩 서버(OpenAI 호환 `/embeddings`, 예: Ollama의 `bge-m3`). 비우면 키워드 검색 |
+| `MEMORY_MIN_SCORE` | 의미 검색 결과로 인정할 최소 코사인 유사도. 모델마다 다르며 bge-m3는 약 0.45 |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` / `OTEL_EXPORTER_OTLP_HEADERS` / `OTEL_CAPTURE_CONTENT` | 선택. Agent 실행 trace를 OpenTelemetry로 내보낼 곳 ([`MONITORING.md`](MONITORING.md#agent-trace-opentelemetry)) |
 | `AGENTGATE_APPROVAL_TTL` | 선택. 결정되지 않은 승인 요청을 만료시키는 시간 (기본 `PT24H`) |
 | `AGENTGATE_NOTIFY_WEBHOOK_*` | 선택. 승인 요청 알림 웹훅 ([`API_SPEC.md`](API_SPEC.md) 승인 처리 참고) |
@@ -56,6 +58,37 @@ docker compose ps        # 모두 Up이면 정상
 1. **Runtime Agent 등록**: 워크플로 수준의 Tool / 승인 노드는 `runtime-agent`로 평가된다. 콘솔의 Agents 화면에서 Agent ID `runtime-agent`로 한 번 등록한다.
 2. **사용자 만들기**: Users 화면에서 역할별 계정(EDITOR / APPROVER / VIEWER)을 만들고 공용 ADMIN 계정 사용을 줄인다.
 3. **모델 연결 확인**: `docker compose exec runtime python -c "import urllib.request;print(urllib.request.urlopen('http://localhost:8000/llm/health').read())"` — `model_available: true`면 정상.
+
+## 모델 서버를 별도 장비로 (Ollama)
+
+GPU 장비(예: DGX Spark)는 모델만 돌리고 AgentGate는 다른 서버에 두는 구성이다. Runtime(채팅)과 AgentGate(임베딩)가 모두 모델 서버를 호출한다.
+
+모델 서버에서 (sudo 필요):
+
+```bash
+ollama pull bge-m3                      # 기억 검색용 임베딩 (채팅 모델은 이미 받아 둔 것을 사용)
+
+# Ollama는 기본으로 127.0.0.1에서만 받는다 → 사내망에서 받도록
+sudo mkdir -p /etc/systemd/system/ollama.service.d
+printf '[Service]\nEnvironment="OLLAMA_HOST=0.0.0.0:11434"\n' | sudo tee /etc/systemd/system/ollama.service.d/override.conf
+sudo systemctl daemon-reload && sudo systemctl restart ollama
+
+# Ollama에는 인증이 없으므로 11434는 AgentGate 서버에서만 허용한다
+sudo ufw allow 22/tcp                  # enable 전에 SSH부터 허용 (접속이 끊기지 않게)
+sudo ufw allow from <AgentGate 서버 IP> to any port 11434 proto tcp
+sudo ufw enable
+```
+
+AgentGate 서버에서 연결 확인:
+
+```bash
+curl http://<모델 서버 IP>:11434/v1/models                 # 받아 둔 모델 목록
+curl http://<모델 서버 IP>:11434/v1/embeddings -H 'Content-Type: application/json' \
+  -d '{"model":"bge-m3","input":["연결 확인"]}' | head -c 200
+```
+
+- 다른 PC에서 `curl http://<모델 서버 IP>:11434/v1/models`가 **실패**해야 방화벽이 제대로 걸린 것이다.
+- qwen3 같은 추론 모델은 답 전에 생각(thinking)을 하므로 짧은 질문에도 수 초~수십 초가 걸린다. Ollama는 생각 내용을 답과 분리해 보내므로 답에는 섞이지 않는다. 빠른 응답이 필요한 Agent는 시스템 프롬프트 끝에 `/no_think`를 넣으면 생각을 건너뛴다.
 
 ## 내부망 / 사설 인증서
 
