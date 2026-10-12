@@ -2,12 +2,14 @@ package com.agentgate.memory.controller;
 
 import com.agentgate.memory.dto.AgentMemory;
 import com.agentgate.memory.dto.MemoryCreateRequest;
+import com.agentgate.memory.dto.MemorySaveResult;
 import com.agentgate.memory.service.MemoryService;
 import jakarta.validation.Valid;
 import java.security.Principal;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -31,11 +33,14 @@ public class AgentMemoryController {
         return memoryService.list(agentId, query);
     }
 
+    /** 201 when a memory was stored, 200 when the agent already remembered it. */
     @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public AgentMemory create(@PathVariable String agentId, @Valid @RequestBody MemoryCreateRequest request,
-                              Principal principal) {
-        return memoryService.save(agentId, request.content(), AgentMemory.USER, null, principal.getName());
+    public ResponseEntity<MemorySaveResult> create(@PathVariable String agentId,
+                                                   @Valid @RequestBody MemoryCreateRequest request,
+                                                   Principal principal) {
+        MemorySaveResult result = memoryService.save(agentId, request.content(), AgentMemory.USER, null,
+                principal.getName());
+        return ResponseEntity.status(result.duplicate() ? HttpStatus.OK : HttpStatus.CREATED).body(result);
     }
 
     @DeleteMapping("/{id}")

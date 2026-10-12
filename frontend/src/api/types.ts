@@ -175,6 +175,14 @@ export interface AgentMemory {
   matchedBy: "SEMANTIC" | "KEYWORD" | null;
 }
 
+// What adding a memory did: stored it, or found the agent already remembers it word for word.
+export interface MemorySaveResult {
+  memory: AgentMemory;
+  duplicate: boolean;
+  replaced: number | null;
+  similar: AgentMemory[];
+}
+
 export interface AgentDefinition {
   description?: string | null;
   model?: string | null;

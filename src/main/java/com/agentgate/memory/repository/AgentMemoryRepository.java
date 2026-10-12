@@ -4,6 +4,7 @@ import com.agentgate.memory.dto.AgentMemory;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -18,6 +19,8 @@ import org.springframework.stereotype.Repository;
 public class AgentMemoryRepository {
 
     private static final String COLUMNS = "id, agent_id, content, source, execution_id, created_by, created_at";
+    // Replaced memories are kept for the record but take no part in recall, search or listing.
+    private static final String ACTIVE = "and superseded_by is null ";
 
     private final JdbcClient jdbc;
     private volatile Boolean vectorsSupported;
@@ -60,7 +63,7 @@ public class AgentMemoryRepository {
     }
 
     public List<AgentMemory> recent(String agentId, int limit) {
-        return jdbc.sql("select " + COLUMNS + " from agent_memories where agent_id = :agentId "
+        return jdbc.sql("select " + COLUMNS + " from agent_memories where agent_id = :agentId " + ACTIVE
                         + "order by created_at desc, id desc limit :limit")
                 .param("agentId", agentId)
                 .param("limit", limit)
@@ -71,7 +74,7 @@ public class AgentMemoryRepository {
     /** Closest memories embedded with {@code model}, scored by cosine similarity (1 = same direction). */
     public List<AgentMemory> nearest(String agentId, float[] query, String model, double minScore, int limit) {
         return jdbc.sql("select " + COLUMNS + ", 1 - (embedding <=> cast(:query as vector)) as score "
-                        + "from agent_memories where agent_id = :agentId and embedding_model = :model "
+                        + "from agent_memories where agent_id = :agentId " + ACTIVE + "and embedding_model = :model "
                         + "and embedding is not null and 1 - (embedding <=> cast(:query as vector)) >= :minScore "
                         + "order by embedding <=> cast(:query as vector) limit :limit")
                 .param("query", literal(query))
@@ -99,7 +102,7 @@ public class AgentMemoryRepository {
         }
         String exclude = excludeIds.isEmpty() ? "" : " and id not in (:excludeIds)";
         JdbcClient.StatementSpec statement = jdbc.sql("select " + COLUMNS + ", (" + score + ") as matched "
-                        + "from agent_memories where agent_id = :agentId and (" + matches + ")" + exclude
+                        + "from agent_memories where agent_id = :agentId " + ACTIVE + "and (" + matches + ")" + exclude
                         + " order by matched desc, created_at desc, id desc limit :limit")
                 .param("agentId", agentId)
                 .param("limit", limit);
@@ -115,12 +118,23 @@ public class AgentMemoryRepository {
                 .list();
     }
 
+    /** An active (not replaced) memory of the agent. */
     public Optional<AgentMemory> find(String agentId, Long id) {
-        return jdbc.sql("select " + COLUMNS + " from agent_memories where agent_id = :agentId and id = :id")
+        return jdbc.sql("select " + COLUMNS + " from agent_memories where agent_id = :agentId " + ACTIVE + "and id = :id")
                 .param("agentId", agentId)
                 .param("id", id)
                 .query(AgentMemoryRepository::map)
                 .optional();
+    }
+
+    /** Marks {@code oldId} as replaced by {@code newId}; false if it was not an active memory of the agent. */
+    public boolean supersede(String agentId, Long oldId, Long newId) {
+        return jdbc.sql("update agent_memories set superseded_by = :newId, superseded_at = now() "
+                        + "where agent_id = :agentId and id = :oldId " + ACTIVE)
+                .param("newId", newId)
+                .param("agentId", agentId)
+                .param("oldId", oldId)
+                .update() > 0;
     }
 
     public boolean delete(String agentId, Long id) {
@@ -133,7 +147,8 @@ public class AgentMemoryRepository {
     /** Memories without a vector from {@code model}: never embedded, or embedded with an earlier model. */
     public List<PendingEmbedding> needingEmbedding(String model, int limit) {
         return jdbc.sql("select id, content from agent_memories "
-                        + "where embedding is null or embedding_model is distinct from :model order by id limit :limit")
+                        + "where (embedding is null or embedding_model is distinct from :model) " + ACTIVE
+                        + "order by id limit :limit")
                 .param("model", model)
                 .param("limit", limit)
                 .query((rs, row) -> new PendingEmbedding(rs.getLong("id"), rs.getString("content")))
@@ -156,6 +171,13 @@ public class AgentMemoryRepository {
             text.append(i == 0 ? "" : ",").append(vector[i]);
         }
         return text.append(']').toString();
+    }
+
+    /** Text compared for exact duplicates: case, spaces and punctuation do not count. */
+    public static String normalized(String content) {
+        return Normalizer.normalize(content, Normalizer.Form.NFC)
+                .toLowerCase()
+                .replaceAll("[\\s\\p{Punct}\\p{IsPunctuation}]+", "");
     }
 
     static String escapeLike(String term) {
