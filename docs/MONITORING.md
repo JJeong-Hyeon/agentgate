@@ -39,3 +39,18 @@
 - 차단 급증: `sum(rate(agentgate_governance_decisions_total{status="BLOCKED"}[15m])) > 0.5`
 - 실행 실패: `sum(increase(agentgate_execution_duration_seconds_count{status="FAILED"}[1h])) > 0`
 - LLM 지연: `sum(rate(agentgate_llm_latency_seconds_sum[5m])) / sum(rate(agentgate_llm_latency_seconds_count[5m])) > 30`
+
+## Agent trace (OpenTelemetry)
+
+Runtime은 `OTEL_EXPORTER_OTLP_ENDPOINT`(또는 `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`)가 설정되면 Agent 실행을 OTLP/HTTP로 내보낸다. 표준 OpenTelemetry 환경변수(`OTEL_EXPORTER_OTLP_HEADERS`, `OTEL_SERVICE_NAME` 등)를 그대로 따르므로 Langfuse, Jaeger, Grafana Tempo, OpenTelemetry Collector 어디로든 보낼 수 있다.
+
+| Span | 내용 |
+|---|---|
+| `agentgate.execution` / `agentgate.execution.resume` | 실행 한 번(또는 승인 후 재개). 실행 ID를 `session.id` / `langfuse.session.id`로 넣어 같은 실행의 trace를 한 세션으로 묶는다. 결과(`agentgate.execution.outcome`), 재개 시 승인 결정 |
+| `chat <model>` | Agent의 LLM 호출. GenAI 시맨틱 컨벤션(`gen_ai.request.model`, `gen_ai.response.model`, `gen_ai.usage.*`). Langfuse에서는 generation으로 보인다 |
+| `governance <action>` | AgentGate 판정: 행동, 판정, 위험도, 근거, 승인 ID |
+| `tool <name>` | Tool 실행과 결과. MCP 클라이언트가 만드는 `MCP send ...` span이 그 아래에 붙는다 |
+
+- 프롬프트, 응답, Tool 인자·결과는 `OTEL_CAPTURE_CONTENT=true`일 때만 span에 넣는다(최대 4000자). 개인정보가 오갈 수 있으니 수집 서버의 접근 권한과 보존 기간을 확인한 뒤 켠다.
+- Langfuse: `OTEL_EXPORTER_OTLP_ENDPOINT=https://<langfuse 주소>/api/public/otel`, `OTEL_EXPORTER_OTLP_HEADERS=Authorization=Basic <base64(public_key:secret_key)>`
+- Jaeger (OTLP 수신 켠 all-in-one): `OTEL_EXPORTER_OTLP_ENDPOINT=http://<jaeger>:4318`

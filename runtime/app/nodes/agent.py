@@ -44,6 +44,7 @@ from langgraph.graph import StateGraph
 from langgraph.types import Command, interrupt
 
 from app.dsl.schema import AgentSpec, AgentToolSpec
+from app.telemetry import set_attributes, set_content, tracer
 from app.tools.base import GovernedTool, ToolResult
 from app.tools.memory import memory_prompt
 
@@ -182,16 +183,38 @@ def add_agent(
         llm = llm_factory(spec.model, spec.temperature)
         offer_tools = bool(definitions) and not final_turn
         started = time.perf_counter()
-        if json_calls:
-            reply = llm.invoke(flatten(messages))
-            if offer_tools:
-                reply = AIMessage(
-                    content=reply.content, tool_calls=parse_json_calls(reply.content, steps)
-                )
-        else:
-            reply = (llm.bind_tools(definitions) if offer_tools else llm).invoke(messages)
+        requested_model = spec.model or _model_name(llm)
+        with tracer().start_as_current_span(f"chat {requested_model or ''}".strip()) as span:
+            set_attributes(span, _llm_span_attributes(spec, name, requested_model, steps))
+            set_content(span, "langfuse.observation.input", _messages_for_trace(messages))
+            if json_calls:
+                reply = llm.invoke(flatten(messages))
+                if offer_tools:
+                    reply = AIMessage(
+                        content=reply.content, tool_calls=parse_json_calls(reply.content, steps)
+                    )
+            else:
+                reply = (llm.bind_tools(definitions) if offer_tools else llm).invoke(messages)
+            model = reply.response_metadata.get("model_name") or requested_model
+            usage = reply.usage_metadata or {}
+            set_attributes(
+                span,
+                {
+                    "gen_ai.response.model": model,
+                    "gen_ai.usage.input_tokens": usage.get("input_tokens"),
+                    "gen_ai.usage.output_tokens": usage.get("output_tokens"),
+                    "agentgate.llm.tool_calls": len(reply.tool_calls),
+                },
+            )
+            set_content(
+                span,
+                "langfuse.observation.output",
+                {"content": reply.content, "tool_calls": reply.tool_calls}
+                if reply.tool_calls
+                else reply.content,
+            )
         llm_call = {
-            "model": reply.response_metadata.get("model_name") or spec.model or _model_name(llm),
+            "model": model,
             "latency_ms": round((time.perf_counter() - started) * 1000),
         }
         run = {**run, "llm": llm_call}
@@ -391,6 +414,28 @@ def repair_note(problem: str, schema: dict) -> str:
 
 
 _TRACE_TEXT_CHARS = 1500
+
+
+def _llm_span_attributes(
+    spec: AgentSpec, node: str, model: str | None, step: int
+) -> dict[str, Any]:
+    """GenAI semantic conventions, plus Langfuse's hint that the span is a model generation."""
+    return {
+        "gen_ai.operation.name": "chat",
+        "gen_ai.system": "openai",
+        "gen_ai.request.model": model,
+        "gen_ai.request.temperature": spec.temperature,
+        "langfuse.observation.type": "generation",
+        "langfuse.observation.model.name": model,
+        "agentgate.agent.id": spec.agent_id,
+        "agentgate.agent.version": spec.version,
+        "agentgate.node": node,
+        "agentgate.agent.turn": step,
+    }
+
+
+def _messages_for_trace(messages: list[BaseMessage]) -> list[dict[str, Any]]:
+    return [{"role": m.type, "content": m.content} for m in messages]
 
 
 def _model_name(llm: BaseChatModel) -> str | None:

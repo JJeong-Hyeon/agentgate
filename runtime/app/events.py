@@ -10,8 +10,11 @@ from typing import Any
 
 import httpx
 from langgraph.graph.state import CompiledStateGraph
+from langgraph.types import Command
+from opentelemetry.trace import Status, StatusCode
 
 from app.nodes.agent import agent_trace
+from app.telemetry import set_attributes, tracer
 
 log = logging.getLogger(__name__)
 
@@ -85,22 +88,52 @@ def run_graph(
 ) -> None:
     """Run (or resume) until the graph finishes or pauses, reporting each step."""
     execution_id = config["configurable"]["thread_id"]
-    try:
-        for namespace, task in graph.stream(
-            graph_input, config, stream_mode="tasks", subgraphs=True
-        ):
-            reporter.report(execution_id, task_event(task, namespace))
-    except Exception as e:
-        reporter.report(execution_id, {"type": "EXECUTION_FAILED", "error": str(e)})
-        raise
+    resume = graph_input.resume if isinstance(graph_input, Command) else None
+    with tracer().start_as_current_span(
+        "agentgate.execution.resume" if resume is not None else "agentgate.execution"
+    ) as span:
+        set_attributes(span, _execution_attributes(execution_id, graph_input, resume))
+        try:
+            for namespace, task in graph.stream(
+                graph_input, config, stream_mode="tasks", subgraphs=True
+            ):
+                reporter.report(execution_id, task_event(task, namespace))
+        except Exception as e:
+            span.record_exception(e)
+            span.set_status(Status(StatusCode.ERROR, str(e)))
+            span.set_attribute("agentgate.execution.outcome", "FAILED")
+            reporter.report(execution_id, {"type": "EXECUTION_FAILED", "error": str(e)})
+            raise
 
-    snapshot = graph.get_state(config)
-    if snapshot.interrupts:
-        approval_id = snapshot.interrupts[0].value.get("approval_id")
-        reporter.report(execution_id, {"type": "EXECUTION_WAITING", "approvalId": approval_id})
-    elif not snapshot.next:
-        stopped = snapshot.values.get("stopped")
-        if stopped:
-            reporter.report(execution_id, {"type": "EXECUTION_STOPPED", "error": stopped["reason"]})
-        else:
-            reporter.report(execution_id, {"type": "EXECUTION_COMPLETED"})
+        snapshot = graph.get_state(config)
+        if snapshot.interrupts:
+            approval_id = snapshot.interrupts[0].value.get("approval_id")
+            span.set_attribute("agentgate.execution.outcome", "WAITING_APPROVAL")
+            set_attributes(span, {"agentgate.approval.waiting_id": approval_id})
+            reporter.report(execution_id, {"type": "EXECUTION_WAITING", "approvalId": approval_id})
+        elif not snapshot.next:
+            stopped = snapshot.values.get("stopped")
+            if stopped:
+                span.set_attribute("agentgate.execution.outcome", "STOPPED")
+                reporter.report(
+                    execution_id, {"type": "EXECUTION_STOPPED", "error": stopped["reason"]}
+                )
+            else:
+                span.set_attribute("agentgate.execution.outcome", "COMPLETED")
+                reporter.report(execution_id, {"type": "EXECUTION_COMPLETED"})
+
+
+def _execution_attributes(execution_id: str, graph_input: Any, resume: Any) -> dict[str, Any]:
+    attributes: dict[str, Any] = {
+        "agentgate.execution.id": execution_id,
+        # Groups the first run and every resume after an approval (Langfuse reads its own key).
+        "session.id": execution_id,
+        "langfuse.session.id": execution_id,
+    }
+    if isinstance(graph_input, dict):
+        workflow = graph_input.get("workflow") or {}
+        attributes["agentgate.workflow.id"] = workflow.get("workflowId")
+        attributes["agentgate.workflow.version"] = workflow.get("version")
+    if isinstance(resume, dict):
+        attributes["agentgate.approval.decision"] = resume.get("decision")
+    return attributes

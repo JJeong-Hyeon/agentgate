@@ -4,9 +4,11 @@ import time
 from abc import ABC, abstractmethod
 from typing import Any, Literal
 
+from opentelemetry.trace import Status, StatusCode
 from pydantic import BaseModel
 
 from app.governance.agentgate_client import AgentGateClient, AgentGateError
+from app.telemetry import current_step, set_attributes, set_content, tracer
 
 MAX_OUTPUT_CHARS = 2000
 
@@ -52,19 +54,43 @@ class GovernedTool(ABC):
     ) -> ToolResult:
         """Ask AgentGate; with `agent_id` / `agent_version` it is asked on behalf of that agent,
         whose definition's tool permissions then apply."""
-        try:
-            decision = self._gate.evaluate(
-                self.action,
-                target=self.target,
-                labels=self.labels,
-                execution_id=execution_id,
-                reason=reason,
-                agent_id=agent_id,
-                agent_version=agent_version,
-                delegated_by=delegated_by,
+        with tracer().start_as_current_span(f"governance {self.action}") as span:
+            set_attributes(
+                span,
+                {
+                    "agentgate.action": self.action,
+                    "agentgate.target": self.target,
+                    "agentgate.labels": list(self.labels) or None,
+                    "agentgate.agent.id": agent_id,
+                    "agentgate.agent.version": agent_version,
+                    "agentgate.delegated_by": delegated_by or None,
+                    "agentgate.step": current_step(),
+                },
             )
-        except AgentGateError as e:
-            return ToolResult(tool=self.name, status="FAILED", error=str(e))
+            try:
+                decision = self._gate.evaluate(
+                    self.action,
+                    target=self.target,
+                    labels=self.labels,
+                    execution_id=execution_id,
+                    reason=reason,
+                    agent_id=agent_id,
+                    agent_version=agent_version,
+                    delegated_by=delegated_by,
+                )
+            except AgentGateError as e:
+                span.set_status(Status(StatusCode.ERROR, str(e)))
+                span.set_attribute("agentgate.decision.status", "FAILED")
+                return ToolResult(tool=self.name, status="FAILED", error=str(e))
+            set_attributes(
+                span,
+                {
+                    "agentgate.decision.status": decision.status,
+                    "agentgate.decision.risk_level": decision.risk_level,
+                    "agentgate.decision.basis": decision.basis,
+                    "agentgate.approval.id": decision.approval_id,
+                },
+            )
         return ToolResult(
             tool=self.name,
             status=decision.status,
@@ -78,10 +104,26 @@ class GovernedTool(ABC):
         """Run the tool; only called after authorize() allowed it (directly or via approval)."""
 
     def execute_timed(self, payload: dict[str, Any] | None, authorized: ToolResult) -> ToolResult:
-        """execute(), with how long it took recorded in the result."""
-        started = time.perf_counter()
-        result = self.execute(payload, authorized)
-        elapsed = round((time.perf_counter() - started) * 1000)
+        """execute(), with how long it took recorded in the result (and traced)."""
+        with tracer().start_as_current_span(f"tool {self.name}") as span:
+            set_attributes(
+                span,
+                {
+                    "agentgate.tool": self.name,
+                    "agentgate.action": self.action,
+                    "agentgate.target": self.target,
+                    "agentgate.approval.id": authorized.approval_id,
+                    "agentgate.step": current_step(),
+                },
+            )
+            set_content(span, "langfuse.observation.input", payload)
+            started = time.perf_counter()
+            result = self.execute(payload, authorized)
+            elapsed = round((time.perf_counter() - started) * 1000)
+            span.set_attribute("agentgate.tool.status", result.status)
+            if result.status == "FAILED":
+                span.set_status(Status(StatusCode.ERROR, result.error or "tool failed"))
+            set_content(span, "langfuse.observation.output", result.response_body or result.error)
         return result.model_copy(update={"duration_ms": elapsed})
 
     def run(
