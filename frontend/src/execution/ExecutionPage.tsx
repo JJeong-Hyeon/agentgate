@@ -9,6 +9,12 @@ import { agentTrace, isQuietAgentStep, totalTokens } from "./agentTrace";
 import { duration, nodeStatuses } from "./state";
 import { useExecutionStream } from "./useExecutionStream";
 
+const DECISION_TEXT: Record<string, string> = {
+  APPROVED: "승인됨",
+  REJECTED: "거절됨",
+  EXPIRED: "만료됨",
+};
+
 const STATUS_TEXT: Record<string, string> = {
   RUNNING: "실행 중",
   WAITING_APPROVAL: "승인 대기",
@@ -131,7 +137,7 @@ function ApprovalPanel({ approvalId }: { approvalId: number }) {
           </p>
         )}
         {a?.reason && <p className="approval-reason">{a.reason}</p>}
-        {a && a.status !== "PENDING" && <p className="muted">{a.status === "APPROVED" ? "승인됨" : "거절됨"} — 재개 중…</p>}
+        {a && a.status !== "PENDING" && <p className="muted">{DECISION_TEXT[a.status]} — 재개 중…</p>}
         {error && <p className="error">{error}</p>}
       </div>
       {canDecide && (!a || a.status === "PENDING") && (
