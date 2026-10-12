@@ -15,3 +15,27 @@
 ## 참고
 
 - Grafana 버전에 따라 import UI가 조금 다를 수 있어 import 후 가벼운 수정이 필요할 수 있다.
+
+## AgentGate 지표
+
+`/actuator/prometheus`에 HTTP·JVM 지표와 함께 아래 지표가 나온다. 대시보드(`infra/grafana/agentgate-dashboard.json`)의 "거버넌스 · Agent" 영역이 이 지표를 쓴다. 이미 import한 대시보드는 다시 import하면 패널이 추가된다.
+
+| 지표 | 종류 | 태그 | 내용 |
+|---|---|---|---|
+| `agentgate_governance_decisions_total` | counter | `status`, `basis`, `risk_level` | 행동 평가 결과 (허용 / 승인 필요 / 차단과 판정 근거) |
+| `agentgate_approvals_pending` | gauge | | 지금 결정을 기다리는 승인 요청 수 |
+| `agentgate_approval_wait_seconds` | timer | `outcome` | 승인 요청이 결정(승인 / 거절 / 만료)되기까지 걸린 시간 |
+| `agentgate_execution_duration_seconds` | timer | `workflow`, `status` | 끝난 실행(완료 / 중단 / 실패)과 소요 시간 |
+| `agentgate_llm_latency_seconds` | timer | `model`, `agent` | Agent의 LLM 호출 응답 시간 |
+| `agentgate_llm_tokens_total` | counter | `model`, `agent`, `direction` | LLM 입력 / 출력 토큰 (모델 서버가 알려줄 때) |
+| `agentgate_tool_duration_seconds` | timer | `tool`, `status`, `agent` | Agent의 Tool 실행 시간과 결과 (`agent/<id>`는 위임) |
+
+- LLM·Tool 지표는 Runtime이 보내는 실행 이벤트에서 계산하므로 AgentGate 한 곳만 수집하면 된다.
+- 태그에는 상태·워크플로·Agent·모델·Tool 이름처럼 개수가 정해진 값만 쓴다. 실행 ID 같은 값은 넣지 않는다.
+
+알림 예시 (Prometheus / Grafana alert):
+
+- 승인 적체: `agentgate_approvals_pending > 10`
+- 차단 급증: `sum(rate(agentgate_governance_decisions_total{status="BLOCKED"}[15m])) > 0.5`
+- 실행 실패: `sum(increase(agentgate_execution_duration_seconds_count{status="FAILED"}[1h])) > 0`
+- LLM 지연: `sum(rate(agentgate_llm_latency_seconds_sum[5m])) / sum(rate(agentgate_llm_latency_seconds_count[5m])) > 30`

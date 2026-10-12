@@ -21,7 +21,10 @@ import com.agentgate.runtime.RuntimeUnavailableException;
 import com.agentgate.runtime.WorkflowValidation;
 import com.agentgate.workflow.repository.WorkflowRepository;
 import com.agentgate.workflow.repository.WorkflowVersionRepository;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -63,6 +66,9 @@ class ExecutionIntegrationTest {
 
     @Autowired
     private WorkflowVersionRepository workflowVersionRepository;
+
+    @Autowired
+    private MeterRegistry meterRegistry;
 
     @MockitoBean
     private RuntimeClient runtimeClient;
@@ -164,6 +170,29 @@ class ExecutionIntegrationTest {
                 .andExpect(jsonPath("$.finishedAt").exists())
                 .andExpect(jsonPath("$.nodes.length()").value(2))
                 .andExpect(jsonPath("$.nodes[1].status").value("COMPLETED"));
+    }
+
+    @Test
+    void agentStepsAndFinishedExecutionsAreMeasured() throws Exception {
+        String id = start();
+        long finishedBefore = finished();
+        String output = """
+                {"agent":{"kind":"answer","agent":"metrics-agent","llm":{"model":"m1","latency_ms":40},"answer":"hi"}}""";
+
+        event(id, objectMapper.writeValueAsString(Map.of("type", "NODE_COMPLETED", "nodeId", "answer",
+                "step", "answer.think", "taskId", "t1", "output", output)))
+                .andExpect(status().isAccepted());
+        event(id, "{\"type\":\"EXECUTION_COMPLETED\"}");
+
+        assertThat(meterRegistry.get("agentgate.llm.latency").tags("model", "m1", "agent", "metrics-agent").timer().count())
+                .isEqualTo(1);
+        assertThat(finished()).isEqualTo(finishedBefore + 1);
+    }
+
+    private long finished() {
+        Timer timer = meterRegistry.find("agentgate.execution.duration").tags("workflow", "echo", "status", "COMPLETED")
+                .timer();
+        return timer == null ? 0 : timer.count();
     }
 
     @Test

@@ -35,6 +35,8 @@ dependencies {
     runtimeOnly 'org.postgresql:postgresql'
     annotationProcessor 'org.projectlombok:lombok'
     testImplementation 'com.h2database:h2'
+    // Checks metric names as Prometheus exposes them (the Grafana dashboard queries those).
+    testImplementation 'io.micrometer:micrometer-registry-prometheus'
     testImplementation 'org.springframework.boot:spring-boot-testcontainers'
     testImplementation 'org.testcontainers:testcontainers-postgresql'
     testImplementation 'org.springframework.boot:spring-boot-starter-actuator-test'
