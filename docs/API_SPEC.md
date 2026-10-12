@@ -179,6 +179,22 @@ POST   /api/v1/tool-risks/apply-suggestions        지정 안 된 Tool에 추천
 - 추천: `readOnlyHint` → `LOW`, `destructiveHint: false` → `MEDIUM`, 그 외 `HIGH`. annotations는 서버가 스스로 보고하는 값이라 자동 적용하지 않는다
 - 라벨 정책(예: `PII` → `HIGH`)보다 Tool 위험도(행동 지정)가 우선한다. 라벨과 함께 더 엄격하게 하려면 행동+라벨 정책을 추가한다
 
+### Agent Memory (장기 기억)
+
+실행 상태(Checkpoint)와 별개로 Agent가 실행을 넘어 기억하는 내용. Agent별로 저장된다.
+
+```
+GET    /api/v1/agents/{agentId}/memories?query=<검색어>   최신 100개, query가 있으면 관련도 순 (모든 역할)
+POST   /api/v1/agents/{agentId}/memories                  {"content": "VIP 고객은 라떼 쿠폰을 받는다"} → 201 (ADMIN)
+DELETE /api/v1/agents/{agentId}/memories/{id}             → 204 (ADMIN)
+```
+
+- 응답: `id`, `agentId`, `content`(최대 4000자), `source`(`AGENT`: 실행 중 Agent가 저장 / `USER`: 콘솔에서 추가), `executionId`, `createdBy`, `createdAt`, 검색 시 `score`·`matchedBy`(`SEMANTIC` / `KEYWORD`)
+- 검색: 임베딩 모델(`AGENTGATE_EMBEDDING_BASE_URL` + `AGENTGATE_EMBEDDING_MODEL`, OpenAI 호환 `/embeddings`)과 PostgreSQL pgvector 확장이 있으면 의미 검색(코사인 유사도 `AGENTGATE_MEMORY_MIN_SCORE` 이상)을 하고, 부족한 만큼 키워드(부분 일치, "고객"이 "고객이"와 일치) 결과로 채운다. 둘 중 하나라도 없거나 임베딩 서버가 응답하지 않으면 키워드 검색만 한다
+- 임베딩 없이 저장된 기억(서버 장애, 모델 설정 전)과 다른 모델로 임베딩된 기억은 5분마다 현재 모델로 다시 임베딩된다
+
+Runtime 전용 (`X-Runtime-Token`): `POST /api/v1/runtime/memories` `{"agentId","content","executionId"}` → 201, `POST /api/v1/runtime/memories/search` `{"agentId","query","limit"(1~20, 기본 5)}`.
+
 ## 3. 승인 처리 (status가 APPROVAL_REQUIRED일 때, 관리자 인증 필요)
 
 ```

@@ -1,6 +1,7 @@
 services:
   postgres:
-    image: 'postgres:latest'
+    # pgvector: semantic search over agent memories (optional; plain PostgreSQL falls back to keywords).
+    image: 'pgvector/pgvector:pg17'
     environment:
       - 'POSTGRES_DB=mydatabase'
       - 'POSTGRES_PASSWORD=secret'

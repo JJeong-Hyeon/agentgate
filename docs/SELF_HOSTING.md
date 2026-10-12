@@ -37,6 +37,7 @@ cp .env.example .env
 | `AGENTGATE_SECRET_KEY` | DB에 저장하는 인증정보(MCP 서버 헤더) 암호화 키 (`openssl rand -base64 32`). 잃어버리면 저장된 헤더를 다시 입력해야 하므로 따로 백업 |
 | `LLM_BASE_URL` / `LLM_MODEL` / `LLM_API_KEY` | 모델 서버. 같은 서버에서 돌고 있으면 `http://host.docker.internal:<포트>/v1` |
 | `LLM_TOOL_CALLING` | vLLM을 `--enable-auto-tool-choice --tool-call-parser <parser>`로 띄웠으면 `native`, 아니면 `json` |
+| `EMBEDDING_BASE_URL` / `EMBEDDING_MODEL` / `EMBEDDING_API_KEY` | 선택. Agent 기억의 의미 검색용 임베딩 서버(OpenAI 호환 `/embeddings`, 예: vLLM으로 `BAAI/bge-m3` 서빙). 비우면 키워드 검색 |
 | `AGENTGATE_APPROVAL_TTL` | 선택. 결정되지 않은 승인 요청을 만료시키는 시간 (기본 `PT24H`) |
 | `AGENTGATE_NOTIFY_WEBHOOK_*` | 선택. 승인 요청 알림 웹훅 ([`API_SPEC.md`](API_SPEC.md) 승인 처리 참고) |
 

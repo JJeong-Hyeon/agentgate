@@ -39,6 +39,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/actions").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/executions/*/events").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/runtime/mcp-servers").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/runtime/memories", "/api/v1/runtime/memories/search")
+                        .permitAll()
                         .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/prometheus").permitAll()
 
                         // Every signed-in user: who am I, and my own password.
