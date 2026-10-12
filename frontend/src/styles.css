@@ -645,6 +645,22 @@ fieldset.mode {
   display: grid;
   gap: 4px;
 }
+.memories {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+.memory {
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.memory p {
+  margin: 0 0 4px;
+  white-space: pre-wrap;
+}
 .agent-summary {
   padding: 8px;
   border: 1px solid var(--border);

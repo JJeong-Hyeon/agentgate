@@ -14,7 +14,7 @@ export interface TraceAgent {
 
 export type AgentTrace = TraceAgent &
   (
-  | { kind: "start"; prompt: string }
+  | { kind: "start"; prompt: string; memories?: string[]; memory_status?: string }
   | { kind: "tool_calls"; step?: number; tokens?: Tokens; calls: { tool: string; arguments: unknown }[] }
   | { kind: "answer"; step?: number; tokens?: Tokens; answer: string }
   | { kind: "repair"; step?: number; tokens?: Tokens; answer: string; problem: string }
@@ -79,14 +79,24 @@ export function totalTokens(nodes: NodeExecution[] = []): { input: number; outpu
   return seen ? { input, output } : null;
 }
 
+const MEMORY_LABELS: Record<string, string> = {
+  "memory/search": "기억 검색",
+  "memory/save": "기억 저장",
+  "memory/recall": "기억 회상",
+  memory_search: "기억 검색",
+  memory_save: "기억 저장",
+};
+
 /** "server/tool" from a recorded tool name like "helper:notes/save_note"; delegations read "→ agent". */
 export function toolLabel(tool: string): string {
   const name = tool.slice(tool.indexOf(":") + 1);
+  if (MEMORY_LABELS[name]) return MEMORY_LABELS[name];
   return name.startsWith("agent/") ? `→ ${name.slice("agent/".length)}에게 위임` : name;
 }
 
 /** The model's function name as people read it: delegate__research → "→ research에게 위임". */
 export function callLabel(functionName: string): string {
+  if (MEMORY_LABELS[functionName]) return MEMORY_LABELS[functionName];
   return functionName.startsWith("delegate__") ? `→ ${functionName.slice("delegate__".length)}에게 위임` : functionName;
 }
 

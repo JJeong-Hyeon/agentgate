@@ -26,6 +26,23 @@ function statusClass(status: string): string {
   return "risk-blocked";
 }
 
+function RecalledMemories({ memories, status }: { memories: string[]; status: string }) {
+  if (status !== "EXECUTED") {
+    return <p className="muted">기억 회상 안 함 ({CALL_STATUS_TEXT[status] ?? status})</p>;
+  }
+  if (memories.length === 0) return <p className="muted">회상한 기억 없음</p>;
+  return (
+    <>
+      <span className="agent-step-kind">회상한 기억 {memories.length}개</span>
+      <ul>
+        {memories.map((memory, i) => (
+          <li key={i}>{memory}</li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
 /** One agent sub-step: what the model asked for, how AgentGate decided, what came back. */
 export function AgentStep({ trace }: { trace: AgentTrace }) {
   const path = delegationPath(trace);
@@ -48,6 +65,7 @@ function StepBody({ trace }: { trace: AgentTrace }) {
         <div className="agent-step">
           <span className="agent-step-kind">작업</span>
           <pre>{trace.prompt}</pre>
+          {trace.memory_status && <RecalledMemories memories={trace.memories ?? []} status={trace.memory_status} />}
         </div>
       );
     case "tool_calls":
