@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     # Shared secret with AgentGate (X-Runtime-Token both ways): it authenticates resume requests
     # from AgentGate and this runtime's action evaluations and events. Empty → resume disabled.
     runtime_token: str = ""
+    # Local development only: lets the runtime start, and answer anyone, without RUNTIME_TOKEN.
+    runtime_allow_no_token: bool = False
     # JSON file with MCP servers ({"mcpServers": {...}}); empty → no MCP tools available.
     mcp_config_path: str = ""
     # Export prompts and answers on trace spans (OpenTelemetry, when an OTLP endpoint is set).

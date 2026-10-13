@@ -150,6 +150,21 @@ def test_registry_caches_and_keeps_the_last_list_when_agentgate_fails():
     assert source.calls == 2  # the failure is not retried on every call
 
 
+def test_registered_servers_are_dropped_when_agentgate_stays_unreachable_too_long():
+    now = [0.0]
+    source = Source({"crm": McpServerConfig(url="http://crm/mcp")})
+    registry = McpServerRegistry(
+        {}, source, ttl_seconds=30, max_stale_seconds=300, clock=lambda: now[0]
+    )
+    assert set(registry.servers()) == {"crm"}
+
+    source.results = [RuntimeError("AgentGate down")]
+    now[0] = 200
+    assert set(registry.servers()) == {"crm"}  # a short outage keeps the last list
+    now[0] = 301
+    assert registry.servers() == {}  # a long one does not: the server may have been disabled
+
+
 def test_registry_without_agentgate_has_only_the_config_file():
     assert McpServerRegistry(FILE).servers() == FILE
 

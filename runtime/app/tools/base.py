@@ -8,9 +8,14 @@ from opentelemetry.trace import Status, StatusCode
 from pydantic import BaseModel
 
 from app.governance.agentgate_client import AgentGateClient, AgentGateError
+from app.governance.payload import payload_hash
 from app.telemetry import current_step, set_attributes, set_content, tracer
 
 MAX_OUTPUT_CHARS = 2000
+
+
+class PayloadMismatch(Exception):
+    """What is about to run is not what the approver approved; the execution fails instead."""
 
 
 class ToolResult(BaseModel):
@@ -51,9 +56,11 @@ class GovernedTool(ABC):
         agent_version: int | None = None,
         reason: str | None = None,
         delegated_by: str | None = None,
+        payload: dict[str, Any] | None = None,
     ) -> ToolResult:
         """Ask AgentGate; with `agent_id` / `agent_version` it is asked on behalf of that agent,
-        whose definition's tool permissions then apply."""
+        whose definition's tool permissions then apply. With the `payload` about to be sent, its
+        hash is recorded with any approval, to be checked by payload_matches() before running."""
         with tracer().start_as_current_span(f"governance {self.action}") as span:
             set_attributes(
                 span,
@@ -77,6 +84,7 @@ class GovernedTool(ABC):
                     agent_id=agent_id,
                     agent_version=agent_version,
                     delegated_by=delegated_by,
+                    payload_hash=self.payload_hash(payload) if payload is not None else None,
                 )
             except AgentGateError as e:
                 span.set_status(Status(StatusCode.ERROR, str(e)))
@@ -98,6 +106,17 @@ class GovernedTool(ABC):
             approval_id=decision.approval_id,
             basis=decision.basis,
         )
+
+    def payload_hash(self, payload: dict[str, Any] | None) -> str:
+        return payload_hash(self.action, self.target, payload)
+
+    def check_payload(self, payload: dict[str, Any] | None, approved_hash: str | None) -> None:
+        """Raises PayloadMismatch unless `payload` is what AgentGate recorded for the approval.
+        No recorded hash (an approval from before hashes existed) is not checked."""
+        if approved_hash is not None and approved_hash != self.payload_hash(payload):
+            raise PayloadMismatch(
+                f"{self.name}: the payload to run differs from the one that was approved"
+            )
 
     @abstractmethod
     def execute(self, payload: dict[str, Any] | None, authorized: ToolResult) -> ToolResult:

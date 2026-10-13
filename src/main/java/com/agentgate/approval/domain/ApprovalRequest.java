@@ -71,6 +71,10 @@ public class ApprovalRequest {
     @Column(length = 500)
     private String delegatedBy;
 
+    // SHA-256 the runtime computed over what it will run once approved; null for requests that did not send one.
+    @Column(length = 64)
+    private String payloadHash;
+
     public ApprovalRequest(String agentId, String action, String target, List<String> labels, RiskLevel riskLevel) {
         this(agentId, action, target, labels, riskLevel, null);
     }
@@ -82,8 +86,14 @@ public class ApprovalRequest {
 
     public ApprovalRequest(String agentId, String action, String target, List<String> labels, RiskLevel riskLevel,
                            String executionId, String reason, String delegatedBy) {
+        this(agentId, action, target, labels, riskLevel, executionId, reason, delegatedBy, null);
+    }
+
+    public ApprovalRequest(String agentId, String action, String target, List<String> labels, RiskLevel riskLevel,
+                           String executionId, String reason, String delegatedBy, String payloadHash) {
         this(agentId, action, target, labels, riskLevel, executionId, reason);
         this.delegatedBy = delegatedBy;
+        this.payloadHash = payloadHash;
     }
 
     public ApprovalRequest(String agentId, String action, String target, List<String> labels, RiskLevel riskLevel,

@@ -67,7 +67,8 @@ public class RuntimeResumeNotifier {
         if (approval == null || !approval.needsRuntimeNotification()) {
             return;
         }
-        if (runtimeClient.resume(approval.getExecutionId(), approval.getId(), approval.getStatus())) {
+        if (runtimeClient.resume(approval.getExecutionId(), approval.getId(), approval.getStatus(),
+                approval.getPayloadHash())) {
             transactionTemplate.executeWithoutResult(status ->
                     approvalRequestRepository.findById(approvalId).ifPresent(ApprovalRequest::markRuntimeNotified));
         }

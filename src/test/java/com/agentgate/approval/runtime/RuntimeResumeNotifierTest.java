@@ -66,7 +66,7 @@ class RuntimeResumeNotifierTest {
     @Test
     void deliveredDecisionIsMarkedNotified() {
         ApprovalRequest approval = approval("exec-1", true);
-        when(runtimeClient.resume("exec-1", 7L, ApprovalStatus.APPROVED)).thenReturn(true);
+        when(runtimeClient.resume("exec-1", 7L, ApprovalStatus.APPROVED, null)).thenReturn(true);
 
         notifier.onApprovalDecided(new ApprovalDecidedEvent(7L));
 
@@ -77,7 +77,7 @@ class RuntimeResumeNotifierTest {
     @Test
     void failedDeliveryStaysPendingForRetry() {
         ApprovalRequest approval = approval("exec-1", true);
-        when(runtimeClient.resume("exec-1", 7L, ApprovalStatus.APPROVED)).thenReturn(false);
+        when(runtimeClient.resume("exec-1", 7L, ApprovalStatus.APPROVED, null)).thenReturn(false);
 
         notifier.onApprovalDecided(new ApprovalDecidedEvent(7L));
 
@@ -90,7 +90,7 @@ class RuntimeResumeNotifierTest {
 
         notifier.onApprovalDecided(new ApprovalDecidedEvent(7L));
 
-        verify(runtimeClient, never()).resume(any(), any(), any());
+        verify(runtimeClient, never()).resume(any(), any(), any(), any());
     }
 
     @Test
@@ -99,7 +99,7 @@ class RuntimeResumeNotifierTest {
 
         notifier.onApprovalDecided(new ApprovalDecidedEvent(7L));
 
-        verify(runtimeClient, never()).resume(any(), any(), any());
+        verify(runtimeClient, never()).resume(any(), any(), any(), any());
     }
 
     @Test
@@ -110,7 +110,7 @@ class RuntimeResumeNotifierTest {
         notifier.onApprovalDecided(new ApprovalDecidedEvent(7L));
         notifier.retryUndelivered();
 
-        verify(runtimeClient, never()).resume(any(), any(), any());
+        verify(runtimeClient, never()).resume(any(), any(), any(), any());
     }
 
     @Test
@@ -118,7 +118,7 @@ class RuntimeResumeNotifierTest {
         ApprovalRequest approval = approval("exec-1", true);
         when(repository.findByExecutionIdIsNotNullAndStatusNotAndRuntimeNotifiedAtIsNull(ApprovalStatus.PENDING))
                 .thenReturn(List.of(approval));
-        when(runtimeClient.resume("exec-1", 7L, ApprovalStatus.APPROVED)).thenReturn(true);
+        when(runtimeClient.resume("exec-1", 7L, ApprovalStatus.APPROVED, null)).thenReturn(true);
 
         notifier.retryUndelivered();
 

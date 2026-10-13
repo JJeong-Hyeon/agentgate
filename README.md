@@ -94,7 +94,7 @@ MCP 도구를 쓰려면 `mcpServers` 형식의 설정 파일을 만들고 `MCP_C
 cd runtime
 python3.12 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
-cp .env.example .env
+cp .env.example .env      # RUNTIME_TOKEN을 채운다 (Runtime만 로컬에서 띄울 때는 RUNTIME_ALLOW_NO_TOKEN=true)
 uvicorn app.main:app --reload
 pytest
 ```

@@ -15,6 +15,7 @@ from app.dsl.compiler import CompileError, WorkflowCompiler
 from app.governance.agentgate_client import AgentGateClient
 from app.nodes.agent import FINAL_TURN_NOTE, function_names
 from app.runner import WorkflowRunner
+from app.tools.base import PayloadMismatch
 from app.tools.catalog import ToolCatalog
 from app.tools.mcp import McpServerConfig
 from tests.fake_llm import ScriptedChatModel, calls
@@ -152,6 +153,33 @@ def test_approval_required_waits_then_runs_when_approved():
     assert len(gate.bodies) == 1  # not asked again on resume
     assert result["tool_results"][0]["status"] == "EXECUTED"
     assert result["tool_results"][0]["approval_id"] == 101
+
+
+def test_the_payload_hash_is_recorded_and_an_approved_call_runs_only_if_it_matches():
+    from app.governance.payload import payload_hash
+
+    args = {"a": 2, "b": 3}
+    llm = ScriptedChatModel.of(calls(("local__add", args)), "2+3=5", "done")
+    gate = PolicyGate(add="APPROVAL_REQUIRED")
+    graph, state = build(agent_workflow(), llm, gate)
+    graph.invoke(state, CONFIG)
+    expected = payload_hash("MCP:local:add", gate.bodies[0]["target"], args)
+    assert gate.bodies[0]["payloadHash"] == expected
+
+    result = graph.invoke(Command(resume={"decision": "APPROVED", "payloadHash": expected}), CONFIG)
+
+    assert result["tool_results"][0]["status"] == "EXECUTED"
+
+
+def test_an_approval_for_other_arguments_fails_the_execution_instead_of_running():
+    llm = ScriptedChatModel.of(calls(("local__add", {"a": 2, "b": 3})), "never", "done")
+    graph, state = build(agent_workflow(), llm, PolicyGate(add="APPROVAL_REQUIRED"))
+    graph.invoke(state, CONFIG)
+
+    with pytest.raises(PayloadMismatch, match="differs from the one that was approved"):
+        graph.invoke(Command(resume={"decision": "APPROVED", "payloadHash": "0" * 64}), CONFIG)
+
+    assert [m for m in llm.log[-1]["messages"] if isinstance(m, ToolMessage)] == []
 
 
 def test_rejected_call_is_reported_to_the_model_which_continues():

@@ -59,7 +59,7 @@ def add_tool(
     def gate(state: dict, config: RunnableConfig) -> Command:
         # The LangGraph thread id is the execution id AgentGate links approvals to.
         execution_id = config.get("configurable", {}).get("thread_id")
-        result = tool.authorize(execution_id)
+        result = tool.authorize(execution_id, payload=build_payload(state))
         update = {"pending_tool": result.model_dump()}
         if result.status == "ALLOWED":
             return Command(update=update, goto=execute_node)
@@ -71,12 +71,17 @@ def add_tool(
         pending = state["pending_tool"]
         decision = interrupt({"tool": name, "approval_id": pending["approval_id"]})
         if decision.get("decision") == "APPROVED":
-            return Command(goto=execute_node)
+            # The hash AgentGate recorded for this approval; execute() runs only what it matches.
+            approved = {**pending, "approved_hash": decision.get("payloadHash")}
+            return Command(update={"pending_tool": approved}, goto=execute_node)
         return denied(ToolResult(**{**pending, "status": "REJECTED"}))
 
     def execute(state: dict) -> dict:
-        authorized = ToolResult(**state["pending_tool"])
-        return finish(tool.execute_timed(build_payload(state), authorized))
+        pending = state["pending_tool"]
+        authorized = ToolResult(**pending)
+        payload = build_payload(state)
+        tool.check_payload(payload, pending.get("approved_hash"))
+        return finish(tool.execute_timed(payload, authorized))
 
     graph.add_node(name, gate, destinations=(execute_node, approval_node, *next_nodes, END))
     graph.add_node(approval_node, await_approval, destinations=(execute_node, *next_nodes, END))

@@ -59,7 +59,7 @@ class RuntimeClientTest {
 
     @Test
     void sendsResumeWithTokenAndDecision() {
-        boolean delivered = client().resume("exec-1", 7L, ApprovalStatus.APPROVED);
+        boolean delivered = client().resume("exec-1", 7L, ApprovalStatus.APPROVED, null);
 
         assertThat(delivered).isTrue();
         assertThat(path.get()).isEqualTo("/runtime/executions/exec-1/resume");
@@ -68,24 +68,31 @@ class RuntimeClientTest {
     }
 
     @Test
+    void resumeCarriesThePayloadHashRecordedWithTheApproval() {
+        client().resume("exec-1", 7L, ApprovalStatus.APPROVED, "abc123");
+
+        assertThat(body.get()).contains("\"payloadHash\":\"abc123\"");
+    }
+
+    @Test
     void conflictCountsAsDelivered() {
         responseStatus = 409;
 
-        assertThat(client().resume("exec-1", 7L, ApprovalStatus.REJECTED)).isTrue();
+        assertThat(client().resume("exec-1", 7L, ApprovalStatus.REJECTED, null)).isTrue();
     }
 
     @Test
     void serverErrorShouldBeRetried() {
         responseStatus = 500;
 
-        assertThat(client().resume("exec-1", 7L, ApprovalStatus.APPROVED)).isFalse();
+        assertThat(client().resume("exec-1", 7L, ApprovalStatus.APPROVED, null)).isFalse();
     }
 
     @Test
     void unreachableRuntimeShouldBeRetried() {
         RuntimeClient unreachable = new RuntimeClient(RestClient.builder(), "http://127.0.0.1:1", "secret");
 
-        assertThat(unreachable.resume("exec-1", 7L, ApprovalStatus.APPROVED)).isFalse();
+        assertThat(unreachable.resume("exec-1", 7L, ApprovalStatus.APPROVED, null)).isFalse();
     }
 
     @Test

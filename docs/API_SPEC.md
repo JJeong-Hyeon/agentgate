@@ -34,7 +34,8 @@ X-Runtime-Token: <runtime token>    # Agent Runtime: 등록된 어느 Agent의 �
 - `reason` (선택, 최대 1000자): 승인 요청에 저장되어 승인자에게 표시되는 설명
 - `executionId` (선택, 최대 64자): Runtime 실행 ID(LangGraph `thread_id`). 승인 요청이 생성되면 함께 저장되어 승인 후 어떤 실행을 재개할지 식별하는 데 쓰임
 - `delegatedBy` (선택, 최대 500자): 이 행동을 위임한 Agent 경로(바깥부터, 예: `supervisor>research-agent`). Audit Log와 승인 요청에 기록된다
-- `agentVersion` (선택, 양의 정수): Agent 정의 버전. 지정하면 그 정의의 Tool 권한을 정책보다 먼저 적용한다 (`action`은 `MCP:<server>:<tool>`로 정의의 Tool과 대응). 정의에 없는 Tool → `BLOCKED`, 권한 `BLOCKED` → `BLOCKED`, 권한 `APPROVAL` → 정책이 허용해도 `APPROVAL_REQUIRED`. Tool에 지정한 라벨은 `labels`와 합쳐 정책 매칭에 쓰인다. 없는 버전이면 404 `AGENT_DEFINITION_NOT_FOUND`
+- `agentVersion` (선택, 양의 정수): Agent 정의 버전. 지정하면 그 정의의 Tool 권한을 정책보다 먼저 적용한다 (`action`은 `MCP:<server>:<tool>`로 정의의 Tool과 대응). 정의에 없는 Tool → `BLOCKED`, 권한 `BLOCKED` → `BLOCKED`, 권한 `APPROVAL` → 정책이 허용해도 `APPROVAL_REQUIRED`. Tool에 지정한 라벨은 `labels`와 합쳐 정책 매칭에 쓰인다. 없는 버전이면 404 `AGENT_DEFINITION_NOT_FOUND`. **생략하면 Tool 권한 검사 없이 정책만 평가한다.** Runtime이 실행하는 Agent는 항상 버전을 보내므로 Tool 권한이 적용되고, 버전 없이 호출하는 것은 Agent가 API 키로 직접 부르는 경우와 워크플로 수준 Tool(HTTP/MCP Tool 노드)이다
+- `payloadHash` (선택, 최대 64자): Runtime이 실행할 내용(action, target, 인자)의 SHA-256. `APPROVAL_REQUIRED`일 때 승인 요청에 저장되어 승인 응답의 `payloadHash`로 보이고, 승인 결정을 Runtime에 알릴 때(`resume`) 함께 전달된다. Runtime은 실행 직전 현재 내용의 해시와 비교해 다르면 실행하지 않고 실행을 실패시킨다(승인한 것과 실행하는 것의 결속). 해시 없이 만들어진 승인 요청은 검사하지 않는다
 
 **응답**
 ```json

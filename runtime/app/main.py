@@ -29,6 +29,12 @@ def build_gate(settings: Settings) -> AgentGateClient:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
+    if not settings.runtime_token and not settings.runtime_allow_no_token:
+        raise RuntimeError(
+            "RUNTIME_TOKEN is not set, so the runtime API would answer anyone. Set it to the same "
+            "value as AgentGate's AGENTGATE_RUNTIME_TOKEN "
+            "(local development only: RUNTIME_ALLOW_NO_TOKEN=true)."
+        )
     setup_tracing(settings.otel_capture_content)
     registered = (
         AgentGateServers(settings.agentgate_base_url, settings.runtime_token)

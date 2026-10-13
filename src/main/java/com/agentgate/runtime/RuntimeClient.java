@@ -76,11 +76,16 @@ public class RuntimeClient {
      * @return true when there is nothing left to deliver (resumed, already resumed, or unknown to the runtime);
      *         false when the call should be retried.
      */
-    public boolean resume(String executionId, Long approvalId, ApprovalStatus decision) {
+    public boolean resume(String executionId, Long approvalId, ApprovalStatus decision, String payloadHash) {
+        // The payload hash recorded with the approval: the runtime runs the call only if it still matches.
+        Map<String, Object> body = new java.util.HashMap<>(Map.of("approvalId", approvalId, "decision", decision.name()));
+        if (payloadHash != null) {
+            body.put("payloadHash", payloadHash);
+        }
         try {
             restClient.post()
                     .uri("/runtime/executions/{id}/resume", executionId)
-                    .body(Map.of("approvalId", approvalId, "decision", decision.name()))
+                    .body(body)
                     .retrieve()
                     .toBodilessEntity();
             return true;
