@@ -33,7 +33,7 @@ jobs:
         working-directory: runtime
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
           cache: pip
@@ -52,7 +52,7 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
           cache: pip
@@ -101,7 +101,7 @@ jobs:
         run: docker run --rm -v "$PWD:/src" $TRIVY rootfs $TRIVY_ARGS /src/build/libs
       - name: Frontend (package-lock.json)
         run: docker run --rm -v "$PWD:/src" $TRIVY fs $TRIVY_ARGS /src/frontend
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - name: Runtime (Python)
