@@ -24,5 +24,15 @@ def fail() -> str:
     raise ValueError("boom")
 
 
+@server.tool()
+def count(path: str) -> str:
+    """Append a line to `path` and return how many calls that makes (each call is its own
+    process, so a file is how tests observe how many times this actually ran)."""
+    with open(path, "a") as f:
+        f.write("1\n")
+    with open(path) as f:
+        return str(sum(1 for _ in f))
+
+
 if __name__ == "__main__":
     server.run()

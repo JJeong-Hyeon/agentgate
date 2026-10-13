@@ -1,5 +1,6 @@
 """What every tool shares: an AgentGate check before it may run, and one result format."""
 
+import logging
 import time
 from abc import ABC, abstractmethod
 from typing import Any, Literal
@@ -14,6 +15,8 @@ from app.telemetry import current_step, set_attributes, set_content, tracer
 from app.tools import ledger
 
 MAX_OUTPUT_CHARS = 2000
+
+log = logging.getLogger(__name__)
 
 
 class PayloadMismatch(Exception):
@@ -135,7 +138,14 @@ class GovernedTool(ABC):
         key = authorized.idempotency_key
         settings = get_settings() if key else None
         if key:
-            replay = ledger.begin(settings, key, self.name)
+            try:
+                replay = ledger.begin(settings, key, self.name)
+            except Exception as e:  # noqa: BLE001 - a ledger we cannot reach must not be bypassed
+                return ToolResult(
+                    tool=self.name,
+                    status="FAILED",
+                    error=f"could not check the call ledger, so the call was not made: {e}",
+                )
             if replay is not None:
                 return replay.model_copy(
                     update={
@@ -165,7 +175,12 @@ class GovernedTool(ABC):
             set_content(span, "langfuse.observation.output", result.response_body or result.error)
         final = result.model_copy(update={"duration_ms": elapsed})
         if key:
-            ledger.finish(settings, key, final)
+            try:
+                ledger.finish(settings, key, final)
+            except Exception:  # noqa: BLE001 - the call already ran; its result still goes back
+                log.warning(
+                    "could not record the outcome of %r in the call ledger", key, exc_info=True
+                )
         return final
 
     def run(
