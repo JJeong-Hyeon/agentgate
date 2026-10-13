@@ -1,11 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { AgentGateClient, type Credentials } from "../api/client";
+import { AgentGateClient, UNAUTHORIZED_EVENT, type Credentials } from "../api/client";
 import type { Me, Role } from "../api/types";
 
-const STORAGE_KEY = "agentgate.credentials";
-
 interface AuthState {
+  /** The signed-in user's API client; null before sign-in (the login gate keys off this). */
   client: AgentGateClient | null;
+  /** The same client regardless of sign-in: its requests carry the session cookie, nothing else. */
+  api: AgentGateClient;
   username: string | null;
   /** Current user's profile and roles; null while it loads or before login. */
   me: Me | null;
@@ -17,25 +18,10 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | null>(null);
 
-// Credentials live only for this browser tab's session; storage may be unavailable (private mode).
-function loadStored(): Credentials | null {
-  try {
-    const raw = sessionStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as Credentials) : null;
-  } catch {
-    return null;
-  }
-}
-
-function store(credentials: Credentials | null): void {
-  try {
-    if (credentials) sessionStorage.setItem(STORAGE_KEY, JSON.stringify(credentials));
-    else sessionStorage.removeItem(STORAGE_KEY);
-  } catch {
-    // Login still works for this page load.
-  }
-}
-
+/**
+ * Who is signed in, by the server's session cookie: the browser never holds the password. On load (and
+ * reload) the session, if any, is found by asking the server who this is.
+ */
 export function AuthProvider({
   children,
   fetchImpl,
@@ -43,62 +29,53 @@ export function AuthProvider({
   children: ReactNode;
   fetchImpl?: typeof fetch;
 }) {
-  const [credentials, setCredentials] = useState<Credentials | null>(loadStored);
+  const client = useMemo(() => new AgentGateClient(null, fetchImpl), [fetchImpl]);
   const [me, setMe] = useState<Me | null>(null);
-  // Starts true when credentials were restored from storage, so the nav doesn't flash role-gated links.
-  const [meLoading, setMeLoading] = useState(credentials !== null);
+  const [meLoading, setMeLoading] = useState(true);
 
-  const logout = useCallback(() => {
-    store(null);
-    setCredentials(null);
-    setMe(null);
-  }, []);
-
-  const login = useCallback(
-    async (candidate: Credentials) => {
-      // GET /me both verifies the credentials and returns this user's roles.
-      const profile = await new AgentGateClient(candidate, fetchImpl).getMe();
-      store(candidate);
-      setCredentials(candidate);
-      setMe(profile);
-    },
-    [fetchImpl],
-  );
-
-  // Credentials restored from sessionStorage (page reload) still need their roles fetched.
   useEffect(() => {
-    if (!credentials || me) return;
     let cancelled = false;
-    setMeLoading(true);
-    new AgentGateClient(credentials, fetchImpl)
+    client
       .getMe()
       .then((profile) => {
         if (!cancelled) setMe(profile);
       })
-      .catch(() => {
-        if (!cancelled) logout();
-      })
+      .catch(() => undefined)
       .finally(() => {
         if (!cancelled) setMeLoading(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [credentials, me, fetchImpl, logout]);
+  }, [client]);
+
+  // The session ended while the console was open.
+  useEffect(() => {
+    // Only this provider's own client: a request of a page that is already gone must not sign anyone out.
+    const onUnauthorized = (event: Event) => {
+      if ((event as CustomEvent).detail === client) setMe(null);
+    };
+    window.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
+    return () => window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
+  }, [client]);
+
+  const logout = useCallback(() => {
+    setMe(null);
+    client.logout().catch(() => undefined);
+  }, [client]);
+
+  const login = useCallback(
+    async ({ username, password }: Credentials) => {
+      setMe(await client.login(username, password));
+    },
+    [client],
+  );
 
   const hasRole = useCallback((...roles: Role[]) => roles.some((r) => me?.roles.includes(r)), [me]);
 
   const value = useMemo<AuthState>(
-    () => ({
-      client: credentials ? new AgentGateClient(credentials, fetchImpl) : null,
-      username: credentials?.username ?? null,
-      me,
-      meLoading,
-      hasRole,
-      login,
-      logout,
-    }),
-    [credentials, fetchImpl, me, meLoading, hasRole, login, logout],
+    () => ({ client: me ? client : null, api: client, username: me?.username ?? null, me, meLoading, hasRole, login, logout }),
+    [client, me, meLoading, hasRole, login, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -110,9 +87,7 @@ export function useAuth(): AuthState {
   return state;
 }
 
-/** The API client of the logged-in admin; only for pages behind the login gate. */
+/** The API client for pages behind the login gate (App shows them only to a signed-in user). */
 export function useClient(): AgentGateClient {
-  const { client } = useAuth();
-  if (!client) throw new Error("Not logged in");
-  return client;
+  return useAuth().api;
 }

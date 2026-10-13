@@ -1,20 +1,29 @@
 package com.agentgate.config;
 
 import com.agentgate.user.service.LoginAttemptService;
+import jakarta.servlet.http.HttpServletRequest;
+import java.util.Set;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
+import org.springframework.security.web.savedrequest.NullRequestCache;
 import tools.jackson.databind.ObjectMapper;
 
 @Configuration
 public class SecurityConfig {
 
+    private static final Set<String> SAFE_METHODS = Set.of("GET", "HEAD", "TRACE", "OPTIONS");
     private static final String ADMIN = "ADMIN";
     private static final String EDITOR = "EDITOR";
     private static final String APPROVER = "APPROVER";
@@ -39,10 +48,36 @@ public class SecurityConfig {
             "/api/v1/mcp-servers", "/api/v1/mcp-servers/**"};
 
     @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) throws Exception {
+        return configuration.getAuthenticationManager();
+    }
+
+    /**
+     * CSRF only matters for requests the browser authenticates by itself, i.e. with a live session cookie. Header
+     * credentials (Basic, API key, runtime token) are never added by a cross-site page, and requests without a
+     * session carry nothing to abuse. Sign-in itself starts a session, so it cannot need one.
+     */
+    static boolean csrfExempt(HttpServletRequest request) {
+        return request.getSession(false) == null
+                || request.getHeader(HttpHeaders.AUTHORIZATION) != null
+                || request.getHeader("X-API-Key") != null
+                || request.getHeader("X-Runtime-Token") != null
+                || "/api/v1/auth/login".equals(request.getRequestURI());
+    }
+
+    @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, LoginAttemptService loginAttempts,
                                                    ObjectMapper objectMapper) throws Exception {
         http
-                .csrf(csrf -> csrf.disable())
+                // The console reads the XSRF-TOKEN cookie and sends it back in X-XSRF-TOKEN.
+                .csrf(csrf -> csrf
+                        .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                        .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
+                        .requireCsrfProtectionMatcher(request -> !SAFE_METHODS.contains(request.getMethod())
+                                && !csrfExempt(request)))
+                // A rejected request must not leave a session (and so a CSRF duty) behind.
+                .requestCache(cache -> cache.requestCache(new NullRequestCache()))
+                .addFilterAfter(new CsrfCookieFilter(), BasicAuthenticationFilter.class)
                 .httpBasic(Customizer.withDefaults())
                 .headers(headers -> headers.contentSecurityPolicy(csp -> csp.policyDirectives(CONTENT_SECURITY_POLICY)))
                 // Repeated failed sign-ins are refused before their password is checked.
@@ -50,6 +85,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // Agents (API key) and the runtime (runtime token) authenticate in their controllers.
                         .requestMatchers("/api/v1/actions").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/login", "/api/v1/auth/logout").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/executions/*/events").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/runtime/mcp-servers").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/runtime/memories", "/api/v1/runtime/memories/search")

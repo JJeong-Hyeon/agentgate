@@ -56,7 +56,8 @@ function Layout() {
 }
 
 export function App() {
-  const { client } = useAuth();
+  const { client, meLoading } = useAuth();
+  if (meLoading) return null;
   if (!client) return <LoginPage />;
   return (
     <BrowserRouter>

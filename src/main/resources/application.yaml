@@ -12,6 +12,15 @@ spring:
     baseline-version: 0
 
 server:
+  servlet:
+    session:
+      # 콘솔 로그인 세션. 이 시간 동안 요청이 없으면 다시 로그인한다.
+      timeout: ${AGENTGATE_SESSION_TIMEOUT:PT8H}
+      cookie:
+        http-only: true
+        same-site: lax
+        # HTTPS 뒤에서 운영하면 true (selfhost compose 기본). 로컬 HTTP 개발은 false.
+        secure: ${AGENTGATE_SESSION_COOKIE_SECURE:false}
   # Trust X-Forwarded-* from reverse proxies on private networks (ALB, Caddy), so requests that reached the
   # proxy over HTTPS are treated as secure (HSTS, redirect URLs).
   forward-headers-strategy: native

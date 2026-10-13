@@ -42,14 +42,41 @@ export class ApiError extends Error {
   }
 }
 
-/** Thin wrapper over AgentGate's REST API using HTTP Basic admin credentials. */
+/** Fired (with the client as `detail`) when the server says the session is gone (expired, signed out elsewhere). */
+export const UNAUTHORIZED_EVENT = "agentgate:unauthorized";
+
+function csrfToken(): string | null {
+  const match = document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+/**
+ * Thin wrapper over AgentGate's REST API. The console signs in with a session cookie (no credentials here);
+ * with `credentials` it sends HTTP Basic instead, as scripts do.
+ */
 export class AgentGateClient {
-  private readonly credentials: Credentials;
+  private readonly credentials: Credentials | null;
   private readonly fetchImpl: typeof fetch;
 
-  constructor(credentials: Credentials, fetchImpl: typeof fetch = fetch.bind(globalThis)) {
+  constructor(credentials: Credentials | null = null, fetchImpl: typeof fetch = fetch.bind(globalThis)) {
     this.credentials = credentials;
     this.fetchImpl = fetchImpl;
+  }
+
+  /** Signs in: the server answers with the user and sets the session cookie. */
+  login(username: string, password: string): Promise<Me> {
+    return this.request("/api/v1/auth/login", { method: "POST", body: JSON.stringify({ username, password }) });
+  }
+
+  logout(): Promise<void> {
+    return this.request("/api/v1/auth/logout", { method: "POST" });
+  }
+
+  /** Headers that authenticate a request: Basic, or the CSRF token that goes with the session cookie. */
+  private authHeaders(method = "GET"): Record<string, string> {
+    if (this.credentials) return { Authorization: this.authorization() };
+    const token = ["GET", "HEAD", "OPTIONS"].includes(method) ? null : csrfToken();
+    return token ? { "X-XSRF-TOKEN": token } : {};
   }
 
   getDashboard(period: DashboardPeriod): Promise<Dashboard> {
@@ -109,7 +136,7 @@ export class AgentGateClient {
     const response = await this.fetchImpl(`/api/v1/executions/${encodeURIComponent(executionId)}/stream`, {
       headers: {
         Accept: "text/event-stream",
-        Authorization: this.authorization(),
+        ...this.authHeaders(),
         "X-Requested-With": "XMLHttpRequest",
       },
       signal,
@@ -271,7 +298,7 @@ export class AgentGateClient {
   }
 
   private authorization(): string {
-    const { username, password } = this.credentials;
+    const { username, password } = this.credentials!;
     return `Basic ${btoa(`${username}:${password}`)}`;
   }
 
@@ -280,7 +307,7 @@ export class AgentGateClient {
       ...init,
       headers: {
         Accept: "application/json",
-        Authorization: this.authorization(),
+        ...this.authHeaders(init.method),
         // Makes AgentGate answer 401 without WWW-Authenticate, so the browser's own login dialog never appears.
         "X-Requested-With": "XMLHttpRequest",
         ...(init.body ? { "Content-Type": "application/json" } : {}),
@@ -289,6 +316,10 @@ export class AgentGateClient {
     });
     if (!response.ok) {
       const body = (await response.json().catch(() => null)) as ApiErrorBody | null;
+      // A session that ended while the console was open: back to the sign-in page (not for sign-in itself).
+      if (response.status === 401 && !this.credentials && path !== "/api/v1/auth/login") {
+        window.dispatchEvent(new CustomEvent(UNAUTHORIZED_EVENT, { detail: this }));
+      }
       throw new ApiError(response.status, body);
     }
     // 204 No Content (e.g. DELETE) has no body to parse.

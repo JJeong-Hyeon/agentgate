@@ -58,6 +58,8 @@ X-Runtime-Token: <runtime token>    # Agent Runtime: 등록된 어느 Agent의 �
 
 콘솔 API는 HTTP Basic으로 DB 사용자를 인증한다. 역할은 여럿 가질 수 있다.
 
+**콘솔 로그인(세션)**: `POST /api/v1/auth/login` `{"username","password"}` → 200 (사용자 정보 + `HttpOnly` 세션 쿠키 `JSESSIONID`와 `XSRF-TOKEN` 쿠키), 잘못된 정보 401 `INVALID_CREDENTIALS`, 실패 제한에 걸리면 429. `POST /api/v1/auth/logout` → 204 (세션 종료). 세션 쿠키로 인증한 요청 중 상태를 바꾸는 것(POST · PUT · DELETE)은 `X-XSRF-TOKEN` 헤더에 `XSRF-TOKEN` 쿠키 값을 보내야 하고, 없으면 403이다. HTTP Basic, `X-API-Key`, `X-Runtime-Token`을 쓰는 요청과 세션 없는 요청은 이 검사를 받지 않으므로 스크립트는 지금처럼 Basic으로 호출하면 된다. 세션은 8시간(`AGENTGATE_SESSION_TIMEOUT`) 요청이 없으면 끝난다.
+
 같은 아이디 + 같은 IP에서 로그인이 연속 5번 실패하면 15분 동안, 한 IP에서 아이디와 상관없이 15분 안에 20번 실패하면 그 IP 전체가 15분 동안 막힌다. 막힌 동안은 비밀번호가 맞아도 `429` + `Retry-After`(초)와 `code: TOO_MANY_LOGIN_ATTEMPTS`를 돌려준다. 로그인에 성공하면 그 아이디 + IP의 실패 횟수는 초기화된다. 횟수와 시간은 `AGENTGATE_LOGIN_MAX_FAILURES`, `AGENTGATE_LOGIN_MAX_FAILURES_PER_IP`, `AGENTGATE_LOGIN_LOCK_DURATION`으로 바꾼다.
 
 | 역할 | 할 수 있는 일 |
