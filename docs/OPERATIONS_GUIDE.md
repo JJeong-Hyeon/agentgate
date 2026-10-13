@@ -97,14 +97,14 @@ AgentGate를 사내에 처음 도입하는 담당자를 위한 문서다. 설치
 | 승인 알림이 오지 않음 | app 로그의 webhook 오류 | URL · 포맷(`SLACK` / `JSON`) 확인. 실패한 알림은 `PENDING`인 동안 30초마다 재시도된다 |
 | 등록한 MCP Tool이 안 보임 | Tools 화면 새로고침 | Runtime은 30초 안에 반영한다. MCP 서버 URL에 Runtime 컨테이너에서 접근 가능한지 확인 |
 | app이 기동하지 않음 | `docker compose logs app` | 관리자 비밀번호가 기본값(`changeme`)이거나 `AGENTGATE_SECRET_KEY` 누락, 또는 DB 스키마 검증 오류 |
-| 로그인 화면에 "잠시 막혔습니다" | app 로그의 `Sign-in ... blocked` | 실패 반복으로 막힌 상태. `Retry-After` 시간(기본 15분)이 지나면 풀린다. 급하면 `docker compose restart app`으로 초기화 |
+| 로그인 화면에 "잠시 막혔습니다" | app 로그의 `Sign-in ... blocked` | 실패 반복으로 막힌 상태. `Retry-After` 시간(기본 15분)이 지나면 풀린다. 급하면 `docker compose exec redis redis-cli eval "for _,k in ipairs(redis.call('keys', ARGV[1])) do redis.call('del', k) end" 0 'agentgate:login:*'`로 초기화 |
 | 브라우저 인증서 경고 | 사내 도메인 여부 | Caddy 자체 CA 인증서를 사내 PC에 배포 ([`SELF_HOSTING.md`](SELF_HOSTING.md#내부망--사설-인증서)) |
 
 ## 8. 알려진 제약
 
 도입 전에 알고 있어야 할 현재 한계다.
 
-- **로그인 시도 제한은 메모리에만 기록된다.** 재시작하면 초기화되고, App을 여러 대 띄우면 대마다 따로 센다. 콘솔은 사외에 공개하지 말고 사내망 · VPN 안에서만 접근하게 한다.
+- **로그인 시도 제한은 Redis에 기록된다** (selfhost 기본, `AGENTGATE_LOGIN_STORE=memory`면 메모리). 재시작해도 유지되고 App 여러 대가 함께 센다. Redis에 닿지 못하면 막지 않고 경고만 남긴다. 콘솔은 사외에 공개하지 말고 사내망 · VPN 안에서만 접근하게 한다.
 - **IP 단위 차단은 실제 클라이언트 IP가 보여야 의미가 있다.** 로그인 차단 로그(`Sign-in ... from <IP> blocked`)에 모든 사용자가 같은 IP(예: Docker Desktop의 `172.18.0.1`)로 찍히면, 한 사람의 실패로 전원이 막힐 수 있다. 이때는 `AGENTGATE_LOGIN_MAX_FAILURES_PER_IP`를 크게 잡는다.
 - **감사 로그와 승인 기록은 자동으로 지우지 않는다.** 끝난 실행의 상세 기록과 checkpoint는 `AGENTGATE_EXECUTION_RETENTION`(기본 90일)이 지나면 지워지지만, 거버넌스 기록은 회사 보존 정책에 맞춰 직접 관리한다.
 - **동시 실행 수는 모델 서버가 정한다.** 2026-10 부하 테스트 결과:
