@@ -237,3 +237,59 @@ def test_duplicate_execution_id_is_conflict(client):
 
     body = {"task": "t", "workflow": SIMPLE, "executionId": "exec-dup"}
     assert client.post("/runtime/executions", json=body).status_code == 409
+
+
+def crashed_before(client, step: str, execution_id: str = "crashed") -> str:
+    """Leaves an execution as a restart would: checkpointed, with `step` still to run."""
+    from app.dsl import Workflow
+
+    runner = app.dependency_overrides[get_runner]()
+    workflow = Workflow.model_validate(research())
+    graph = runner.graph_for_workflow(workflow)
+    initial = {
+        "task": "t",
+        "workflow": workflow.model_dump(mode="json", by_alias=True),
+        "revisions": {},
+    }
+    graph.invoke(initial, {"configurable": {"thread_id": execution_id}}, interrupt_before=[step])
+    return execution_id
+
+
+def test_an_interrupted_execution_is_recovered_from_its_last_checkpoint(client, target):
+    execution_id = crashed_before(client, "review")
+    assert client.get("/runtime/executions/active").json() == {"execution_ids": []}
+
+    response = client.post(f"/runtime/executions/{execution_id}/recover")
+
+    assert response.status_code == 202
+    assert client.get(f"/runtime/executions/{execution_id}").json()["status"] == "COMPLETED"
+    assert len(target.requests) == 1
+    assert events_sinks[-1].events[-1]["type"] == "EXECUTION_COMPLETED"
+
+
+def test_an_execution_interrupted_at_a_tool_is_not_run_again(client, target):
+    execution_id = crashed_before(client, "report")
+
+    response = client.post(f"/runtime/executions/{execution_id}/recover")
+
+    assert response.status_code == 422
+    assert "report" in response.json()["detail"]
+    assert target.requests == []
+
+
+def test_only_interrupted_executions_are_recovered(client):
+    finished = start(client)["execution_id"]
+
+    assert client.post(f"/runtime/executions/{finished}/recover").status_code == 409
+    assert client.post("/runtime/executions/unknown/recover").status_code == 404
+
+
+def test_background_executions_are_listed_as_active_while_they_run(client):
+    from app import executions
+
+    executions._running.add("busy")
+    try:
+        assert client.get("/runtime/executions/active").json() == {"execution_ids": ["busy"]}
+        assert client.post("/runtime/executions/busy/recover").status_code in (404, 409)
+    finally:
+        executions._running.discard("busy")

@@ -27,6 +27,8 @@ public interface ExecutionRepository extends JpaRepository<Execution, Long> {
 
     long countByStatus(ExecutionStatus status);
 
+    List<Execution> findByStatusAndCreatedAtBefore(ExecutionStatus status, Instant before);
+
     /** Executions that ended (in one of {@code statuses}) before {@code cutoff}, oldest first. */
     @Query("select e from Execution e where e.status in :statuses "
             + "and coalesce(e.finishedAt, e.updatedAt) < :cutoff order by e.id")

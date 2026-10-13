@@ -2,11 +2,14 @@ package com.agentgate.runtime;
 
 import com.agentgate.approval.domain.ApprovalStatus;
 import com.agentgate.common.exception.InvalidWorkflowException;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -88,6 +91,57 @@ public class RuntimeClient {
             log.warn("Failed to resume execution {} for approval {}; will retry", executionId, approvalId, e);
             return false;
         }
+    }
+
+    /** What the runtime did when asked to continue an interrupted execution. */
+    public enum Recovery {
+        /** Running again from its last checkpoint. */
+        RECOVERING,
+        /** Nothing to continue: nothing was saved, or it stopped in the middle of a tool call. */
+        IMPOSSIBLE,
+        /** Running or finished after all; nothing to do. */
+        NOT_INTERRUPTED,
+        /** The runtime could not answer; try again later. */
+        UNAVAILABLE
+    }
+
+    /** Executions the runtime is running right now; empty when it cannot say (disabled or unreachable). */
+    public Optional<Set<String>> activeExecutions() {
+        if (!enabled) {
+            return Optional.empty();
+        }
+        try {
+            ActiveExecutions active = restClient.get()
+                    .uri("/runtime/executions/active")
+                    .retrieve()
+                    .body(ActiveExecutions.class);
+            return Optional.of(active == null ? Set.of() : Set.copyOf(active.executionIds()));
+        } catch (RestClientException e) {
+            log.warn("Could not list the runtime's active executions", e);
+            return Optional.empty();
+        }
+    }
+
+    /** Asks the runtime to continue an execution a restart interrupted. */
+    public Recovery recover(String executionId) {
+        try {
+            restClient.post()
+                    .uri("/runtime/executions/{id}/recover", executionId)
+                    .retrieve()
+                    .toBodilessEntity();
+            return Recovery.RECOVERING;
+        } catch (HttpClientErrorException.NotFound | HttpClientErrorException.UnprocessableContent e) {
+            log.warn("Execution {} cannot be recovered: {}", executionId, e.getResponseBodyAsString());
+            return Recovery.IMPOSSIBLE;
+        } catch (HttpClientErrorException.Conflict e) {
+            return Recovery.NOT_INTERRUPTED;
+        } catch (RestClientException e) {
+            log.warn("Failed to recover execution {}; will retry", executionId, e);
+            return Recovery.UNAVAILABLE;
+        }
+    }
+
+    private record ActiveExecutions(@JsonProperty("execution_ids") List<String> executionIds) {
     }
 
     /**

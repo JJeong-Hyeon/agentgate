@@ -92,6 +92,7 @@ AgentGate를 사내에 처음 도입하는 담당자를 위한 문서다. 설치
 |---|---|---|
 | 실행이 바로 실패, Studio에 LLM 오류 | `/llm/health`, `docker compose logs runtime` | 모델 서버 기동 여부, `LLM_BASE_URL`. SSH 터널을 쓰면 `scripts/model-tunnel.sh status <host>` (서버 재부팅 시 터널이 끊긴다) |
 | 실행이 오래 RUNNING | Studio의 마지막 단계, LLM 지연 지표 | 모델 서버 부하. 추론 강도를 낮추거나 `LLM_TIMEOUT_SECONDS` 조정 |
+| Runtime 재시작 뒤 실행이 FAILED ("Interrupted by a runtime restart") | app 로그의 `InterruptedExecutionJob` | 재시작으로 끊긴 실행은 1~2분 안에 마지막 checkpoint부터 자동으로 이어 실행된다. Tool 호출 도중 끊긴 실행만 중복 실행을 막으려고 FAILED로 남긴다. 그 Tool의 결과(예: 환불 여부)를 직접 확인한다 |
 | 승인했는데 이어지지 않음 | `docker compose logs app`의 resume 재시도 로그 | AgentGate가 30초마다 Runtime에 재전달한다. Runtime이 떠 있는지, `RUNTIME_TOKEN`이 양쪽에 같은지 확인 |
 | 승인 알림이 오지 않음 | app 로그의 webhook 오류 | URL · 포맷(`SLACK` / `JSON`) 확인. 실패한 알림은 `PENDING`인 동안 30초마다 재시도된다 |
 | 등록한 MCP Tool이 안 보임 | Tools 화면 새로고침 | Runtime은 30초 안에 반영한다. MCP 서버 URL에 Runtime 컨테이너에서 접근 가능한지 확인 |
