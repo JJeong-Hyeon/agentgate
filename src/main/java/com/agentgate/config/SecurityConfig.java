@@ -1,5 +1,6 @@
 package com.agentgate.config;
 
+import com.agentgate.user.service.LoginAttemptService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -8,6 +9,8 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
+import tools.jackson.databind.ObjectMapper;
 
 @Configuration
 public class SecurityConfig {
@@ -31,10 +34,13 @@ public class SecurityConfig {
             "/api/v1/mcp-servers", "/api/v1/mcp-servers/**"};
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, LoginAttemptService loginAttempts,
+                                                   ObjectMapper objectMapper) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
                 .httpBasic(Customizer.withDefaults())
+                // Repeated failed sign-ins are refused before their password is checked.
+                .addFilterBefore(new LoginThrottleFilter(loginAttempts, objectMapper), BasicAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> auth
                         // Agents (API key) and the runtime (runtime token) authenticate in their controllers.
                         .requestMatchers("/api/v1/actions").permitAll()

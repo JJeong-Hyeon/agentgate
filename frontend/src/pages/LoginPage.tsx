@@ -2,6 +2,13 @@ import { useState, type FormEvent } from "react";
 import { ApiError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 
+function loginError(e: unknown): string {
+  if (e instanceof ApiError && e.status === 401) return "아이디 또는 비밀번호가 올바르지 않습니다.";
+  if (e instanceof ApiError && e.status === 429)
+    return "로그인 실패가 반복되어 잠시 막혔습니다. 잠시 후 다시 시도하세요.";
+  return "AgentGate에 연결할 수 없습니다.";
+}
+
 export function LoginPage() {
   const { login } = useAuth();
   const [username, setUsername] = useState("admin");
@@ -16,11 +23,7 @@ export function LoginPage() {
     try {
       await login({ username, password });
     } catch (e) {
-      setError(
-        e instanceof ApiError && e.status === 401
-          ? "아이디 또는 비밀번호가 올바르지 않습니다."
-          : "AgentGate에 연결할 수 없습니다.",
-      );
+      setError(loginError(e));
     } finally {
       setSubmitting(false);
     }

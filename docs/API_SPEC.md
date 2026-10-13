@@ -56,6 +56,8 @@ X-Runtime-Token: <runtime token>    # Agent Runtime: 등록된 어느 Agent의 �
 
 콘솔 API는 HTTP Basic으로 DB 사용자를 인증한다. 역할은 여럿 가질 수 있다.
 
+같은 아이디 + 같은 IP에서 로그인이 연속 5번 실패하면 15분 동안, 한 IP에서 아이디와 상관없이 15분 안에 20번 실패하면 그 IP 전체가 15분 동안 막힌다. 막힌 동안은 비밀번호가 맞아도 `429` + `Retry-After`(초)와 `code: TOO_MANY_LOGIN_ATTEMPTS`를 돌려준다. 로그인에 성공하면 그 아이디 + IP의 실패 횟수는 초기화된다. 횟수와 시간은 `AGENTGATE_LOGIN_MAX_FAILURES`, `AGENTGATE_LOGIN_MAX_FAILURES_PER_IP`, `AGENTGATE_LOGIN_LOCK_DURATION`으로 바꾼다.
+
 | 역할 | 할 수 있는 일 |
 |---|---|
 | `ADMIN` | 아래 전부 + 사용자, 정책, Tool 위험도, MCP 서버, Agent 등록·API Key·위험도 상한 |
