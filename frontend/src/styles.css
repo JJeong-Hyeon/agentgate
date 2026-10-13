@@ -887,3 +887,18 @@ fieldset.mode {
 .governance-table .num {
   text-align: right;
 }
+
+.payload-preview summary {
+  cursor: pointer;
+  color: var(--muted, #6b7280);
+}
+.payload-preview pre {
+  margin: 0.4rem 0 0;
+  padding: 0.6rem;
+  max-height: 20rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: rgba(127, 127, 127, 0.1);
+  border-radius: 4px;
+}

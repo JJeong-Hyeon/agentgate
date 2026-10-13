@@ -52,6 +52,7 @@ class AgentGateClient:
         agent_version: int | None = None,
         delegated_by: str | None = None,
         payload_hash: str | None = None,
+        payload_preview: str | None = None,
     ) -> Decision:
         """`agent_id` defaults to the client's own; `agent_version` applies that agent
         definition's tool permissions."""
@@ -72,6 +73,8 @@ class AgentGateClient:
             body["delegatedBy"] = delegated_by
         if payload_hash:
             body["payloadHash"] = payload_hash
+        if payload_preview:
+            body["payloadPreview"] = payload_preview
         try:
             response = self._client.post("/api/v1/actions", json=body)
         except httpx.HTTPError as e:

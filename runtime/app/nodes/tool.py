@@ -76,9 +76,10 @@ def add_tool(
             return Command(update={"pending_tool": approved}, goto=execute_node)
         return denied(ToolResult(**{**pending, "status": "REJECTED"}))
 
-    def execute(state: dict) -> dict:
+    def execute(state: dict, config: RunnableConfig) -> dict:
         pending = state["pending_tool"]
-        authorized = ToolResult(**pending)
+        execution_id = config.get("configurable", {}).get("thread_id")
+        authorized = ToolResult(**pending, idempotency_key=f"{execution_id}:{name}")
         payload = build_payload(state)
         tool.check_payload(payload, pending.get("approved_hash"))
         return finish(tool.execute_timed(payload, authorized))

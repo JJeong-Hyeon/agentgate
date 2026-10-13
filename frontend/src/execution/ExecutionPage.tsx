@@ -16,6 +16,7 @@ import {
 } from "./agentTrace";
 import { duration, nodeStatuses } from "./state";
 import { useExecutionStream } from "./useExecutionStream";
+import { PayloadPreview } from "../components/PayloadPreview";
 
 const DECISION_TEXT: Record<string, string> = {
   APPROVED: "승인됨",
@@ -258,6 +259,7 @@ function ApprovalPanel({ approvalId }: { approvalId: number }) {
           </p>
         )}
         {a?.reason && <p className="approval-reason">{a.reason}</p>}
+        {a?.payloadPreview && <PayloadPreview text={a.payloadPreview} />}
         {a && a.status !== "PENDING" && <p className="muted">{DECISION_TEXT[a.status]} — 재개 중…</p>}
         {error && <p className="error">{error}</p>}
       </div>

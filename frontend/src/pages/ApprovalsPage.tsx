@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { useAuth, useClient } from "../auth/AuthContext";
 import { useAsync } from "../useAsync";
+import { PayloadPreview } from "../components/PayloadPreview";
 
 export function ApprovalsPage() {
   const client = useClient();
@@ -47,6 +48,7 @@ export function ApprovalsPage() {
                 <div className="muted">위임 경로: {[...a.delegatedBy.split(">"), a.agentId].join(" → ")}</div>
               )}
               {a.reason && <div className="approval-reason">{a.reason}</div>}
+              {a.payloadPreview && <PayloadPreview text={a.payloadPreview} />}
               {a.executionId && <div className="muted mono">실행 {a.executionId}</div>}
             </div>
             {canDecide && (

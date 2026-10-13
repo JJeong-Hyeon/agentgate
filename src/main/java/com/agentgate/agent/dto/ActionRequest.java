@@ -21,19 +21,22 @@ public record ActionRequest(
         @Size(max = 500) String delegatedBy,
         // SHA-256 of what the runtime will run (action, target, arguments), kept with the approval so the
         // runtime can check, right before running, that it runs what was approved.
-        @Size(max = 64) String payloadHash
+        @Size(max = 64) String payloadHash,
+        // The arguments as the approver should read them (secrets masked), up to 20,000 characters.
+        @Size(max = 20000) String payloadPreview
 ) {
     public ActionRequest {
         labels = (labels == null) ? List.of() : List.copyOf(labels);
     }
 
     public ActionRequest(String agentId, String action, String target, List<String> labels) {
-        this(agentId, action, target, labels, null, null, null, null, null, null);
+        this(agentId, action, target, labels, null, null, null, null, null, null, null);
     }
 
     public ActionRequest(String agentId, String action, String target, List<String> labels, String executionId,
                          Boolean requireApproval, String reason, Integer agentVersion, String delegatedBy) {
-        this(agentId, action, target, labels, executionId, requireApproval, reason, agentVersion, delegatedBy, null);
+        this(agentId, action, target, labels, executionId, requireApproval, reason, agentVersion, delegatedBy, null,
+                null);
     }
 
     public boolean approvalRequested() {

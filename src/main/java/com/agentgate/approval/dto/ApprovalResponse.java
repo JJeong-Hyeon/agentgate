@@ -20,7 +20,8 @@ public record ApprovalResponse(
         String executionId,
         String reason,
         String delegatedBy,
-        String payloadHash
+        String payloadHash,
+        String payloadPreview
 ) {
     public static ApprovalResponse from(ApprovalRequest approvalRequest) {
         return new ApprovalResponse(
@@ -37,7 +38,8 @@ public record ApprovalResponse(
                 approvalRequest.getExecutionId(),
                 approvalRequest.getReason(),
                 approvalRequest.getDelegatedBy(),
-                approvalRequest.getPayloadHash()
+                approvalRequest.getPayloadHash(),
+                approvalRequest.getPayloadPreview()
         );
     }
 }

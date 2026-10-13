@@ -1,5 +1,6 @@
 package com.agentgate.approval.service;
 
+import com.agentgate.approval.domain.ApprovalPayload;
 import com.agentgate.approval.domain.ApprovalRequest;
 import com.agentgate.approval.domain.ApprovalStatus;
 import com.agentgate.approval.dto.ApprovalResponse;
@@ -23,9 +24,10 @@ public class ApprovalService {
 
     @Transactional
     public ApprovalRequest createRequest(String agentId, String action, String target, List<String> labels, RiskLevel riskLevel,
-                                         String executionId, String reason, String delegatedBy, String payloadHash) {
+                                         String executionId, String reason, String delegatedBy,
+                                         ApprovalPayload payload) {
         ApprovalRequest approvalRequest = new ApprovalRequest(agentId, action, target, labels, riskLevel, executionId,
-                reason, delegatedBy, payloadHash);
+                reason, delegatedBy, payload);
         ApprovalRequest saved = approvalRequestRepository.save(approvalRequest);
         eventPublisher.publishEvent(new ApprovalRequestedEvent(saved.getId()));
         return saved;

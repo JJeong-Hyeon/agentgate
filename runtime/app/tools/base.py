@@ -5,10 +5,10 @@ from abc import ABC, abstractmethod
 from typing import Any, Literal
 
 from opentelemetry.trace import Status, StatusCode
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.governance.agentgate_client import AgentGateClient, AgentGateError
-from app.governance.payload import payload_hash
+from app.governance.payload import payload_hash, payload_preview
 from app.telemetry import current_step, set_attributes, set_content, tracer
 
 MAX_OUTPUT_CHARS = 2000
@@ -31,6 +31,9 @@ class ToolResult(BaseModel):
     error: str | None = None
     # How long running the tool took (not the governance check or an approval wait).
     duration_ms: int | None = None
+    # Set just before running, so the receiving system can tell a repeat of this call (a retry, a
+    # recovery) from a new one; never saved with the result.
+    idempotency_key: str | None = Field(default=None, exclude=True)
 
 
 class GovernedTool(ABC):
@@ -85,6 +88,7 @@ class GovernedTool(ABC):
                     agent_version=agent_version,
                     delegated_by=delegated_by,
                     payload_hash=self.payload_hash(payload) if payload is not None else None,
+                    payload_preview=payload_preview(payload) if payload is not None else None,
                 )
             except AgentGateError as e:
                 span.set_status(Status(StatusCode.ERROR, str(e)))

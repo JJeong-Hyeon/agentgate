@@ -75,6 +75,10 @@ public class ApprovalRequest {
     @Column(length = 64)
     private String payloadHash;
 
+    // The arguments as shown to the approver, secrets masked.
+    @Column(columnDefinition = "text")
+    private String payloadPreview;
+
     public ApprovalRequest(String agentId, String action, String target, List<String> labels, RiskLevel riskLevel) {
         this(agentId, action, target, labels, riskLevel, null);
     }
@@ -90,10 +94,13 @@ public class ApprovalRequest {
     }
 
     public ApprovalRequest(String agentId, String action, String target, List<String> labels, RiskLevel riskLevel,
-                           String executionId, String reason, String delegatedBy, String payloadHash) {
+                           String executionId, String reason, String delegatedBy, ApprovalPayload payload) {
         this(agentId, action, target, labels, riskLevel, executionId, reason);
         this.delegatedBy = delegatedBy;
-        this.payloadHash = payloadHash;
+        if (payload != null) {
+            this.payloadHash = payload.hash();
+            this.payloadPreview = payload.preview();
+        }
     }
 
     public ApprovalRequest(String agentId, String action, String target, List<String> labels, RiskLevel riskLevel,

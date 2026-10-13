@@ -6,6 +6,7 @@ import com.agentgate.agent.dto.ActionRequest;
 import com.agentgate.agent.dto.ActionResponse;
 import com.agentgate.agent.dto.AgentDefinition;
 import com.agentgate.agent.repository.AgentRepository;
+import com.agentgate.approval.domain.ApprovalPayload;
 import com.agentgate.approval.domain.ApprovalRequest;
 import com.agentgate.approval.service.ApprovalService;
 import com.agentgate.audit.service.AuditLogService;
@@ -66,7 +67,8 @@ public class AgentActionService {
         if (decision.status() == ActionStatus.APPROVAL_REQUIRED) {
             ApprovalRequest approvalRequest = approvalService.createRequest(
                     request.agentId(), request.action(), request.target(), labels, decision.riskLevel(),
-                    request.executionId(), request.reason(), request.delegatedBy(), request.payloadHash());
+                    request.executionId(), request.reason(), request.delegatedBy(),
+                    new ApprovalPayload(request.payloadHash(), request.payloadPreview()));
             approvalId = approvalRequest.getId();
         }
 
