@@ -25,7 +25,8 @@ services:
   app:
     build:
       context: ../..
-    image: agentgate:local
+    # AGENTGATE_VERSION (e.g. 0.1.0) uses the published image; empty builds from this checkout.
+    image: ${AGENTGATE_IMAGE:-ghcr.io/jjeong-hyeon/agentgate}:${AGENTGATE_VERSION:-local}
     environment:
       SPRING_PROFILES_ACTIVE: prod
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/agentgate
@@ -69,7 +70,7 @@ services:
 
   runtime:
     build: ../../runtime
-    image: agentgate-runtime:local
+    image: ${AGENTGATE_RUNTIME_IMAGE:-ghcr.io/jjeong-hyeon/agentgate-runtime}:${AGENTGATE_VERSION:-local}
     environment:
       AGENTGATE_BASE_URL: http://app:8080
       AGENTGATE_AGENT_ID: runtime-agent
