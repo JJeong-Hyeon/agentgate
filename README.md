@@ -168,5 +168,6 @@ PYTHON=python3.12 ./scripts/e2e.sh   # Docker, Java 21, Python 3.12 + runtime �
 - 확장 아키텍처 (Workflow Builder + LangGraph Runtime): [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - API 스펙: [`docs/API_SPEC.md`](docs/API_SPEC.md)
 - 단일 서버 설치: [`docs/SELF_HOSTING.md`](docs/SELF_HOSTING.md)
+- 도입 · 운영 가이드 (첫 설정, 권장 설정, 장애 대응): [`docs/OPERATIONS_GUIDE.md`](docs/OPERATIONS_GUIDE.md)
 - AWS 배포: [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)
 - 모니터링 (Prometheus + Grafana): [`docs/MONITORING.md`](docs/MONITORING.md)

@@ -1,6 +1,6 @@
 # 단일 서버 설치 (Docker Compose)
 
-사내 서버 한 대에 AgentGate를 설치하는 방법이다. AWS 구성은 [`DEPLOYMENT.md`](DEPLOYMENT.md)를 참고한다.
+사내 서버 한 대에 AgentGate를 설치하는 방법이다. AWS 구성은 [`DEPLOYMENT.md`](DEPLOYMENT.md)를, 설치 후 첫 설정 · 권장 설정 · 운영은 [`OPERATIONS_GUIDE.md`](OPERATIONS_GUIDE.md)를 참고한다.
 
 ```text
 브라우저 ──HTTPS──▶ Caddy :443 ──▶ app :8080 (AgentGate API + 콘솔)
