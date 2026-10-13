@@ -65,6 +65,17 @@ JSON
 PIDS+=($!)
 wait_for http://localhost:8000/health Runtime "$WORK/runtime.log"
 
+# The console, for the browser tests (needs Playwright and its Chromium; skipped without them).
+if "$PYTHON" -c 'import playwright' 2>/dev/null && command -v npm >/dev/null; then
+  echo "==> Console"
+  [[ -d "$ROOT/frontend/node_modules" ]] || (cd "$ROOT/frontend" && npm ci --silent)
+  (cd "$ROOT/frontend" && AGENTGATE_URL=http://localhost:8080 exec ./node_modules/.bin/vite --port 5173 --strictPort \
+    > "$WORK/console.log" 2>&1) &
+  PIDS+=($!)
+  wait_for http://127.0.0.1:5173/ Console "$WORK/console.log"
+  export E2E_UI_URL=http://127.0.0.1:5173
+fi
+
 echo "==> Tests"
 if ! (cd "$ROOT/runtime" && "$PYTHON" -m pytest -q "$ROOT/e2e"); then
   echo "--- agentgate.log" >&2; tail -80 "$WORK/agentgate.log" >&2
