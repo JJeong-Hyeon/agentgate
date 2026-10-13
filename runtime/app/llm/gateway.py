@@ -5,6 +5,8 @@ only requires a different base URL. Agent code depends on the returned
 ChatModel, never on a specific LLM server.
 """
 
+from functools import lru_cache
+
 import httpx
 from langchain_core.language_models import BaseChatModel
 from langchain_openai import ChatOpenAI
@@ -14,6 +16,8 @@ from app.config import Settings
 
 # Ollama ignores the key, but the OpenAI client requires a non-empty value.
 _PLACEHOLDER_API_KEY = "not-needed"
+# How long a call may wait for its turn under LLM_MAX_CONCURRENCY before it fails.
+_QUEUE_TIMEOUT_SECONDS = 900.0
 
 
 def create_chat_model(
@@ -24,15 +28,27 @@ def create_chat_model(
     reasoning_effort: str | None = None,
 ) -> BaseChatModel:
     effort = reasoning_effort or settings.llm_reasoning_effort or None
+    limit = settings.llm_max_concurrency
     return ChatOpenAI(
         base_url=settings.llm_base_url,
         api_key=settings.llm_api_key or _PLACEHOLDER_API_KEY,
         model=model or settings.llm_model,
         temperature=settings.llm_temperature if temperature is None else temperature,
-        timeout=settings.llm_timeout_seconds,
+        # The timeout counts from sending the call; waiting for a free slot has its own limit.
+        timeout=httpx.Timeout(settings.llm_timeout_seconds, pool=_QUEUE_TIMEOUT_SECONDS)
+        if limit
+        else settings.llm_timeout_seconds,
+        http_client=_limited_client(limit) if limit else None,
         max_retries=1,
         reasoning_effort=effort,
     )
+
+
+@lru_cache
+def _limited_client(limit: int) -> httpx.Client:
+    """One connection pool for every chat model: at most `limit` calls reach the model server at
+    once, the rest wait for a free connection."""
+    return httpx.Client(limits=httpx.Limits(max_connections=limit, max_keepalive_connections=limit))
 
 
 class LlmHealth(BaseModel):
