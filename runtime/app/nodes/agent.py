@@ -15,6 +15,10 @@ by AgentGate on behalf of the agent, with its definition's tool permissions.
       └─ none left          → <name>.think
     <name>.execute     run the tool, give the model its result → <name>.gate
 
+By default only the first of several calls in one model turn is kept: the model sees its
+result before deciding on the next one, instead of guessing arguments that depend on it
+(e.g. a refund amount before the order lookup). parallel_calls keeps them all.
+
 Denied calls are answered with a tool message saying why, so the model can continue
 without them. On the last allowed turn (maxSteps) the model gets no tools and must answer.
 
@@ -133,6 +137,7 @@ def add_agent(
     tool_calling: str = "NATIVE",
     delegated_by: str | None = None,
     recall: Recall | None = None,
+    parallel_calls: bool = False,
 ) -> None:
     """`delegated_by` is the chain of agents that handed this one its task (outermost first),
     reported with each of its tool calls; None when it runs as a workflow node. `recall`, if
@@ -218,7 +223,13 @@ def add_agent(
             "model": model,
             "latency_ms": round((time.perf_counter() - started) * 1000),
         }
-        run = {**run, "llm": llm_call}
+        run = {**run, "llm": llm_call, "deferred": 0}
+        if not parallel_calls and len(reply.tool_calls) > 1 and not final_turn:
+            run["deferred"] = len(reply.tool_calls) - 1
+            raw = {k: v for k, v in reply.additional_kwargs.items() if k != "tool_calls"}
+            reply = reply.model_copy(
+                update={"tool_calls": reply.tool_calls[:1], "additional_kwargs": raw}
+            )
         messages.append(reply)
         if reply.tool_calls and not final_turn:
             return Command(update=save(run, messages=messages, steps=steps), goto=gate_node)
@@ -500,7 +511,11 @@ def _agent_trace(sub: str, node_id: str, run: dict, update: dict) -> dict | None
             # The agent answered (on its last turn, any tool calls it still made are ignored).
             return {**trace, "kind": "answer", "answer": _clip(update[node_id])}
         calls = [{"tool": c["name"], "arguments": c["args"]} for c in reply.tool_calls]
-        return {**trace, "kind": "tool_calls", "calls": calls}
+        trace = {**trace, "kind": "tool_calls", "calls": calls}
+        if run.get("deferred"):
+            # Later calls of the same turn, dropped so the model decides them after this result.
+            trace["deferred"] = run["deferred"]
+        return trace
 
     if results:
         # A call that finished in this step: denied at the gate or by an approver, or run.

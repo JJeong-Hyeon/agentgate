@@ -39,6 +39,7 @@ cp .env.example .env
 | `LLM_TOOL_CALLING` | Ollama의 Tool 지원 모델(qwen3 등)이나 `--enable-auto-tool-choice --tool-call-parser <parser>`로 띄운 vLLM이면 `native`, 아니면 `json` |
 | `LLM_TIMEOUT_SECONDS` | 모델 응답 하나를 기다리는 시간(초). 큰 모델·추론(thinking) 모델은 늘린다 |
 | `LLM_REASONING_EFFORT` | 추론 모델이 답 전에 생각하는 정도(`none` / `minimal` / `low` / `medium` / `high`). 비우면 보내지 않는다. Agent 정의에서 Agent별로 바꿀 수 있다 |
+| `LLM_PARALLEL_TOOL_CALLS` | 모델이 한 번에 여러 Tool을 호출했을 때 모두 실행할지. 기본 `false`: 첫 호출만 실행하고 나머지는 그 결과를 본 뒤 모델이 다시 결정한다 (로컬 모델이 앞 결과에 의존하는 인자를 추측하는 것 방지) |
 | `EMBEDDING_BASE_URL` / `EMBEDDING_MODEL` / `EMBEDDING_API_KEY` | 선택. Agent 기억의 의미 검색용 임베딩 서버(OpenAI 호환 `/embeddings`, 예: Ollama의 `bge-m3`). 비우면 키워드 검색 |
 | `MEMORY_MIN_SCORE` | 의미 검색 결과로 인정할 최소 코사인 유사도. 모델마다 다르며 bge-m3는 약 0.45 |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` / `OTEL_EXPORTER_OTLP_HEADERS` / `OTEL_CAPTURE_CONTENT` | 선택. Agent 실행 trace를 OpenTelemetry로 내보낼 곳 ([`MONITORING.md`](MONITORING.md#agent-trace-opentelemetry)) |

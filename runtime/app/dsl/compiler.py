@@ -119,8 +119,10 @@ class WorkflowCompiler:
         tool_transport: httpx.BaseTransport | None = None,
         mcp_servers: "dict[str, McpServerConfig] | McpServerRegistry | None" = None,
         tool_calling: str = "NATIVE",
+        parallel_tool_calls: bool = False,
     ):
         self._tool_calling = tool_calling
+        self._parallel_tool_calls = parallel_tool_calls
         self._llm_factory = llm_factory
         self._gate = gate
         self._tool_transport = tool_transport
@@ -294,6 +296,7 @@ class WorkflowCompiler:
             next_nodes,
             spec.tool_calling or self._tool_calling,
             recall=self._recall(node.id, spec, None),
+            parallel_calls=self._parallel_tool_calls,
         )
 
     def _agent_tools(
@@ -402,6 +405,7 @@ class WorkflowCompiler:
             spec.tool_calling or self._tool_calling,
             delegated_by=">".join(chain),
             recall=self._recall(name, spec, ">".join(chain)),
+            parallel_calls=self._parallel_tool_calls,
         )
         graph.add_edge(START, name)
         # No checkpointer: the subgraph checkpoints in the parent's, under its task.

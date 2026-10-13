@@ -83,12 +83,14 @@ def agent_workflow(**spec_overrides) -> dict:
     }
 
 
-def build(dsl: dict, llm: ScriptedChatModel, gate: PolicyGate, checkpointer=None):
+def build(dsl: dict, llm: ScriptedChatModel, gate: PolicyGate, checkpointer=None, **options):
     workflow = attach_tool_schemas(Workflow.model_validate(dsl), CATALOG)
     client = AgentGateClient(
         "http://agentgate", "runtime-agent", transport=httpx.MockTransport(gate), runtime_token="t"
     )
-    compiler = WorkflowCompiler(lambda *_: llm, client, mcp_servers={"local": ECHO_SERVER})
+    compiler = WorkflowCompiler(
+        lambda *_: llm, client, mcp_servers={"local": ECHO_SERVER}, **options
+    )
     graph = compiler.compile(workflow, checkpointer or InMemorySaver())
     state = {
         "task": "add things",
@@ -176,11 +178,46 @@ def test_blocked_call_never_runs_and_the_model_is_told_why():
     assert result["helper"] == "Blocked."
 
 
-def test_several_calls_in_one_turn_are_handled_in_order():
+def test_only_the_first_call_of_a_turn_runs_so_the_model_sees_its_result_first():
+    llm = ScriptedChatModel.of(
+        calls(("local__echo", {"text": "a"}), ("local__echo", {"text": "b"})),
+        AIMessage(
+            content="", tool_calls=[{"name": "local__echo", "args": {"text": "b"}, "id": "call-b"}]
+        ),
+        "ab",
+        "done",
+    )
+    graph, state = build(agent_workflow(), llm, PolicyGate())
+
+    result = graph.invoke(state, CONFIG)
+
+    second_turn = llm.log[1]["messages"]
+    [first_reply] = [m for m in second_turn if isinstance(m, AIMessage)]
+    assert [c["args"] for c in first_reply.tool_calls] == [{"text": "a"}]
+    assert "tool_calls" not in first_reply.additional_kwargs
+    assert [m.content for m in second_turn if isinstance(m, ToolMessage)] == ["echo: a"]
+    assert [r["status"] for r in result["tool_results"]] == ["EXECUTED", "EXECUTED"]
+    assert result["helper"] == "ab"
+
+
+def test_deferred_calls_are_reported_in_the_trace():
+    llm = ScriptedChatModel.of(
+        calls(("local__echo", {"text": "a"}), ("local__echo", {"text": "b"})), "a", "done"
+    )
+    graph, state = build(agent_workflow(), llm, PolicyGate())
+
+    outputs = agent_outputs(graph, state)
+
+    first = next(out["agent"] for step, out in outputs if step == "helper.think")
+    assert first["calls"] == [{"tool": "local__echo", "arguments": {"text": "a"}}]
+    assert first["deferred"] == 1
+
+
+def test_parallel_calls_in_one_turn_are_handled_in_order():
     llm = ScriptedChatModel.of(
         calls(("local__echo", {"text": "a"}), ("local__echo", {"text": "b"})), "ab", "done"
     )
-    graph, state = build(agent_workflow(), llm, PolicyGate())
+    graph, state = build(agent_workflow(), llm, PolicyGate(), parallel_tool_calls=True)
 
     result = graph.invoke(state, CONFIG)
 
