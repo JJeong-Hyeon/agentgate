@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { ApiError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
+import { Logo } from "../components/Logo";
 
 function loginError(e: unknown): string {
   if (e instanceof ApiError && e.status === 401) return "아이디 또는 비밀번호가 올바르지 않습니다.";
@@ -32,7 +33,10 @@ export function LoginPage() {
   return (
     <main className="login">
       <form className="card login-card" onSubmit={submit}>
-        <h1>AgentGate</h1>
+        <h1>
+          <Logo size={28} />
+          AgentGate
+        </h1>
         <label>
           아이디
           <input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" />

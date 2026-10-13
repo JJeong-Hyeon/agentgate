@@ -8,6 +8,9 @@
   --accent-hover: #2850c4;
   --accent-soft: #eef2fe;
   --accent-text: #ffffff;
+  /* The wordmark/logo's own color -- deliberately darker and more saturated than --accent
+     (which stays the lighter interactive blue for buttons/links/focus rings). */
+  --brand: #202d6b;
   --danger: #c4372c;
   --danger-soft: #fbeae8;
   --ok: #1a8a4c;
@@ -34,6 +37,7 @@
     --accent: #6490f3;
     --accent-hover: #80a6f5;
     --accent-soft: #1d2740;
+    --brand: #8b9af5;
     --danger: #e5584c;
     --danger-soft: #3a2220;
     --ok: #46c383;
@@ -83,6 +87,15 @@ button:hover:not(:disabled) {
 }
 button:active:not(:disabled) {
   transform: translateY(1px);
+}
+/* No global anchor color existed, so a plain <Link> with no className (a couple do) fell back
+   to the browser default -- blue, or purple once visited -- instead of the app's palette.
+   :where() keeps this at zero specificity so it still loses to .item/.palette-item/etc, which
+   set their own color; without it, ":visited" alone outranks a plain class selector and was
+   turning every visited agent/tool/workflow list row's text blue. Author origin still beats the
+   browser's own default link colors regardless, so the override itself isn't lost. */
+:where(a, a:visited) {
+  color: var(--accent);
 }
 button:focus-visible,
 a:focus-visible,
@@ -205,8 +218,11 @@ h2 {
   box-shadow: var(--shadow-md);
 }
 .login-card h1 {
-  text-align: center;
-  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--brand);
 }
 .login-card label {
   display: grid;
@@ -232,8 +248,12 @@ h2 {
   flex-wrap: wrap;
 }
 .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
   font-weight: 800;
-  color: var(--accent);
+  color: var(--brand);
   letter-spacing: -0.02em;
 }
 .topbar nav {
