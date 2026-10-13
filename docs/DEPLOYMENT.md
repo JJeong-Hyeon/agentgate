@@ -51,7 +51,7 @@ terraform apply  # 위와 동일한 -var 플래그로
 
 ### HTTPS (도메인 + ACM 인증서)
 
-외부에 공개하는 콘솔은 HTTPS로만 연다. 로그인(Basic 인증) 정보가 매 요청마다 전송되기 때문이다.
+외부에 공개하는 콘솔은 HTTPS로만 연다. 로그인 정보와 세션 쿠키가 평문으로 오가기 때문이다. (세션 쿠키의 `Secure`는 `AGENTGATE_SESSION_COOKIE_SECURE=true`로 켠다.)
 
 1. 콘솔 도메인(예: `agentgate.example.com`)의 인증서를 ALB와 같은 리전(기본 `ap-northeast-2`)의 ACM에서 발급한다(DNS 검증).
 2. `-var="certificate_arn=<인증서 ARN>"`로 `terraform apply` — ALB에 443 리스너(TLS 1.2+)가 생기고, 80은 443으로 301 리다이렉트한다.
@@ -172,4 +172,4 @@ App이 기동할 때 Flyway가 RDS 스키마를 마이그레이션한다(`db/mig
 - `agentgate.admin.password`가 개발용 기본값("changeme")이면 `prod` 프로파일에서 기동이 즉시 실패한다(`SecurityHardeningCheck`).
 - `AGENTGATE_RUNTIME_BASE_URL`을 설정했는데 `AGENTGATE_RUNTIME_TOKEN`이 비어 있으면 기동이 실패한다.
 - `AGENTGATE_SECRET_KEY`가 없으면 `prod` 프로파일에서 기동이 실패한다. 이 키로 MCP 서버 인증 헤더를 AES-256-GCM으로 암호화해 저장하며, 키를 잃거나 바꾸면 저장된 헤더를 다시 입력해야 한다. 안전한 곳(예: AWS Secrets Manager / SSM Parameter Store)에 백업할 것.
-- `certificate_arn` 없이 HTTP(80)로 운영하면 UI 로그인(Basic 인증)이 평문으로 전송된다. 외부에 공개할 때는 반드시 [HTTPS](#https-도메인--acm-인증서)를 설정할 것.
+- `certificate_arn` 없이 HTTP(80)로 운영하면 콘솔 로그인(비밀번호와 세션 쿠키)이 평문으로 전송된다. 외부에 공개할 때는 반드시 [HTTPS](#https-도메인--acm-인증서)를 설정할 것.

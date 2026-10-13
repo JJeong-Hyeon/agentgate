@@ -55,7 +55,7 @@ cp .env.example .env
 
 ```bash
 docker compose up -d --build
-# 또는 릴리스 이미지로: .env에 AGENTGATE_VERSION=0.1.0 을 넣고
+# 또는 릴리스 이미지로: .env에 AGENTGATE_VERSION=0.3.0 (원하는 릴리스 버전)을 넣고
 docker compose pull && docker compose up -d
 docker compose ps        # 모두 Up이면 정상
 ```
@@ -150,3 +150,26 @@ docker compose --profile monitoring up -d
 
 - 업데이트 전에는 백업을 먼저 뜬다.
 - `/actuator/prometheus`는 외부(Caddy)에서 막혀 있다. Prometheus는 compose 네트워크 안에서 `app:8080`을 수집하도록 붙인다([`MONITORING.md`](MONITORING.md)).
+
+## 설치 확인
+
+```bash
+docker compose ps                     # app · runtime이 (healthy)면 준비된 것
+curl -k https://<AGENTGATE_DOMAIN>/actuator/health      # {"status":"UP"}
+docker compose exec runtime python -c "import urllib.request;print(urllib.request.urlopen('http://localhost:8000/llm/health').read())"   # model_available: true
+```
+
+브라우저로 `https://<AGENTGATE_DOMAIN>/`에 접속해 ADMIN으로 로그인하면 대시보드가 보인다. 이어서 [`OPERATIONS_GUIDE.md`](OPERATIONS_GUIDE.md)의 도입 체크리스트를 따른다.
+
+## 문제 해결
+
+| 증상 | 원인 · 조치 |
+|---|---|
+| `docker compose up`이 `set ... in .env` 오류로 멈춘다 | 필수 값이 비어 있다. 메시지에 나온 변수를 `.env`에 채운다 |
+| 80 · 443 포트를 못 연다 | 같은 서버의 다른 웹 서버가 쓰고 있다. 멈추거나 compose의 `caddy` 포트를 바꾼다 |
+| 브라우저가 인증서 경고를 띄운다 | 공개 DNS에 없는 이름은 Caddy가 자체 CA로 인증서를 만든다. [내부망 / 사설 인증서](#내부망--사설-인증서) |
+| 기동 직후 잠깐 502 | app이 준비되기 전이다. `docker compose ps`가 `(healthy)`가 될 때까지 기다린다 |
+| `model_available: false` / 실행이 LLM 오류로 실패 | `LLM_BASE_URL` · `LLM_MODEL`을 확인한다. 모델 서버가 다른 장비면 연결(SSH 터널 등)이 끊겼는지 본다 |
+| 로그인이 "잠시 막혔습니다" | 실패가 반복돼 잠긴 것이다. 15분 뒤 풀리거나 [운영 가이드](OPERATIONS_GUIDE.md#7-장애-대응)의 초기화 명령을 쓴다 |
+| 업그레이드 뒤 앱이 기동하지 않는다 | `docker compose logs app`에서 스키마 검증 · 필수 설정 오류를 확인한다. 안 되면 `AGENTGATE_VERSION`을 이전 버전으로 되돌리고 백업을 복원한다 |
+

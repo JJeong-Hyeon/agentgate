@@ -603,4 +603,43 @@ Visual Workflow + LangGraph Runtime + Local LLM + Tool/MCP + Policy/Risk/HITL + 
 
 ## 21. 현재 상태
 
-Phase 1~9 완료. GUI에서 Agent를 정의하고(Tool·권한·위임), 워크플로에 넣어 Local LLM으로 실행하면, Agent(위임받은 Agent 포함)의 모든 Tool 호출이 그 Agent 이름으로 권한 → 정책 → 위험도 판정을 거쳐 실행·승인 대기·차단되고, 그 과정이 위임 경로와 함께 Execution Studio와 Audit Log에 남는다. 다음 단계는 17장의 이후 단계를 따른다.
+Phase 1~9 완료, 이후 운영 · 보안 보강까지 반영(버전별 변경은 [`CHANGELOG.md`](../CHANGELOG.md)). GUI에서 Agent를 정의하고(Tool · 권한 · 위임), 워크플로에 넣어 Local LLM으로 실행하면, Agent(위임받은 Agent 포함)의 모든 Tool 호출이 그 Agent 이름으로 권한 → 정책 → 위험도 판정을 거쳐 실행 · 승인 대기 · 차단되고, 그 과정이 위임 경로와 함께 Execution Studio와 Audit Log에 남는다. 설치는 [`SELF_HOSTING.md`](SELF_HOSTING.md), 운영은 [`OPERATIONS_GUIDE.md`](OPERATIONS_GUIDE.md)를 본다.
+
+---
+
+## 22. 보안 · 안정성 설계
+
+### 22.1 승인과 실행 내용의 결속
+
+승인자가 본 것과 실제로 실행되는 것이 같다는 것을 서버가 보장하기 위한 흐름이다.
+
+1. Runtime이 Tool을 실행하기 전에 `POST /api/v1/actions`로 평가를 요청하면서, 실행할 내용(action · target · 인자)을 정규화한 JSON의 SHA-256(`payloadHash`)과 비밀값을 가린 인자 미리보기(`payloadPreview`, 최대 20,000자)를 함께 보낸다. 가리는 키: `password` · `secret` · `token` · `api_key` · `authorization` · `credential`을 포함하는 이름
+2. 승인이 필요하면 AgentGate가 둘을 승인 요청(DB)에 저장한다. 승인 화면은 미리보기를 보여 준다
+3. 승인 · 거절 결정이 나면 AgentGate가 Runtime에 재개를 요청하면서 **저장해 둔 해시를 돌려준다**
+4. Runtime은 실행 직전의 내용으로 해시를 다시 계산해 비교한다. 다르면 Tool을 실행하지 않고 실행을 실패시킨다(`PayloadMismatch`)
+5. 해시 없이 만들어진 승인 요청(이 기능 이전의 것)은 검사하지 않는다
+
+대상: Agent의 Tool 호출과 HTTP/MCP Tool 노드. Approval 노드는 실행할 내용이 없어 해당 없다. 비교 기준이 Runtime 체크포인트가 아니라 AgentGate DB에 저장된 해시라서, 체크포인트가 중간에 바뀌어도 감지된다.
+
+### 22.2 로그인 · 세션 · CSRF
+
+- 콘솔은 `POST /api/v1/auth/login`으로 서버 세션을 만들고 `HttpOnly` 쿠키를 받는다. 비밀번호는 브라우저에 남지 않는다. 로그인 시 세션 ID를 바꿔 세션 고정을 막는다
+- 세션 쿠키로 인증한 상태 변경 요청은 `XSRF-TOKEN` 쿠키 값을 `X-XSRF-TOKEN` 헤더로 돌려보내야 한다. Basic · `X-API-Key` · `X-Runtime-Token` 헤더 요청과 세션이 없는 요청은 CSRF 대상이 아니다(교차 사이트 페이지가 붙일 수 없는 자격이거나 악용할 것이 없는 요청)
+- 인증에 실패한 요청이 세션을 만들지 않도록 요청 캐시를 끄고, 브라우저의 Basic 로그인 창이 뜨지 않도록 401에는 `WWW-Authenticate`를 싣지 않는다
+- 로그인 실패는 아이디+IP, IP 단위로 센다(Redis, Redis에 닿지 못하면 막지 않음). 한도를 넘으면 비밀번호가 맞아도 429
+- 응답에 CSP(`default-src 'self'` 등)를 싣는다
+- 스크립트 · 자동화는 같은 API를 HTTP Basic으로 호출한다. 사내 계정(OIDC · SAML) 연동은 없다
+
+### 22.3 Runtime 보호
+
+- Runtime의 모든 `/runtime/*` API는 `X-Runtime-Token`을 요구한다(`/health` 제외). `RUNTIME_TOKEN`이 없으면 Runtime은 기동하지 않는다(로컬 개발만 `RUNTIME_ALLOW_NO_TOKEN=true`)
+- AgentGate에서 가져온 MCP 서버 목록은 30초 캐시하고, AgentGate에 5분 넘게 닿지 못하면 버린다(비활성화한 서버가 계속 쓰이지 않게)
+- 컨테이너는 root가 아닌 사용자로 실행하고, selfhost에서는 Runtime 포트를 공개하지 않는다
+
+### 22.4 실행 안정성
+
+- **실시간 화면 동기화**: 실행 화면의 SSE는 "상태 읽기 + 구독 등록"과 "이벤트 적용 + 발행"을 실행별 락으로 서로 배타적으로 처리해, 이벤트가 누락되거나 오래된 스냅샷이 최신 상태를 덮어쓰지 않게 한다
+- **재시작 복구**: AgentGate가 1분마다 `RUNNING`인데 Runtime에서 돌고 있지 않은 실행(시작 후 2분 경과)을 찾아 `POST /runtime/executions/{id}/recover`로 마지막 체크포인트부터 이어 실행한다. Tool 실행 도중 끊긴 실행은 이미 실행됐을 수 있어 이어 가지 않고 `FAILED`로 표시한다
+- **중복 방지**: HTTP Tool 호출에 `Idempotency-Key: <실행 ID>:<단계>`를 붙인다(받는 쪽이 재시도 · 복구로 인한 반복을 걸러낼 수 있다). MCP Tool에는 붙일 자리가 없다. 승인 재개는 Runtime이 `_running` 집합으로 중복을 막고, 이미 재개된 실행에 대한 중복 알림은 409/404로 완료 처리한다
+- **모델 호출 제한**: `LLM_MAX_CONCURRENCY`로 모델 서버에 동시에 보내는 호출 수를 제한하고 나머지는 Runtime에서 줄 선다(대기는 모델 타임아웃에 포함되지 않음). 한 턴에 여러 Tool을 부르면 첫 호출만 실행하고 나머지는 결과를 본 뒤 모델이 다시 정한다(`LLM_PARALLEL_TOOL_CALLS`)
+- **보존**: 끝난 실행의 기록과 Runtime 체크포인트는 `AGENTGATE_EXECUTION_RETENTION`(기본 90일)이 지나면 지운다. 감사 로그와 승인 기록은 지우지 않는다
