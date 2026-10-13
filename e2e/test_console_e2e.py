@@ -86,6 +86,18 @@ def agent_workflow(admin, action_risk):  # noqa: F811
     return {"workflowId": workflow_id, "name": f"UI flow {suffix}", "agentId": agent_id}
 
 
+def wait_for_approval_panel(page, admin, execution_id: str):  # noqa: F811
+    panel = page.get_by_role("region", name="승인 요청")
+    try:
+        panel.get_by_role("heading", name="승인이 필요합니다").wait_for(timeout=30000)
+    except sync_api.TimeoutError:
+        execution = admin.get(f"/api/v1/executions/{execution_id}").json()
+        raise AssertionError(
+            f"no approval panel; execution={execution}; page={page.inner_text('body')[:1500]!r}"
+        ) from None
+    return panel
+
+
 def run_from_the_console(page, workflow: dict) -> str:
     page.get_by_role("link", name="Workflows").click()
     page.get_by_role("button", name=workflow["name"]).click()
@@ -99,8 +111,7 @@ def test_a_person_approves_a_tool_call_in_the_console_and_the_run_continues(page
     sign_in(page, *ADMIN)
     execution_id = run_from_the_console(page, agent_workflow)
 
-    panel = page.get_by_role("region", name="승인 요청")
-    panel.get_by_role("heading", name="승인이 필요합니다").wait_for()
+    panel = wait_for_approval_panel(page, admin, execution_id)
     assert "MCP:echo:add" in panel.inner_text()
     assert agent_workflow["agentId"] in panel.inner_text()
     assert '"a": 2' in panel.inner_text()
@@ -115,8 +126,7 @@ def test_a_person_approves_a_tool_call_in_the_console_and_the_run_continues(page
 def test_a_person_rejects_a_tool_call_and_it_never_runs(page, admin, agent_workflow):  # noqa: F811
     sign_in(page, *ADMIN)
     execution_id = run_from_the_console(page, agent_workflow)
-    panel = page.get_by_role("region", name="승인 요청")
-    panel.get_by_role("heading", name="승인이 필요합니다").wait_for()
+    panel = wait_for_approval_panel(page, admin, execution_id)
 
     panel.get_by_role("button", name="거절").click()
 
@@ -142,8 +152,7 @@ def test_a_viewer_sees_the_request_but_cannot_decide(page, admin, agent_workflow
     try:
         sign_in(page, username, password)
         page.goto(f"{UI}/executions/{started['executionId']}")
-        panel = page.get_by_role("region", name="승인 요청")
-        panel.get_by_role("heading", name="승인이 필요합니다").wait_for()
+        panel = wait_for_approval_panel(page, admin, started["executionId"])
         assert panel.get_by_role("button", name="승인").count() == 0
         assert panel.get_by_role("button", name="거절").count() == 0
     finally:
