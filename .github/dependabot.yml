@@ -16,6 +16,10 @@ updates:
     directories: [/, /runtime]
     schedule:
       interval: weekly
+    # CI does not build the images, so a major base image upgrade (Python, JRE, Node) is checked by hand.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
