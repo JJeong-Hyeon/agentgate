@@ -169,6 +169,12 @@ def get_execution(execution_id: str, runner: Runner) -> ExecutionResponse:
     return _describe(_graph_for(runner, execution_id), execution_id)
 
 
+@router.delete("/{execution_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_execution(execution_id: str, runner: Runner) -> None:
+    """Forgets a finished execution's checkpoints; deleting an unknown execution is a no-op."""
+    runner.forget(execution_id)
+
+
 @router.post(
     "/{execution_id}/resume",
     status_code=status.HTTP_202_ACCEPTED,

@@ -89,6 +89,30 @@ class RuntimeClientTest {
     }
 
     @Test
+    void forgetsAnExecutionWithTheToken() {
+        responseStatus = 204;
+
+        assertThat(client().forgetExecution("exec-1")).isTrue();
+        assertThat(path.get()).isEqualTo("/runtime/executions/exec-1");
+        assertThat(token.get()).isEqualTo("secret");
+    }
+
+    @Test
+    void forgettingAnExecutionTheRuntimeDoesNotKnowIsDone() {
+        responseStatus = 404;
+
+        assertThat(client().forgetExecution("exec-1")).isTrue();
+    }
+
+    @Test
+    void forgettingFailsWhenTheRuntimeErrs() {
+        responseStatus = 500;
+
+        assertThat(client().forgetExecution("exec-1")).isFalse();
+        assertThat(new RuntimeClient(RestClient.builder(), "", "").forgetExecution("exec-1")).isTrue();
+    }
+
+    @Test
     void disabledWithoutBaseUrl() {
         assertThat(new RuntimeClient(RestClient.builder(), "", "").isEnabled()).isFalse();
     }

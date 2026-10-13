@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -18,6 +19,10 @@ public interface NodeExecutionRepository extends JpaRepository<NodeExecution, Lo
     List<NodeExecution> findByExecutionOrderByIdAsc(Execution execution);
 
     List<NodeExecution> findByExecutionAndStatus(Execution execution, NodeStatus status);
+
+    @Modifying
+    @Query("delete from NodeExecution n where n.execution = :execution")
+    int deleteByExecution(@Param("execution") Execution execution);
 
     /** Model calls per model since {@code since}: calls, average latency and tokens. */
     @Query("select new com.agentgate.dashboard.ModelUsage(n.llmModel, count(n), avg(n.llmLatencyMs), "

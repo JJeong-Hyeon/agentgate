@@ -33,6 +33,11 @@ agentgate:
     # 한 IP에서 아이디와 상관없이 lock-duration 안에 이만큼 실패하면 그 IP의 로그인을 막는다.
     max-failures-per-ip: ${AGENTGATE_LOGIN_MAX_FAILURES_PER_IP:20}
     lock-duration: ${AGENTGATE_LOGIN_LOCK_DURATION:PT15M}
+  retention:
+    # 끝난 실행(완료 / 중단 / 실패)의 기록과 Runtime checkpoint를 이 기간이 지나면 지운다. P0D면 지우지 않는다.
+    # 감사 로그와 승인 기록은 지우지 않는다.
+    executions: ${AGENTGATE_EXECUTION_RETENTION:P90D}
+    check-delay: PT1H
   approval:
     # PENDING 상태로 이 시간이 지난 승인 요청은 EXPIRED 처리되고, 대기 중인 실행은 거절과 동일하게 진행된다.
     ttl: ${AGENTGATE_APPROVAL_TTL:PT24H}

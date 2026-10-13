@@ -91,6 +91,29 @@ public class RuntimeClient {
     }
 
     /**
+     * Drops a finished execution's checkpoints on the runtime.
+     *
+     * @return true when the runtime holds nothing more for it (or is disabled); false when the call should be retried.
+     */
+    public boolean forgetExecution(String executionId) {
+        if (!enabled) {
+            return true;
+        }
+        try {
+            restClient.delete()
+                    .uri("/runtime/executions/{id}", executionId)
+                    .retrieve()
+                    .toBodilessEntity();
+            return true;
+        } catch (HttpClientErrorException.NotFound e) {
+            return true;
+        } catch (RestClientException e) {
+            log.warn("Failed to delete execution {} on the runtime; will retry", executionId, e);
+            return false;
+        }
+    }
+
+    /**
      * Validates a Workflow DSL document with the runtime, which owns the DSL schema.
      *
      * @throws RuntimeUnavailableException when the runtime is disabled or cannot answer

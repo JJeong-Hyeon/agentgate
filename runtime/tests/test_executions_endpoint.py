@@ -201,6 +201,15 @@ def test_resume_disabled_without_configured_token(approval_client):
     assert resume(approval_client, execution_id).status_code == 503
 
 
+def test_deleting_an_execution_forgets_its_checkpoints(client):
+    execution_id = start(client)["execution_id"]
+
+    assert client.delete(f"/runtime/executions/{execution_id}").status_code == 204
+    assert client.get(f"/runtime/executions/{execution_id}").status_code == 404
+    # Deleting again (or an execution the runtime never had) is fine.
+    assert client.delete(f"/runtime/executions/{execution_id}").status_code == 204
+
+
 def test_resume_unknown_execution_is_404(approval_client):
     assert resume(approval_client, "unknown").status_code == 404
 
