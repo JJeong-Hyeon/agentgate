@@ -90,7 +90,9 @@ def wait_for_approval_panel(page, admin, execution_id: str):  # noqa: F811
     panel = page.get_by_role("region", name="승인 요청")
     try:
         panel.get_by_role("heading", name="승인이 필요합니다").wait_for(timeout=30000)
-    except sync_api.TimeoutError:
+        # The request's details load after the panel appears.
+        sync_api.expect(panel).to_contain_text("MCP:echo:add", timeout=15000)
+    except (sync_api.TimeoutError, AssertionError):
         execution = admin.get(f"/api/v1/executions/{execution_id}").json()
         raise AssertionError(
             f"no approval panel; execution={execution}; page={page.inner_text('body')[:1500]!r}"
