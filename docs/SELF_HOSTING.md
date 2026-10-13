@@ -54,6 +54,8 @@ cp .env.example .env
 
 ```bash
 docker compose up -d --build
+# 또는 릴리스 이미지로: .env에 AGENTGATE_VERSION=0.1.0 을 넣고
+docker compose pull && docker compose up -d
 docker compose ps        # 모두 Up이면 정상
 ```
 
@@ -137,7 +139,9 @@ docker compose --profile monitoring up -d
 
 | 작업 | 명령 (`deploy/selfhost`에서) |
 |---|---|
-| 업데이트 | `git pull && docker compose up -d --build` — DB 스키마는 기동 시 Flyway가 자동 적용 |
+| 업데이트 (릴리스) | [`CHANGELOG.md`](../CHANGELOG.md) 확인 → `.env`의 `AGENTGATE_VERSION`을 새 버전으로 → `docker compose pull && docker compose up -d`. DB 스키마는 기동 시 Flyway가 자동 적용 |
+| 업데이트 (소스) | `git pull && docker compose up -d --build` |
+| 되돌리기 | `AGENTGATE_VERSION`을 이전 버전으로 바꾸고 백업한 DB를 복원 (새 버전이 DB 스키마를 바꿨을 수 있으므로) |
 | 로그 | `docker compose logs -f app runtime` |
 | 백업 | `docker compose exec -T postgres pg_dump -U agentgate agentgate > agentgate-$(date +%F).sql` |
 | 복원 | `docker compose exec -T postgres psql -U agentgate agentgate < agentgate-<날짜>.sql` (빈 DB에) |
