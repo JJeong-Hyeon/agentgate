@@ -47,6 +47,7 @@ cp .env.example .env
 | `GRAFANA_ADMIN_PASSWORD` / `PROMETHEUS_RETENTION` | 선택. 모니터링 프로필(아래)의 Grafana 관리자 비밀번호, Prometheus 보존 기간(기본 `30d`) |
 | `AGENTGATE_APPROVAL_TTL` | 선택. 결정되지 않은 승인 요청을 만료시키는 시간 (기본 `PT24H`) |
 | `AGENTGATE_EXECUTION_RETENTION` | 선택. 끝난 실행의 기록과 Runtime checkpoint를 지우는 기간 (기본 `P90D`, `P0D`면 지우지 않음). 감사 로그와 승인 기록은 지우지 않는다 |
+| `AGENTGATE_SESSION_TIMEOUT` / `AGENTGATE_SESSION_COOKIE_SECURE` | 선택. 콘솔 로그인 세션의 유휴 만료(기본 `PT8H`)와 쿠키 `Secure` 여부(compose 기본 `true`: HTTPS 뒤에서 운영) |
 | `AGENTGATE_LOGIN_*` | 선택. 로그인 실패 제한(저장소 `STORE`: compose 기본 `redis`, 직접 실행 기본 `memory`): 아이디 + IP당 연속 실패 `MAX_FAILURES`(기본 5), IP당 `MAX_FAILURES_PER_IP`(기본 20), 막는 시간 `LOCK_DURATION`(기본 `PT15M`) |
 | `AGENTGATE_NOTIFY_WEBHOOK_*` | 선택. 승인 요청 알림 웹훅 ([`API_SPEC.md`](API_SPEC.md) 승인 처리 참고) |
 

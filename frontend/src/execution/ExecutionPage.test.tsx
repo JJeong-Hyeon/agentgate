@@ -126,7 +126,8 @@ describe("ExecutionPage", () => {
       expect(fetchImpl.mock.calls.some(([url]) => String(url) === "/api/v1/approvals/7/approve")).toBe(true),
     );
     const streamCall = fetchImpl.mock.calls.find(([url]) => String(url).endsWith("/stream"))!;
-    expect((streamCall[1]!.headers as Record<string, string>).Authorization).toBe(`Basic ${btoa("admin:pw")}`);
+    // The session cookie authenticates the stream; the password is never sent.
+    expect((streamCall[1]!.headers as Record<string, string>).Authorization).toBeUndefined();
   });
 
   it("shows what an agent asked for, how AgentGate decided, and what came back", async () => {

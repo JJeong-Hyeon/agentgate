@@ -3,6 +3,18 @@
 버전별 변경 사항. 형식은 [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/), 버전은 [Semantic Versioning](https://semver.org/lang/ko/)을 따른다.
 릴리스 이미지: `ghcr.io/jjeong-hyeon/agentgate`, `ghcr.io/jjeong-hyeon/agentgate-runtime` (설치 · 업그레이드는 [`docs/SELF_HOSTING.md`](docs/SELF_HOSTING.md)).
 
+## [0.3.0] - 2026-10-13
+
+### 변경
+- **콘솔 로그인이 서버 세션 쿠키 방식으로 바뀌었다.** 이전에는 비밀번호를 브라우저 세션 저장소에 두고 모든 요청에 Basic 인증으로 보냈다(화면에 XSS가 생기면 유출). 이제 `POST /api/v1/auth/login`이 `HttpOnly` 세션 쿠키를 발급하고, 비밀번호는 브라우저에 남지 않는다. 세션 쿠키로 인증한 요청은 CSRF 토큰(`X-XSRF-TOKEN`)을 요구하고, 세션이 끝나면 콘솔이 로그인 화면으로 돌아간다
+- HTTP Basic(스크립트 · 자동화)과 API 키 · Runtime 토큰 인증은 그대로 동작한다
+- 설정 추가: `AGENTGATE_SESSION_TIMEOUT`(기본 8시간), `AGENTGATE_SESSION_COOKIE_SECURE`(selfhost 기본 `true`)
+
+### 업그레이드 시 알아둘 것
+- 업그레이드하면 열려 있던 콘솔은 다시 로그인해야 한다
+- HTTPS 없이 HTTP로 selfhost를 운영한다면 `AGENTGATE_SESSION_COOKIE_SECURE=false`가 필요하다 (권장하지 않음)
+- 사내 계정(OIDC · SAML) 연동은 아직 없다
+
 ## [0.2.0] - 2026-10-13
 
 ### 보안 · 안정성
