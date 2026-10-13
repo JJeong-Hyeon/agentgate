@@ -10,7 +10,7 @@ COPY frontend/ ./
 COPY runtime/examples /runtime/examples
 RUN npm run build
 
-FROM eclipse-temurin:21-jdk AS build
+FROM eclipse-temurin:25-jdk AS build
 WORKDIR /src
 COPY gradlew settings.gradle build.gradle ./
 COPY gradle gradle
@@ -19,7 +19,7 @@ COPY src src
 COPY --from=frontend /frontend/dist src/main/resources/static
 RUN ./gradlew --no-daemon -q bootJar -x test && cp build/libs/agentgate-*-SNAPSHOT.jar /agentgate.jar
 
-FROM eclipse-temurin:21-jre
+FROM eclipse-temurin:25-jre
 RUN useradd --system --uid 10001 agentgate
 COPY --from=build /agentgate.jar /app/agentgate.jar
 USER agentgate
