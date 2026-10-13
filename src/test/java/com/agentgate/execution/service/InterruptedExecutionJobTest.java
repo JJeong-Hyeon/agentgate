@@ -45,6 +45,8 @@ class InterruptedExecutionJobTest {
         when(runtime.recover("lost")).thenReturn(Recovery.RECOVERING);
         when(runtime.recover("cut")).thenReturn(Recovery.IMPOSSIBLE);
         when(executionService.apply(any(), any())).thenReturn(mock(ExecutionResponse.class));
+        when(broadcaster.sequenced(any(), any()))
+                .thenAnswer(call -> ((java.util.function.Supplier<?>) call.getArgument(1)).get());
     }
 
     @Test

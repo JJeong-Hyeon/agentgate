@@ -85,8 +85,11 @@ public class InterruptedExecutionJob {
     private void fail(String executionId) {
         ExecutionEvent event = new ExecutionEvent(ExecutionEvent.Type.EXECUTION_FAILED, null, null, null, null,
                 NOT_RECOVERABLE, null, clock.instant());
-        broadcaster.publish(executionId, "update", Map.of("event", event,
-                "execution", executionService.apply(executionId, event)));
-        broadcaster.complete(executionId);
+        broadcaster.sequenced(executionId, () -> {
+            broadcaster.publish(executionId, "update", Map.of("event", event,
+                    "execution", executionService.apply(executionId, event)));
+            broadcaster.complete(executionId);
+            return null;
+        });
     }
 }

@@ -12,6 +12,7 @@ import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -56,9 +57,12 @@ public class ExecutionController {
     /** Live updates: a {@code snapshot} event with the full execution, then one {@code update} per runtime event. */
     @GetMapping(path = "/{executionId}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter stream(@PathVariable String executionId) {
-        ExecutionResponse snapshot = executionService.get(executionId);
-        SseEmitter emitter = broadcaster.subscribe(executionId, snapshot);
-        if (FINISHED.contains(snapshot.status())) {
+        AtomicReference<ExecutionResponse> snapshot = new AtomicReference<>();
+        SseEmitter emitter = broadcaster.subscribe(executionId, () -> {
+            snapshot.set(executionService.get(executionId));
+            return snapshot.get();
+        });
+        if (FINISHED.contains(snapshot.get().status())) {
             emitter.complete();
         }
         return emitter;
@@ -72,11 +76,14 @@ public class ExecutionController {
         if (!runtimeClient.acceptsToken(token)) {
             throw new InvalidRuntimeTokenException();
         }
-        ExecutionResponse updated = executionService.apply(executionId, event);
-        broadcaster.publish(executionId, "update", Map.of("event", event, "execution", updated));
-        if (FINISHED.contains(updated.status())) {
-            broadcaster.complete(executionId);
-        }
+        broadcaster.sequenced(executionId, () -> {
+            ExecutionResponse updated = executionService.apply(executionId, event);
+            broadcaster.publish(executionId, "update", Map.of("event", event, "execution", updated));
+            if (FINISHED.contains(updated.status())) {
+                broadcaster.complete(executionId);
+            }
+            return updated;
+        });
         return ResponseEntity.accepted().build();
     }
 }
