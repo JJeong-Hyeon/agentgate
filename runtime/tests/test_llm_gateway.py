@@ -96,3 +96,97 @@ def test_chat_with_real_llm():
     reply = model.invoke("Reply with the single word: pong")
 
     assert reply.content.strip()
+
+
+class _SlowChatServer:
+    """OpenAI-compatible chat endpoint that answers slowly and records how many calls overlap."""
+
+    def __init__(self, delay: float = 0.3):
+        import json
+        import threading
+        import time
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+        self.active = 0
+        self.peak = 0
+        lock = threading.Lock()
+        server = self
+
+        class Handler(BaseHTTPRequestHandler):
+            protocol_version = "HTTP/1.1"
+
+            def do_POST(self):
+                self.rfile.read(int(self.headers["Content-Length"]))
+                with lock:
+                    server.active += 1
+                    server.peak = max(server.peak, server.active)
+                time.sleep(delay)
+                with lock:
+                    server.active -= 1
+                body = json.dumps(
+                    {
+                        "id": "c",
+                        "object": "chat.completion",
+                        "created": 0,
+                        "model": "m",
+                        "choices": [
+                            {
+                                "index": 0,
+                                "message": {"role": "assistant", "content": "ok"},
+                                "finish_reason": "stop",
+                            }
+                        ],
+                    }
+                ).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *args):
+                pass
+
+        self.httpd = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.url = f"http://127.0.0.1:{self.httpd.server_address[1]}/v1"
+        threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
+
+    def close(self):
+        self.httpd.shutdown()
+
+
+def _call_at_once(server: _SlowChatServer, calls: int, **overrides) -> list[str]:
+    from concurrent.futures import ThreadPoolExecutor
+
+    config = Settings(_env_file=None, llm_base_url=server.url, llm_model="m", **overrides)
+    # Separate chat models (as separate agents get) still share the limit.
+    models = [create_chat_model(config) for _ in range(calls)]
+    with ThreadPoolExecutor(calls) as pool:
+        return list(pool.map(lambda m: m.invoke("hi").content, models))
+
+
+def test_calls_beyond_the_concurrency_limit_wait_their_turn():
+    server = _SlowChatServer()
+    try:
+        answers = _call_at_once(server, 4, llm_max_concurrency=2, llm_timeout_seconds=0.5)
+    finally:
+        server.close()
+
+    # Each call takes 0.3s, so queued calls would time out (0.5s) if waiting counted.
+    assert answers == ["ok"] * 4
+    assert server.peak == 2
+
+
+def test_without_a_limit_calls_go_out_together():
+    server = _SlowChatServer()
+    try:
+        _call_at_once(server, 4)
+    finally:
+        server.close()
+
+    assert server.peak == 4
+
+
+def test_concurrency_limit_cannot_be_negative():
+    with pytest.raises(ValueError):
+        settings(llm_max_concurrency=-1)

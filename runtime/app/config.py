@@ -1,6 +1,7 @@
 from functools import lru_cache
 from typing import Literal
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -27,6 +28,9 @@ class Settings(BaseSettings):
     # Run every tool call of a model turn. Off: only the first, and the model decides the rest
     # after seeing its result (local models otherwise guess arguments that depend on it).
     llm_parallel_tool_calls: bool = False
+    # Model calls sent to the model server at once; more wait here, so the server's own queue
+    # does not eat into LLM_TIMEOUT_SECONDS. 0 → no limit. Match the server (OLLAMA_NUM_PARALLEL).
+    llm_max_concurrency: int = Field(default=0, ge=0)
     # Empty → in-memory checkpoints (lost on restart).
     runtime_database_url: str = ""
     # Shared secret with AgentGate (X-Runtime-Token both ways): it authenticates resume requests

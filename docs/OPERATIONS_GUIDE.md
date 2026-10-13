@@ -50,6 +50,7 @@ AgentGate를 사내에 처음 도입하는 담당자를 위한 문서다. 설치
 | `LLM_REASONING_EFFORT` | 전역 `none` | qwen3:14b 기준 호출당 약 15초 → 2초 |
 | Agent 정의의 추론 강도 | 돈 · 외부 발송을 다루는 Agent는 `medium` | `none`에서는 조회를 건너뛰고 금액을 추측한 사례가 있었다. `medium`에서는 조회 후 정확한 금액을 썼다 (대신 턴당 약 12~25초) |
 | `LLM_TIMEOUT_SECONDS` | 추론을 켜는 Agent가 있으면 `120` 이상 | 추론 턴이 25초를 넘기도 한다 |
+| `LLM_MAX_CONCURRENCY` | Ollama면 `OLLAMA_NUM_PARALLEL`과 같게 (예: `2`) | 넘는 호출은 Runtime에서 기다려 모델 서버 대기가 타임아웃에 들어가지 않는다. 동시 5건 실측: 제한 없음 100~124초 → `2`로 55~90초, 실패 없음 |
 | `LLM_PARALLEL_TOOL_CALLS` | `false` (기본) | 한 턴의 여러 호출 중 첫 호출만 실행하고, 나머지는 결과를 본 뒤 다시 결정하게 한다 |
 | `MEMORY_MIN_SCORE` | bge-m3 기준 `0.45` | 관련 문장 0.55~0.73, 무관 문장 약 0.30 |
 | `AGENTGATE_APPROVAL_TTL` | 업무 시간에 맞게 (기본 `PT24H`) | 만료된 요청은 거절과 같이 처리된다. 주말을 넘기는 업무면 늘린다 |
@@ -108,5 +109,6 @@ AgentGate를 사내에 처음 도입하는 담당자를 위한 문서다. 설치
 - **동시 실행 수는 모델 서버가 정한다.** 2026-10 부하 테스트 결과:
   - 거버넌스 API(`/api/v1/actions`, App CPU 2개): 동시 10 → 약 860 req/s, 동시 50 → 약 1,430 req/s. 오류 0, p99 100ms 미만, 감사 로그 누락 없음.
   - 실모델 동시 실행(DGX Spark Ollama `qwen3:14b`, 추론 `medium`, Agent 2턴): 단독 약 27초, 동시 5건은 모두 성공했지만 100~124초. 모델 호출 한 번이 최대 69초까지 늘었다.
-  - 동시 실행이 더 늘면 모델 호출이 `LLM_TIMEOUT_SECONDS`(권장 120)를 넘겨 실행이 실패할 수 있다. 모델 서버 처리량에 맞춰 업무를 늘리고, LLM 지연 지표(`agentgate_llm_latency_seconds`)를 지켜본다.
+  - `LLM_MAX_CONCURRENCY`를 정하지 않으면 동시 실행이 늘 때 모델 호출이 `LLM_TIMEOUT_SECONDS`(권장 120)를 넘겨 실행이 실패할 수 있다. 정해 두면 넘는 호출은 Runtime에서 최대 15분까지 차례를 기다린다. 같은 조건에서 `2`로 두면 동시 5건이 55~90초에 끝났다.
+  - LLM 지연 지표(`agentgate_llm_latency_seconds`)와 Studio의 모델 지연에는 이 대기 시간도 포함된다.
 - **Agent의 판단은 모델에 좌우된다.** 거버넌스는 "무엇을 실행할 수 있는가"를 통제할 뿐 판단의 정확성을 보장하지 않는다. 되돌리기 어려운 작업은 HIGH로 두고 사람이 확인한다.
