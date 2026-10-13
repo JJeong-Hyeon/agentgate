@@ -140,9 +140,11 @@ com.agentgate
 ```bash
 cd frontend
 npm install
-npm run dev        # http://localhost:5173, /api는 localhost:8080(AgentGate)으로 프록시
+npm run dev        # http://127.0.0.1:5173, /api는 localhost:8080(AgentGate)으로 프록시
 npm test
 ```
+
+dev 서버는 기본적으로 `127.0.0.1`에만 바인딩됩니다. 다른 기기에서 접속하려면 `VITE_HOST=0.0.0.0 npm run dev`로 실행합니다.
 
 관리자 계정(기본 `admin` / `changeme`)으로 로그인합니다. 자격 증명은 브라우저 탭 세션 동안만 보관됩니다.
 
