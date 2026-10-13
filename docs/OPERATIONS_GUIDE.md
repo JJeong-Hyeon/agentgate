@@ -53,6 +53,7 @@ AgentGate를 사내에 처음 도입하는 담당자를 위한 문서다. 설치
 | `LLM_PARALLEL_TOOL_CALLS` | `false` (기본) | 한 턴의 여러 호출 중 첫 호출만 실행하고, 나머지는 결과를 본 뒤 다시 결정하게 한다 |
 | `MEMORY_MIN_SCORE` | bge-m3 기준 `0.45` | 관련 문장 0.55~0.73, 무관 문장 약 0.30 |
 | `AGENTGATE_APPROVAL_TTL` | 업무 시간에 맞게 (기본 `PT24H`) | 만료된 요청은 거절과 같이 처리된다. 주말을 넘기는 업무면 늘린다 |
+| `AGENTGATE_EXECUTION_RETENTION` | 기본 `P90D` | 끝난 실행의 단계별 기록 · checkpoint 삭제 시점. 감사 로그 · 승인 기록은 남는다 |
 
 ## 5. 일상 운영
 
@@ -75,6 +76,8 @@ AgentGate를 사내에 처음 도입하는 담당자를 위한 문서다. 설치
 | 분기 | 계정 · 역할 점검 | 퇴사자 비활성화, ADMIN 최소화 |
 | 분기 | 복원 리허설 | 백업 파일을 빈 DB에 복원해 기동되는지 확인 |
 | 변경 시 | `.env` 백업 | 특히 `AGENTGATE_SECRET_KEY` — 잃으면 MCP 서버 인증 헤더를 다시 입력해야 한다 |
+
+복원 (`.sql.gz` 백업을 빈 DB에): `gunzip -c agentgate-<날짜>.sql.gz | docker compose exec -T postgres psql -U agentgate agentgate`
 
 백업 cron 예시 (14일 보관):
 
@@ -101,7 +104,7 @@ AgentGate를 사내에 처음 도입하는 담당자를 위한 문서다. 설치
 
 - **로그인 시도 제한은 메모리에만 기록된다.** 재시작하면 초기화되고, App을 여러 대 띄우면 대마다 따로 센다. 콘솔은 사외에 공개하지 말고 사내망 · VPN 안에서만 접근하게 한다.
 - **IP 단위 차단은 실제 클라이언트 IP가 보여야 의미가 있다.** 로그인 차단 로그(`Sign-in ... from <IP> blocked`)에 모든 사용자가 같은 IP(예: Docker Desktop의 `172.18.0.1`)로 찍히면, 한 사람의 실패로 전원이 막힐 수 있다. 이때는 `AGENTGATE_LOGIN_MAX_FAILURES_PER_IP`를 크게 잡는다.
-- **실행 기록 보존 정책이 없다.** 실행 체크포인트와 기록이 계속 쌓이므로 DB 용량을 지표로 지켜본다.
+- **감사 로그와 승인 기록은 자동으로 지우지 않는다.** 끝난 실행의 상세 기록과 checkpoint는 `AGENTGATE_EXECUTION_RETENTION`(기본 90일)이 지나면 지워지지만, 거버넌스 기록은 회사 보존 정책에 맞춰 직접 관리한다.
 - **동시 실행 수는 모델 서버가 정한다.** 2026-10 부하 테스트 결과:
   - 거버넌스 API(`/api/v1/actions`, App CPU 2개): 동시 10 → 약 860 req/s, 동시 50 → 약 1,430 req/s. 오류 0, p99 100ms 미만, 감사 로그 누락 없음.
   - 실모델 동시 실행(DGX Spark Ollama `qwen3:14b`, 추론 `medium`, Agent 2턴): 단독 약 27초, 동시 5건은 모두 성공했지만 100~124초. 모델 호출 한 번이 최대 69초까지 늘었다.

@@ -108,15 +108,14 @@ class AgentActionIntegrationTest {
     }
 
     @Test
-    void unknownAgentReturnsNotFound() throws Exception {
+    void unknownAgentLooksLikeAWrongKey() throws Exception {
         String body = """
                 {"agentId":"ghost-agent","action":"VIEW_DATA","labels":[]}
                 """;
 
         mockMvc.perform(post("/api/v1/actions").header("X-API-Key", API_KEY)
                         .contentType(MediaType.APPLICATION_JSON).content(body))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("AGENT_NOT_FOUND"));
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

@@ -20,6 +20,11 @@ public class SecurityConfig {
     private static final String APPROVER = "APPROVER";
     private static final String[] ALL_ROLES = {"ADMIN", "EDITOR", "APPROVER", "VIEWER"};
 
+    // The console loads only its own bundle and calls only this origin; inline styles come from React Flow.
+    private static final String CONTENT_SECURITY_POLICY = "default-src 'self'; script-src 'self'; "
+            + "style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; "
+            + "object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
+
     // Console APIs behind sign-in; specific rules above take precedence.
     private static final String[] CONSOLE_RESOURCES = {
             "/api/v1/dashboard",
@@ -39,6 +44,7 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .httpBasic(Customizer.withDefaults())
+                .headers(headers -> headers.contentSecurityPolicy(csp -> csp.policyDirectives(CONTENT_SECURITY_POLICY)))
                 // Repeated failed sign-ins are refused before their password is checked.
                 .addFilterBefore(new LoginThrottleFilter(loginAttempts, objectMapper), BasicAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> auth
