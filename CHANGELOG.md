@@ -3,6 +3,23 @@
 버전별 변경 사항. 형식은 [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/), 버전은 [Semantic Versioning](https://semver.org/lang/ko/)을 따른다.
 릴리스 이미지: `ghcr.io/jjeong-hyeon/agentgate`, `ghcr.io/jjeong-hyeon/agentgate-runtime` (설치 · 업그레이드는 [`docs/SELF_HOSTING.md`](docs/SELF_HOSTING.md)).
 
+## [0.2.0] - 2026-10-13
+
+### 보안 · 안정성
+- **승인과 실행 내용의 결속**: Runtime이 실행할 내용(액션, 대상, 인자)의 SHA-256을 승인 요청에 저장하고, 승인 후 재개할 때 현재 내용의 해시와 비교한다. 다르면 실행하지 않고 실행을 실패시킨다 (Agent의 Tool 호출, HTTP/MCP Tool 노드)
+- **승인 화면에 인자 전체 표시** ("인자 전체 보기", 최대 20,000자, 비밀번호 · 토큰 같은 키는 `***`)
+- HTTP Tool 호출에 `Idempotency-Key` 헤더 추가
+- Runtime은 `RUNTIME_TOKEN` 없이 시작하지 않는다 (로컬 개발만 `RUNTIME_ALLOW_NO_TOKEN=true`)
+- AgentGate에 5분 넘게 닿지 못하면 캐시한 MCP 서버 목록을 버린다
+- 실행 화면이 승인 대기 상태를 놓치던 문제 수정: 스냅샷을 읽는 사이 들어온 이벤트가 누락되거나 오래된 스냅샷이 최신 상태를 덮어쓸 수 있었다
+- 루트 `compose.yaml`은 개발 전용으로 명시하고 포트를 127.0.0.1로 제한, 이미지 버전 고정
+- 의존성 취약점 CI 스캔과 Dependabot(월 1회, 종류별 묶음)
+
+### 업그레이드 시 알아둘 것
+- DB 마이그레이션 V10, V11이 기동 시 자동 적용된다 (승인 요청에 `payload_hash`, `payload_preview` 열 추가). 업그레이드 전에 백업을 뜬다
+- 업그레이드 시점에 대기 중이던 승인은 해시가 없어 검사 없이 기존처럼 동작한다
+- 로컬에서 Runtime만 띄운다면 `RUNTIME_TOKEN`을 채우거나 `RUNTIME_ALLOW_NO_TOKEN=true`가 필요하다 (selfhost 스택은 이미 `RUNTIME_TOKEN`을 요구한다)
+
 ## [0.1.1] - 2026-10-13
 
 ### 변경
