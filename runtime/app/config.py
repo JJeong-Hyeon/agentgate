@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     # medium, high), unless an agent's definition says. Empty → not sent; the model decides.
     # "none" turns off thinking in reasoning models such as qwen3 on Ollama (much faster).
     llm_reasoning_effort: Literal["", "none", "minimal", "low", "medium", "high"] = ""
+    # Run every tool call of a model turn. Off: only the first, and the model decides the rest
+    # after seeing its result (local models otherwise guess arguments that depend on it).
+    llm_parallel_tool_calls: bool = False
     # Empty → in-memory checkpoints (lost on restart).
     runtime_database_url: str = ""
     # Shared secret with AgentGate (X-Runtime-Token both ways): it authenticates resume requests

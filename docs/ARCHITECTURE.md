@@ -217,6 +217,7 @@ JSON Schema는 `GET /runtime/workflows/schema`로 제공한다 (프론트엔드 
 - Agent의 Tool 호출 방식은 두 가지다 (`LLM_TOOL_CALLING`, Agent 정의의 `toolCalling`으로 Agent별 지정 가능).
   - `native`: OpenAI function calling. vLLM은 `--enable-auto-tool-choice --tool-call-parser <모델에 맞는 parser>`(Qwen 계열은 `hermes`)로 띄워야 한다.
   - `json`: Tool 목록과 응답 형식을 프롬프트로 안내하고 모델의 JSON 응답을 호출로 해석한다. function calling을 지원하지 않는 서버/모델용.
+- 모델이 한 턴에 여러 Tool을 호출하면 기본적으로 첫 호출만 실행하고, 나머지는 그 결과를 본 뒤 모델이 다시 결정한다. 실모델(qwen3:14b) 확인에서 주문 조회와 환불을 동시에 호출하며 조회 전에 환불 금액을 지어내는 문제가 있었다. 모두 실행하려면 `LLM_PARALLEL_TOOL_CALLS=true`.
 - Tool 호출 품질은 모델 크기에 크게 좌우된다. 3B급은 불필요한 호출을 반복하기 쉬워(로컬 확인 결과) 운영에는 **14B 이상 Tool Calling 지원 모델**을 권장한다. 반복 호출은 `maxSteps`와 거버넌스(승인)로 제한된다.
 
 ---
