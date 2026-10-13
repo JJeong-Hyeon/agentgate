@@ -171,3 +171,7 @@ PYTHON=python3.12 ./scripts/e2e.sh   # Docker, Java 21, Python 3.12 + runtime �
 - 도입 · 운영 가이드 (첫 설정, 권장 설정, 장애 대응): [`docs/OPERATIONS_GUIDE.md`](docs/OPERATIONS_GUIDE.md)
 - AWS 배포: [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)
 - 모니터링 (Prometheus + Grafana): [`docs/MONITORING.md`](docs/MONITORING.md)
+
+## 라이선스
+
+[Apache License 2.0](LICENSE)
