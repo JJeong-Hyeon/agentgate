@@ -29,6 +29,15 @@ class SpaRoutingTest {
     }
 
     @Test
+    void theConsoleIsServedWithAContentSecurityPolicy() throws Exception {
+        mockMvc.perform(get("/workflows"))
+                .andExpect(header().string("Content-Security-Policy",
+                        org.hamcrest.Matchers.containsString("script-src 'self'")))
+                .andExpect(header().string("Content-Security-Policy",
+                        org.hamcrest.Matchers.containsString("frame-ancestors 'none'")));
+    }
+
+    @Test
     void apiStillRequiresLogin() throws Exception {
         mockMvc.perform(get("/api/v1/workflows")).andExpect(status().isUnauthorized());
         mockMvc.perform(get("/api/v1/workflows").with(httpBasic("test-admin", "wrong")))

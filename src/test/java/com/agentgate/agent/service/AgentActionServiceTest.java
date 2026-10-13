@@ -64,12 +64,22 @@ class AgentActionServiceTest {
     }
 
     @Test
-    void throwsWhenAgentIsUnknown() {
+    void unknownAgentIsRejectedLikeAWrongKey() {
         when(agentRepository.findByAgentId("ghost-agent")).thenReturn(Optional.empty());
 
         ActionRequest request = new ActionRequest("ghost-agent", "VIEW_DATA", null, List.of());
 
         assertThatThrownBy(() -> service.evaluate(request, API_KEY))
+                .isInstanceOf(InvalidApiKeyException.class);
+    }
+
+    @Test
+    void unknownAgentIsNotFoundForTheRuntime() {
+        when(agentRepository.findByAgentId("ghost-agent")).thenReturn(Optional.empty());
+
+        ActionRequest request = new ActionRequest("ghost-agent", "VIEW_DATA", null, List.of());
+
+        assertThatThrownBy(() -> service.evaluate(request, null, true))
                 .isInstanceOf(AgentNotFoundException.class);
     }
 
