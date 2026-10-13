@@ -12,13 +12,15 @@ public record AgentStep(
         String agent,
         String llmModel,
         Long llmLatencyMs,
+        Long llmQueueWaitMs,
         Long inputTokens,
         Long outputTokens,
         String toolName,
         String toolStatus,
         Long toolDurationMs
 ) {
-    static final AgentStep NONE = new AgentStep(null, null, null, null, null, null, null, null);
+    static final AgentStep NONE =
+            new AgentStep(null, null, null, null, null, null, null, null, null);
 
     public boolean hasLlmCall() {
         return llmLatencyMs != null;
@@ -45,12 +47,16 @@ public record AgentStep(
         String agent = text(trace, "agent");
         String model = null;
         Long latency = null;
+        Long queueWait = null;
         Long input = null;
         Long outputTokens = null;
         JsonNode llm = trace.get("llm");
         if (llm != null && llm.isObject()) {
             model = text(llm, "model");
             latency = Math.max(llm.path("latency_ms").asLong(0), 0);
+            if (llm.hasNonNull("queue_wait_ms")) {
+                queueWait = Math.max(llm.path("queue_wait_ms").asLong(0), 0);
+            }
             JsonNode tokens = trace.get("tokens");
             if (tokens != null && tokens.isObject()) {
                 input = number(tokens, "input");
@@ -65,7 +71,8 @@ public record AgentStep(
             toolStatus = text(trace, "status");
             toolDuration = Math.max(trace.path("duration_ms").asLong(0), 0);
         }
-        return new AgentStep(agent, model, latency, input, outputTokens, tool, toolStatus, toolDuration);
+        return new AgentStep(
+                agent, model, latency, queueWait, input, outputTokens, tool, toolStatus, toolDuration);
     }
 
     /** "notes/save_note" from "helper:notes/save_note": the node prefix is not part of the tool. */

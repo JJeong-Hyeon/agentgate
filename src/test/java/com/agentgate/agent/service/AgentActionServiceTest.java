@@ -104,8 +104,8 @@ class AgentActionServiceTest {
         ActionResponse response = service.evaluate(
                 new ActionRequest("mail-agent", "MCP:notes:save_note", null, List.of()), API_KEY);
 
-        // The agent's definition lists no such tool, yet a call that names no version is judged by policy alone:
-        // tool grants are enforced for runtime-run agents (which always name their version).
+        // The agent has never had a definition at all, so there is no grant to enforce: it is
+        // judged by policy alone, same as before any Agent Definition / Tool Catalog existed.
         assertThat(response.status()).isEqualTo(ActionStatus.ALLOWED);
     }
 
@@ -217,6 +217,20 @@ class AgentActionServiceTest {
     }
 
     @Test
+    void blocksToolsNotGrantedWhenNoVersionIsNamedButTheAgentHasADefinition() {
+        // A direct Action API call (no agentVersion) for an agent that does have tool grants must
+        // not skip the grant check just because the caller omitted the version: it falls back to
+        // the latest definition instead of passing through to policy alone.
+        agentWithTools(new AgentToolDefinition("notes", "list_notes", ToolPermission.AUTO, List.of()));
+
+        ActionResponse response = service.evaluate(
+                new ActionRequest("mail-agent", "MCP:notes:delete_note", null, List.of()), API_KEY);
+
+        assertThat(response.status()).isEqualTo(ActionStatus.BLOCKED);
+        assertThat(response.basis()).isEqualTo(DecisionBasis.TOOL_NOT_GRANTED);
+    }
+
+    @Test
     void requiresApprovalForApprovalToolsEvenWhenPoliciesAllow() {
         Agent agent = agentWithTools(new AgentToolDefinition("notes", "save_note", ToolPermission.APPROVAL, List.of()));
         when(riskEvaluationService.evaluate("MCP:notes:save_note", List.of()))
@@ -261,6 +275,8 @@ class AgentActionServiceTest {
 
     private Agent agentWithTools(AgentToolDefinition... tools) {
         Agent agent = new Agent("mail-agent", "Mail Agent", ApiKeyGenerator.hash(API_KEY));
+        agent.nextDefinitionVersion(null);
+        agent.nextDefinitionVersion(null);
         when(agentRepository.findByAgentId("mail-agent")).thenReturn(Optional.of(agent));
         when(agentDefinitionService.definition(agent, 2)).thenReturn(
                 new AgentDefinition(null, null, null, "prompt", List.of(tools), 8, null, null, null, null, null));

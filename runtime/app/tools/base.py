@@ -7,9 +7,11 @@ from typing import Any, Literal
 from opentelemetry.trace import Status, StatusCode
 from pydantic import BaseModel, Field
 
+from app.config import get_settings
 from app.governance.agentgate_client import AgentGateClient, AgentGateError
 from app.governance.payload import payload_hash, payload_preview
 from app.telemetry import current_step, set_attributes, set_content, tracer
+from app.tools import ledger
 
 MAX_OUTPUT_CHARS = 2000
 
@@ -127,7 +129,21 @@ class GovernedTool(ABC):
         """Run the tool; only called after authorize() allowed it (directly or via approval)."""
 
     def execute_timed(self, payload: dict[str, Any] | None, authorized: ToolResult) -> ToolResult:
-        """execute(), with how long it took recorded in the result (and traced)."""
+        """execute(), with how long it took recorded in the result (and traced). With an
+        idempotency key, a call already on record in the ledger is replayed instead of run
+        again (see app.tools.ledger)."""
+        key = authorized.idempotency_key
+        settings = get_settings() if key else None
+        if key:
+            replay = ledger.begin(settings, key, self.name)
+            if replay is not None:
+                return replay.model_copy(
+                    update={
+                        "risk_level": authorized.risk_level,
+                        "approval_id": authorized.approval_id,
+                        "basis": authorized.basis,
+                    }
+                )
         with tracer().start_as_current_span(f"tool {self.name}") as span:
             set_attributes(
                 span,
@@ -147,7 +163,10 @@ class GovernedTool(ABC):
             if result.status == "FAILED":
                 span.set_status(Status(StatusCode.ERROR, result.error or "tool failed"))
             set_content(span, "langfuse.observation.output", result.response_body or result.error)
-        return result.model_copy(update={"duration_ms": elapsed})
+        final = result.model_copy(update={"duration_ms": elapsed})
+        if key:
+            ledger.finish(settings, key, final)
+        return final
 
     def run(
         self, payload: dict[str, Any] | None = None, execution_id: str | None = None

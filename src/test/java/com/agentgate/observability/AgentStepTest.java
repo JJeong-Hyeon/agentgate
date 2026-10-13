@@ -17,9 +17,18 @@ class AgentStepTest {
                 {"agent":{"kind":"answer","agent":"a","llm":{"model":"qwen3","latency_ms":1800},
                  "tokens":{"input":503,"output":43}}}""");
 
-        assertThat(step).isEqualTo(new AgentStep("a", "qwen3", 1800L, 503L, 43L, null, null, null));
+        assertThat(step).isEqualTo(new AgentStep("a", "qwen3", 1800L, null, 503L, 43L, null, null, null));
         assertThat(step.hasLlmCall()).isTrue();
         assertThat(step.hasToolRun()).isFalse();
+    }
+
+    @Test
+    void readsTheQueueWaitWhenTheRuntimeReportsIt() {
+        AgentStep step = parse("""
+                {"agent":{"kind":"answer","agent":"a","llm":{"model":"qwen3","latency_ms":1800,"queue_wait_ms":250},
+                 "tokens":{"input":503,"output":43}}}""");
+
+        assertThat(step).isEqualTo(new AgentStep("a", "qwen3", 1800L, 250L, 503L, 43L, null, null, null));
     }
 
     @Test
