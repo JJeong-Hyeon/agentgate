@@ -81,6 +81,17 @@ def require_runtime_token(
 ) -> None:
     if not settings.runtime_token:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Resume is disabled")
+    require_token_if_configured(settings, x_runtime_token)
+
+
+def require_token_if_configured(
+    settings: Annotated[Settings, Depends(get_settings)],
+    x_runtime_token: Annotated[str | None, Header()] = None,
+) -> None:
+    """Every runtime API answers only AgentGate once RUNTIME_TOKEN is set; without it (local
+    development) they stay open."""
+    if not settings.runtime_token:
+        return
     if not x_runtime_token or not secrets.compare_digest(x_runtime_token, settings.runtime_token):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid runtime token")
 

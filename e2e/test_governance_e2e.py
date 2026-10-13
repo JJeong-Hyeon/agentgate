@@ -18,6 +18,7 @@ AGENTGATE = os.environ.get("E2E_AGENTGATE_URL", "http://localhost:8080")
 RUNTIME = os.environ.get("E2E_RUNTIME_URL", "http://localhost:8000")
 FAKE = os.environ.get("E2E_FAKE_URL", "http://localhost:18081")
 ADMIN = ("admin", os.environ.get("E2E_ADMIN_PASSWORD", "changeme"))
+RUNTIME_AUTH = {"X-Runtime-Token": os.environ.get("E2E_RUNTIME_TOKEN", "e2e-runtime-token")}
 
 
 @pytest.fixture(scope="module")
@@ -57,7 +58,7 @@ def research_workflow() -> dict:
 
 def start_execution(workflow: dict | None = None) -> dict:
     body = {"task": "e2e", "workflow": workflow or research_workflow()}
-    response = httpx.post(f"{RUNTIME}/runtime/executions", json=body, timeout=60)
+    response = httpx.post(f"{RUNTIME}/runtime/executions", json=body, headers=RUNTIME_AUTH, timeout=60)
     response.raise_for_status()
     return response.json()
 
@@ -65,7 +66,7 @@ def start_execution(workflow: dict | None = None) -> dict:
 def wait_for(execution_id: str, status: str, timeout: float = 15) -> dict:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        execution = httpx.get(f"{RUNTIME}/runtime/executions/{execution_id}").json()
+        execution = httpx.get(f"{RUNTIME}/runtime/executions/{execution_id}", headers=RUNTIME_AUTH).json()
         if execution["status"] == status:
             return execution
         time.sleep(0.5)

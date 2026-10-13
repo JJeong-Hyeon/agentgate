@@ -25,7 +25,7 @@ def make_client(replies: list[str], gate: FakeAgentGate, target: FakeTarget) -> 
     )
     events_sinks.append(sink)
     app.dependency_overrides[get_settings] = lambda: Settings(_env_file=None, runtime_token=TOKEN)
-    return TestClient(app)
+    return TestClient(app, headers={"X-Runtime-Token": TOKEN})
 
 
 @pytest.fixture(autouse=True)
@@ -58,7 +58,7 @@ def resume(client, execution_id, approval_id=7, decision="APPROVED", token=TOKEN
     return client.post(
         f"/runtime/executions/{execution_id}/resume",
         json={"approvalId": approval_id, "decision": decision},
-        headers={"X-Runtime-Token": token} if token else {},
+        headers={"X-Runtime-Token": token or ""},
     )
 
 
@@ -170,6 +170,28 @@ def test_resume_requires_runtime_token(approval_client, target, token):
 
     assert resume(approval_client, execution_id, token=token).status_code == 401
     assert target.requests == []
+
+
+@pytest.mark.parametrize("token", ["wrong", ""])
+def test_runtime_apis_answer_only_agentgate_once_a_token_is_set(client, target, token):
+    headers = {"X-Runtime-Token": token}
+    body = {"task": "t", "workflow": research()}
+
+    assert client.post("/runtime/executions", json=body, headers=headers).status_code == 401
+    assert client.get("/runtime/executions/any", headers=headers).status_code == 401
+    validate = client.post("/runtime/workflows/validate", json=SIMPLE, headers=headers)
+    assert validate.status_code == 401
+    assert client.get("/runtime/tools", headers=headers).status_code == 401
+    assert client.get("/health", headers=headers).status_code == 200
+    assert target.requests == []
+
+
+def test_runtime_apis_stay_open_without_a_configured_token(client):
+    app.dependency_overrides[get_settings] = lambda: Settings(_env_file=None, runtime_token="")
+
+    response = client.post("/runtime/workflows/validate", json=SIMPLE, headers={})
+
+    assert response.status_code == 200
 
 
 def test_resume_disabled_without_configured_token(approval_client):
