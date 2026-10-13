@@ -41,6 +41,7 @@ create table if not exists tool_call_ledger (
 def _pool(database_url: str) -> ConnectionPool:
     pool = ConnectionPool(
         database_url,
+        open=True,
         max_size=5,
         kwargs={"autocommit": True, "prepare_threshold": 0, "row_factory": dict_row},
     )
