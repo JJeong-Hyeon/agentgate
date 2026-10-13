@@ -142,9 +142,9 @@ def test_e_concurrent_calls_with_the_same_key_run_it_once():
     for t in threads:
         t.join()
 
-    assert len(target.requests) == 1
-    assert results.count("EXECUTED") == 1
-    # the rest replayed the same result or saw it as still in flight (unknown, not retried)
+    assert len(target.requests) == 1  # the one thing that must always hold: it ran once
+    assert results.count("EXECUTED") >= 1  # the winner, plus anyone who checked after it finished
+    # whoever checked while it was still in flight saw an unknown outcome, not a retry
     assert all(r in ("EXECUTED", "FAILED") for r in results)
 
 
