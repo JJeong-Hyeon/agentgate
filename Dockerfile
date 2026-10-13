@@ -1,7 +1,7 @@
 # AgentGate (API + console) as one image: the React console is built first and bundled into the Spring Boot jar.
 # Used by deploy/selfhost/compose.yaml; build from the repository root: docker build -t agentgate .
 
-FROM node:24-alpine AS frontend
+FROM node:26-alpine AS frontend
 WORKDIR /frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
