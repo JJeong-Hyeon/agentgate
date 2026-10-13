@@ -121,6 +121,16 @@ input {
   color: var(--text);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
+/* The text-input styling above was leaking onto checkboxes/radios, stretching them to
+   `width: 100%` with text-field padding and a border-radius -- in a flex row that made a
+   checkbox claim the whole line's width, pushing its label text to wrap underneath it. */
+input[type="checkbox"],
+input[type="radio"] {
+  width: auto;
+  padding: 0;
+  border-radius: 0;
+  accent-color: var(--accent);
+}
 input:focus-visible {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
@@ -731,15 +741,34 @@ fieldset.mode {
 }
 .tool-table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
 }
 .tool-table td {
-  padding: 6px 4px;
+  padding: 8px 4px;
   border-top: 1px solid var(--border);
   vertical-align: top;
 }
+/* Fixed column widths so a select with the global `width: 100%` can't claim more than its
+   share and squeeze the name column down to where Korean names wrap one syllable per line. */
+.tool-table td:first-child {
+  width: 64%;
+}
+.tool-table td:last-child {
+  width: 36%;
+}
 .tool-table tr.chosen td {
   background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+.tool-table label.inline {
+  align-items: flex-start;
+}
+.tool-table label.inline input[type="checkbox"] {
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+.tool-table td > .muted {
+  margin: 4px 0 0 22px;
 }
 .permission-fields {
   display: grid;
