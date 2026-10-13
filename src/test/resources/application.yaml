@@ -24,3 +24,7 @@ agentgate:
   admin:
     username: test-admin
     password: test-password
+  login:
+    # Many tests sign in with wrong passwords on purpose; LoginThrottleIntegrationTest sets real limits.
+    max-failures: 1000
+    max-failures-per-ip: 1000

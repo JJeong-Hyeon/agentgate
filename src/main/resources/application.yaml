@@ -27,6 +27,12 @@ agentgate:
     # 로컬 개발용 기본값. 운영 배포 전 반드시 환경변수(AGENTGATE_ADMIN_USERNAME/AGENTGATE_ADMIN_PASSWORD)로 override할 것.
     username: admin
     password: changeme
+  login:
+    # 같은 아이디 + 같은 IP에서 이만큼 연속 실패하면 lock-duration 동안 그 조합의 로그인을 막는다(429).
+    max-failures: ${AGENTGATE_LOGIN_MAX_FAILURES:5}
+    # 한 IP에서 아이디와 상관없이 lock-duration 안에 이만큼 실패하면 그 IP의 로그인을 막는다.
+    max-failures-per-ip: ${AGENTGATE_LOGIN_MAX_FAILURES_PER_IP:20}
+    lock-duration: ${AGENTGATE_LOGIN_LOCK_DURATION:PT15M}
   approval:
     # PENDING 상태로 이 시간이 지난 승인 요청은 EXPIRED 처리되고, 대기 중인 실행은 거절과 동일하게 진행된다.
     ttl: ${AGENTGATE_APPROVAL_TTL:PT24H}

@@ -22,6 +22,17 @@ describe("App", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("올바르지 않습니다");
   });
 
+  it("tells the user when sign-in is blocked after repeated failures", async () => {
+    renderApp(
+      vi.fn(async () => Response.json({ status: 429, code: "TOO_MANY_LOGIN_ATTEMPTS" }, { status: 429 })),
+    );
+
+    fireEvent.change(screen.getByLabelText("비밀번호"), { target: { value: "pw" } });
+    fireEvent.click(screen.getByRole("button", { name: "로그인" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("잠시 막혔습니다");
+  });
+
   it("logs in to the dashboard and moves to workflows", async () => {
     const fetchImpl = vi.fn(
       withMe(async (url) => {
