@@ -168,7 +168,7 @@ class ApprovalWorkflowIntegrationTest {
     @Test
     void decidingAnExecutionApprovalResumesTheRuntime() throws Exception {
         when(runtimeClient.isEnabled()).thenReturn(true);
-        when(runtimeClient.resume(any(), any(), any())).thenReturn(true);
+        when(runtimeClient.resume(any(), any(), any(), any())).thenReturn(true);
         MvcResult actionResult = mockMvc.perform(post("/api/v1/actions").header("X-API-Key", API_KEY)
                         .contentType(MediaType.APPLICATION_JSON).content("""
                                 {"agentId":"mail-agent","action":"SEND_EMAIL","labels":["PII"],"executionId":"exec-1"}
@@ -183,7 +183,7 @@ class ApprovalWorkflowIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isOk());
 
-        verify(runtimeClient).resume("exec-1", approvalId, ApprovalStatus.REJECTED);
+        verify(runtimeClient).resume("exec-1", approvalId, ApprovalStatus.REJECTED, null);
         assertThat(approvalRequestRepository.findById(approvalId).orElseThrow().getRuntimeNotifiedAt()).isNotNull();
     }
 
@@ -203,7 +203,7 @@ class ApprovalWorkflowIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isOk());
 
-        verify(runtimeClient, never()).resume(any(), any(), any());
+        verify(runtimeClient, never()).resume(any(), any(), any(), any());
     }
 
     @Test

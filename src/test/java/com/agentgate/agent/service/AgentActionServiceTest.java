@@ -95,6 +95,21 @@ class AgentActionServiceTest {
     }
 
     @Test
+    void withoutAnAgentVersionOnlyPoliciesDecideToolGrantsAreNotChecked() {
+        when(agentRepository.findByAgentId("mail-agent"))
+                .thenReturn(Optional.of(new Agent("mail-agent", "Mail Agent", ApiKeyGenerator.hash(API_KEY))));
+        when(riskEvaluationService.evaluate("MCP:notes:save_note", List.of()))
+                .thenReturn(new RiskEvaluationResult(RiskLevel.LOW, ActionStatus.ALLOWED));
+
+        ActionResponse response = service.evaluate(
+                new ActionRequest("mail-agent", "MCP:notes:save_note", null, List.of()), API_KEY);
+
+        // The agent's definition lists no such tool, yet a call that names no version is judged by policy alone:
+        // tool grants are enforced for runtime-run agents (which always name their version).
+        assertThat(response.status()).isEqualTo(ActionStatus.ALLOWED);
+    }
+
+    @Test
     void returnsEvaluationResultWhenAgentExists() {
         when(agentRepository.findByAgentId("mail-agent"))
                 .thenReturn(Optional.of(new Agent("mail-agent", "Mail Agent", ApiKeyGenerator.hash(API_KEY))));
@@ -108,7 +123,7 @@ class AgentActionServiceTest {
         assertThat(response.status()).isEqualTo(ActionStatus.ALLOWED);
         assertThat(response.riskLevel()).isEqualTo(RiskLevel.LOW);
         assertThat(response.approvalId()).isNull();
-        verify(approvalService, never()).createRequest(anyString(), anyString(), any(), any(), any(), any(), any(), any());
+        verify(approvalService, never()).createRequest(anyString(), anyString(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -119,7 +134,7 @@ class AgentActionServiceTest {
                 .thenReturn(new RiskEvaluationResult(RiskLevel.HIGH, ActionStatus.APPROVAL_REQUIRED));
         ApprovalRequest created = new ApprovalRequest("mail-agent", "SEND_EMAIL", null, List.of("PII"), RiskLevel.HIGH);
         setId(created, 42L);
-        when(approvalService.createRequest(eq("mail-agent"), eq("SEND_EMAIL"), any(), eq(List.of("PII")), eq(RiskLevel.HIGH), any(), any(), any()))
+        when(approvalService.createRequest(eq("mail-agent"), eq("SEND_EMAIL"), any(), eq(List.of("PII")), eq(RiskLevel.HIGH), any(), any(), any(), any()))
                 .thenReturn(created);
 
         ActionRequest request = new ActionRequest("mail-agent", "SEND_EMAIL", null, List.of("PII"));
@@ -145,7 +160,7 @@ class AgentActionServiceTest {
         assertThat(response.status()).isEqualTo(ActionStatus.BLOCKED);
         assertThat(response.riskLevel()).isEqualTo(RiskLevel.BLOCKED);
         assertThat(response.approvalId()).isNull();
-        verify(approvalService, never()).createRequest(anyString(), anyString(), any(), any(), any(), any(), any(), any());
+        verify(approvalService, never()).createRequest(anyString(), anyString(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -208,7 +223,7 @@ class AgentActionServiceTest {
                 .thenReturn(new RiskEvaluationResult(RiskLevel.LOW, ActionStatus.ALLOWED));
         ApprovalRequest created = new ApprovalRequest("mail-agent", "MCP:notes:save_note", null, List.of(), RiskLevel.LOW);
         setId(created, 7L);
-        when(approvalService.createRequest(any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(created);
+        when(approvalService.createRequest(any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(created);
 
         ActionResponse response = service.evaluate(toolCall(agent, "MCP:notes:save_note"), null, true);
 

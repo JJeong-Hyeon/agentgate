@@ -272,6 +272,7 @@ def add_agent(
             agent_version=spec.version,
             reason=approval_reason(spec, tool.label, call["args"], delegated_by),
             delegated_by=delegated_by,
+            payload=call["args"],
         )
         pending = {"call": call, "result": result.model_dump()}
         if result.status == "ALLOWED":
@@ -286,7 +287,9 @@ def add_agent(
         result = ToolResult(**pending["result"])
         decision = interrupt({"tool": result.tool, "approval_id": result.approval_id})
         if decision.get("decision") == "APPROVED":
-            return Command(goto=execute_node)
+            # The hash AgentGate recorded for this approval; execute() runs only what it matches.
+            approved = {**pending, "approved_hash": decision.get("payloadHash")}
+            return Command(update=save(run, pending=approved), goto=execute_node)
         rejected = result.model_copy(update={"status": "REJECTED"})
         update = answer(run, pending["call"], denial(rejected), rejected)
         return Command(update=update, goto=gate_node)
@@ -294,7 +297,9 @@ def add_agent(
     def execute(state: dict) -> Command:
         run = run_of(state)
         call, authorized = run["pending"]["call"], ToolResult(**run["pending"]["result"])
-        result = by_name[call["name"]].tool.execute_timed(call["args"], authorized)
+        tool = by_name[call["name"]].tool
+        tool.check_payload(call["args"], run["pending"].get("approved_hash"))
+        result = tool.execute_timed(call["args"], authorized)
         if result.status == "EXECUTED":
             content = result.response_body or "(no output)"
         else:

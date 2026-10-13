@@ -23,9 +23,9 @@ public class ApprovalService {
 
     @Transactional
     public ApprovalRequest createRequest(String agentId, String action, String target, List<String> labels, RiskLevel riskLevel,
-                                         String executionId, String reason, String delegatedBy) {
+                                         String executionId, String reason, String delegatedBy, String payloadHash) {
         ApprovalRequest approvalRequest = new ApprovalRequest(agentId, action, target, labels, riskLevel, executionId,
-                reason, delegatedBy);
+                reason, delegatedBy, payloadHash);
         ApprovalRequest saved = approvalRequestRepository.save(approvalRequest);
         eventPublisher.publishEvent(new ApprovalRequestedEvent(saved.getId()));
         return saved;

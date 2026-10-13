@@ -66,7 +66,7 @@ public class AgentActionService {
         if (decision.status() == ActionStatus.APPROVAL_REQUIRED) {
             ApprovalRequest approvalRequest = approvalService.createRequest(
                     request.agentId(), request.action(), request.target(), labels, decision.riskLevel(),
-                    request.executionId(), request.reason(), request.delegatedBy());
+                    request.executionId(), request.reason(), request.delegatedBy(), request.payloadHash());
             approvalId = approvalRequest.getId();
         }
 

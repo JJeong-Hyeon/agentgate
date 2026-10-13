@@ -57,6 +57,8 @@ class ResumeRequest(BaseModel):
 
     approval_id: int
     decision: Literal["APPROVED", "REJECTED", "EXPIRED"]
+    # What AgentGate recorded for the approval; the call runs only if it still matches.
+    payload_hash: str | None = None
 
 
 def get_runner(request: Request) -> WorkflowRunner:
@@ -214,7 +216,7 @@ def resume_execution(
             )
         _running.add(execution_id)
 
-    resume = Command(resume={"decision": body.decision})
+    resume = Command(resume={"decision": body.decision, "payloadHash": body.payload_hash})
     background.add_task(_run_logged, graph, resume, execution_id, reporter)
     return ExecutionResponse(execution_id=execution_id, status="RESUMING")
 

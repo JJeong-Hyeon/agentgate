@@ -46,9 +46,10 @@ class ApprovalServiceTest {
         when(approvalRequestRepository.save(org.mockito.ArgumentMatchers.any(ApprovalRequest.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        ApprovalRequest result = service.createRequest("mail-agent", "SEND_EMAIL", null, List.of("PII"), RiskLevel.HIGH, "exec-1", null, null);
+        ApprovalRequest result = service.createRequest("mail-agent", "SEND_EMAIL", null, List.of("PII"), RiskLevel.HIGH, "exec-1", null, null, "abc123");
 
         assertThat(result.getAgentId()).isEqualTo("mail-agent");
+        assertThat(result.getPayloadHash()).isEqualTo("abc123");
         assertThat(result.getStatus()).isEqualTo(ApprovalStatus.PENDING);
         assertThat(result.getExecutionId()).isEqualTo("exec-1");
         verify(eventPublisher).publishEvent(new ApprovalRequestedEvent(result.getId()));

@@ -18,14 +18,22 @@ public record ActionRequest(
         // Definition version the agent runs; its tool permissions then apply on top of policies.
         @Positive Integer agentVersion,
         // Agents that delegated this work, outermost first, e.g. "supervisor>research-agent".
-        @Size(max = 500) String delegatedBy
+        @Size(max = 500) String delegatedBy,
+        // SHA-256 of what the runtime will run (action, target, arguments), kept with the approval so the
+        // runtime can check, right before running, that it runs what was approved.
+        @Size(max = 64) String payloadHash
 ) {
     public ActionRequest {
         labels = (labels == null) ? List.of() : List.copyOf(labels);
     }
 
     public ActionRequest(String agentId, String action, String target, List<String> labels) {
-        this(agentId, action, target, labels, null, null, null, null, null);
+        this(agentId, action, target, labels, null, null, null, null, null, null);
+    }
+
+    public ActionRequest(String agentId, String action, String target, List<String> labels, String executionId,
+                         Boolean requireApproval, String reason, Integer agentVersion, String delegatedBy) {
+        this(agentId, action, target, labels, executionId, requireApproval, reason, agentVersion, delegatedBy, null);
     }
 
     public boolean approvalRequested() {

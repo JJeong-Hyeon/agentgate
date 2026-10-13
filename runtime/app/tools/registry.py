@@ -46,11 +46,14 @@ class McpServerRegistry:
         configured: dict[str, McpServerConfig],
         fetch: Fetch | None = None,
         ttl_seconds: float = 30.0,
+        max_stale_seconds: float = 300.0,
         clock: Callable[[], float] = time.monotonic,
     ):
         self._configured = configured
         self._fetch = fetch
         self._ttl = ttl_seconds
+        self._max_stale = max_stale_seconds
+        self._last_ok: float | None = None
         self._clock = clock
         self._registered: dict[str, McpServerConfig] = {}
         self._fetched_at: float | None = None
@@ -83,8 +86,16 @@ class McpServerRegistry:
                 return self._registered
             try:
                 self._registered = self._fetch()
+                self._last_ok = now
             except Exception as e:  # noqa: BLE001 - keep serving the last known servers
                 log.warning("Could not fetch MCP servers from AgentGate: %s", e)
+                # Not forever: a server AgentGate disabled or whose key it revoked must not stay
+                # usable just because AgentGate cannot be asked.
+                if self._registered and (
+                    self._last_ok is None or now - self._last_ok > self._max_stale
+                ):
+                    log.warning("Dropping the cached MCP servers: AgentGate unreachable too long")
+                    self._registered = {}
             # Also after a failure, so an outage is not retried on every call.
             self._fetched_at = now
             return self._registered
