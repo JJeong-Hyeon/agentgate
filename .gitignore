@@ -42,3 +42,5 @@ out/
 ### Secrets ###
 .env
 !.env.example
+providers.json
+!providers.json.example

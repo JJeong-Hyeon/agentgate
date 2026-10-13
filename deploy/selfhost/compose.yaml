@@ -88,6 +88,9 @@ services:
       LLM_REASONING_EFFORT: ${LLM_REASONING_EFFORT:-}
       LLM_PARALLEL_TOOL_CALLS: ${LLM_PARALLEL_TOOL_CALLS:-false}
       LLM_MAX_CONCURRENCY: ${LLM_MAX_CONCURRENCY:-0}
+      # Optional alternate providers (OpenAI, Gemini, ...); see .env.example and
+      # docs/SELF_HOSTING.md. Empty by default, so this changes nothing unless set.
+      LLM_PROVIDERS_PATH: ${LLM_PROVIDERS_PATH:-}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
       OTEL_EXPORTER_OTLP_HEADERS: ${OTEL_EXPORTER_OTLP_HEADERS:-}
       OTEL_CAPTURE_CONTENT: ${OTEL_CAPTURE_CONTENT:-false}

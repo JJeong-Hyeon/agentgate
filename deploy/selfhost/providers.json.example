@@ -1,0 +1,10 @@
+{
+  "gemini": {
+    "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
+    "api_key": "<your Gemini API key, from https://aistudio.google.com/apikey>"
+  },
+  "openai": {
+    "base_url": "https://api.openai.com/v1",
+    "api_key": "<your OpenAI API key>"
+  }
+}
