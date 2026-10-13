@@ -53,9 +53,11 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="AgentGate Runtime", lifespan=lifespan)
-app.include_router(executions.router)
-app.include_router(workflows.router)
-app.include_router(tools_api.router)
+# Health checks stay open; everything under /runtime is for AgentGate only.
+_runtime_api = [Depends(executions.require_token_if_configured)]
+app.include_router(executions.router, dependencies=_runtime_api)
+app.include_router(workflows.router, dependencies=_runtime_api)
+app.include_router(tools_api.router, dependencies=_runtime_api)
 
 
 @app.get("/health")

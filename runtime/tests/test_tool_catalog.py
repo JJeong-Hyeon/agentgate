@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from app.config import Settings, get_settings
 from app.main import app
 from app.tools.catalog import ToolCatalog
 from app.tools.mcp import McpServerConfig, McpToolInfo
@@ -103,6 +104,8 @@ def api():
         {"a": DOWN_SERVER, "b": DOWN_SERVER}, lister=CountingLister([info("search")])
     )
     app.dependency_overrides[get_catalog] = lambda: catalog
+    # No runtime token configured: the API is open (see test_executions_endpoint for the token).
+    app.dependency_overrides[get_settings] = lambda: Settings(_env_file=None)
     yield TestClient(app)
     app.dependency_overrides.clear()
 
