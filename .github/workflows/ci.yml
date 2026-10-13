@@ -5,6 +5,9 @@ on:
     branches: [main]
   push:
     branches: [main]
+  # Weekly, so vulnerabilities published after a merge are caught too.
+  schedule:
+    - cron: '0 0 * * 1'
 
 jobs:
   test:
@@ -73,3 +76,30 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+
+  security:
+    # Known HIGH/CRITICAL vulnerabilities that already have a fixed version fail the build.
+    runs-on: ubuntu-latest
+    env:
+      TRIVY: aquasec/trivy:0.75.0
+      TRIVY_ARGS: --quiet --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - run: ./gradlew bootJar -x test
+      - name: Java libraries (the jar)
+        run: docker run --rm -v "$PWD:/src" $TRIVY rootfs $TRIVY_ARGS /src/build/libs
+      - name: Frontend (package-lock.json)
+        run: docker run --rm -v "$PWD:/src" $TRIVY fs $TRIVY_ARGS /src/frontend
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Runtime (Python)
+        run: |
+          python -m pip install --upgrade pip pip-audit
+          pip install ./runtime
+          pip-audit --skip-editable
