@@ -47,12 +47,15 @@ public class AgentActionService {
      * @param trustedCaller the runtime (authenticated with the runtime token), which may act for any agent
      */
     public ActionResponse evaluate(ActionRequest request, String apiKey, boolean trustedCaller) {
-        Agent agent = agentRepository.findByAgentId(request.agentId())
-                .orElseThrow(() -> new AgentNotFoundException(request.agentId()));
-
-        if (!trustedCaller && (apiKey == null || !ApiKeyGenerator.hash(apiKey).equals(agent.getApiKeyHash()))) {
-            throw new InvalidApiKeyException();
+        Optional<Agent> found = agentRepository.findByAgentId(request.agentId());
+        if (!trustedCaller) {
+            // An unknown agent looks like a wrong key, so callers cannot probe which agent ids exist.
+            String hash = apiKey == null ? null : ApiKeyGenerator.hash(apiKey);
+            if (found.isEmpty() || hash == null || !hash.equals(found.get().getApiKeyHash())) {
+                throw new InvalidApiKeyException();
+            }
         }
+        Agent agent = found.orElseThrow(() -> new AgentNotFoundException(request.agentId()));
 
         Optional<Grant> tool = (request.agentVersion() == null) ? Optional.empty()
                 : findGrant(agent, request.agentVersion(), request.action());

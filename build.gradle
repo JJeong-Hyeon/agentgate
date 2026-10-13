@@ -18,6 +18,11 @@ repositories {
     mavenCentral()
 }
 
+// Security patches newer than Spring Boot 4.1.1 manages; drop when Boot catches up.
+// Tomcat: CVE-2026-65182, CVE-2026-65905, CVE-2026-68525. Jackson: CVE-2026-89407, -89425, -68497, -91776, -91777.
+ext['tomcat.version'] = '11.0.25'
+ext['jackson-bom.version'] = '3.1.7'
+
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
