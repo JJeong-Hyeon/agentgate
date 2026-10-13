@@ -71,8 +71,11 @@ Runner = Annotated[WorkflowRunner, Depends(get_runner)]
 Reporter = Annotated[EventReporter, Depends(get_reporter)]
 
 # Executions with a resume in flight; a second resume for the same one is a conflict.
-_resuming: set[str] = set()
-_resuming_lock = threading.Lock()
+# Executions this process is running in the background (started, resumed or recovered). After a
+# restart it is empty, which is how AgentGate tells an interrupted execution from a slow one.
+_running: set[str] = set()
+_running_lock = threading.Lock()
+_TOOL_NODE_TYPES = {"HTTP_TOOL", "MCP_TOOL"}
 
 
 def require_runtime_token(
@@ -155,6 +158,8 @@ def create_execution(
         raise HTTPException(status.HTTP_409_CONFLICT, f"Execution '{execution_id}' already exists")
 
     if body.background:
+        with _running_lock:
+            _running.add(execution_id)
         background.add_task(_run_logged, graph, initial, execution_id, reporter)
         response.status_code = status.HTTP_202_ACCEPTED
         return ExecutionResponse(execution_id=execution_id, status="RUNNING")
@@ -162,6 +167,16 @@ def create_execution(
     # Runs synchronously until it completes or pauses for approval.
     run_graph(graph, initial, _config(execution_id), reporter)
     return _describe(graph, execution_id)
+
+
+class ActiveExecutions(BaseModel):
+    execution_ids: list[str]
+
+
+@router.get("/active")
+def active_executions() -> ActiveExecutions:
+    with _running_lock:
+        return ActiveExecutions(execution_ids=sorted(_running))
 
 
 @router.get("/{execution_id}")
@@ -188,29 +203,49 @@ def resume_execution(
     background: BackgroundTasks,
 ) -> ExecutionResponse:
     graph = _graph_for(runner, execution_id)
-    with _resuming_lock:
+    with _running_lock:
         current = _describe(graph, execution_id)
-        if execution_id in _resuming or current.status != "WAITING_APPROVAL":
+        if execution_id in _running or current.status != "WAITING_APPROVAL":
             raise HTTPException(status.HTTP_409_CONFLICT, "Execution is not waiting for approval")
         if current.waiting_approval_id != body.approval_id:
             raise HTTPException(
                 status.HTTP_409_CONFLICT,
                 f"Execution is waiting for approval {current.waiting_approval_id}",
             )
-        _resuming.add(execution_id)
+        _running.add(execution_id)
 
-    background.add_task(_resume, graph, execution_id, body.decision, reporter)
+    resume = Command(resume={"decision": body.decision})
+    background.add_task(_run_logged, graph, resume, execution_id, reporter)
     return ExecutionResponse(execution_id=execution_id, status="RESUMING")
 
 
-def _resume(
-    graph: CompiledStateGraph, execution_id: str, decision: str, reporter: EventReporter
-) -> None:
-    try:
-        _run_logged(graph, Command(resume={"decision": decision}), execution_id, reporter)
-    finally:
-        with _resuming_lock:
-            _resuming.discard(execution_id)
+@router.post("/{execution_id}/recover", status_code=status.HTTP_202_ACCEPTED)
+def recover_execution(
+    execution_id: str, runner: Runner, reporter: Reporter, background: BackgroundTasks
+) -> ExecutionResponse:
+    """Continues an execution a restart interrupted, from its last checkpoint. 404 when nothing was
+    saved, 409 when it is not interrupted, 422 when it stopped in the middle of a tool call: the
+    tool may already have run, so running it again could repeat its effect."""
+    graph = _graph_for(runner, execution_id)
+    with _running_lock:
+        current = _describe(graph, execution_id)
+        if execution_id in _running or current.status != "RUNNING":
+            raise HTTPException(status.HTTP_409_CONFLICT, f"Execution is {current.status}")
+        pending = graph.get_state(_config(execution_id)).next
+        tools = _tool_steps(current.state.get("workflow") or {})
+        unsafe = [step for step in pending if step in tools or step.endswith(".execute")]
+        if unsafe:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT,
+                f"Interrupted while running {', '.join(unsafe)}; it may already have taken effect",
+            )
+        _running.add(execution_id)
+    background.add_task(_run_logged, graph, None, execution_id, reporter)
+    return ExecutionResponse(execution_id=execution_id, status="RUNNING")
+
+
+def _tool_steps(workflow: dict) -> set[str]:
+    return {n["id"] for n in workflow.get("nodes", []) if n.get("type") in _TOOL_NODE_TYPES}
 
 
 def _run_logged(
@@ -221,3 +256,6 @@ def _run_logged(
         run_graph(graph, graph_input, _config(execution_id), reporter)
     except Exception:
         log.exception("Execution %s failed", execution_id)
+    finally:
+        with _running_lock:
+            _running.discard(execution_id)

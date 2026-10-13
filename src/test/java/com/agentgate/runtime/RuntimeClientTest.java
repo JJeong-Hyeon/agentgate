@@ -89,6 +89,38 @@ class RuntimeClientTest {
     }
 
     @Test
+    void listsActiveExecutions() {
+        responseStatus = 200;
+        responseBody = "{\"execution_ids\":[\"a\",\"b\"]}";
+
+        assertThat(client().activeExecutions()).contains(java.util.Set.of("a", "b"));
+        assertThat(path.get()).isEqualTo("/runtime/executions/active");
+    }
+
+    @Test
+    void activeExecutionsAreUnknownWhenTheRuntimeErrs() {
+        responseStatus = 500;
+
+        assertThat(client().activeExecutions()).isEmpty();
+        assertThat(new RuntimeClient(RestClient.builder(), "", "").activeExecutions()).isEmpty();
+    }
+
+    @Test
+    void recoveryOutcomesFollowTheRuntimeAnswer() {
+        responseStatus = 202;
+        assertThat(client().recover("exec-1")).isEqualTo(RuntimeClient.Recovery.RECOVERING);
+        assertThat(path.get()).isEqualTo("/runtime/executions/exec-1/recover");
+        responseStatus = 422;
+        assertThat(client().recover("exec-1")).isEqualTo(RuntimeClient.Recovery.IMPOSSIBLE);
+        responseStatus = 404;
+        assertThat(client().recover("exec-1")).isEqualTo(RuntimeClient.Recovery.IMPOSSIBLE);
+        responseStatus = 409;
+        assertThat(client().recover("exec-1")).isEqualTo(RuntimeClient.Recovery.NOT_INTERRUPTED);
+        responseStatus = 500;
+        assertThat(client().recover("exec-1")).isEqualTo(RuntimeClient.Recovery.UNAVAILABLE);
+    }
+
+    @Test
     void forgetsAnExecutionWithTheToken() {
         responseStatus = 204;
 

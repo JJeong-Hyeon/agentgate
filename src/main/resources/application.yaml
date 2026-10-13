@@ -71,6 +71,10 @@ agentgate:
     # Runtime의 RUNTIME_TOKEN과 같은 값. base-url을 설정했다면 필수.
     token: ${AGENTGATE_RUNTIME_TOKEN:}
     retry-delay: PT30S
+    # RUNNING 실행이 Runtime에서 돌고 있지 않으면(재시작으로 끊김) 마지막 checkpoint부터 이어 실행하거나 FAILED로 표시한다.
+    # 시작 직후의 실행은 이 시간 동안 건드리지 않는다.
+    recovery-grace: PT2M
+    recovery-check-delay: PT1M
   secrets:
     # AES-256 key (32 bytes, Base64) for credentials stored in the database, e.g. MCP server headers.
     # Required in prod (openssl rand -base64 32); empty uses a development key.
