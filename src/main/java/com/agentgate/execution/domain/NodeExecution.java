@@ -67,6 +67,8 @@ public class NodeExecution {
 
     private Long llmLatencyMs;
 
+    private Long llmQueueWaitMs;
+
     private Long inputTokens;
 
     private Long outputTokens;
@@ -100,6 +102,7 @@ public class NodeExecution {
     public void recordCost(AgentStep step) {
         this.llmModel = step.llmModel();
         this.llmLatencyMs = step.llmLatencyMs();
+        this.llmQueueWaitMs = step.llmQueueWaitMs();
         this.inputTokens = step.inputTokens();
         this.outputTokens = step.outputTokens();
         this.toolName = step.toolName();

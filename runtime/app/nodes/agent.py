@@ -47,7 +47,9 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.graph import StateGraph
 from langgraph.types import Command, interrupt
 
+from app.config import get_settings
 from app.dsl.schema import AgentSpec, AgentToolSpec
+from app.llm.gateway import llm_slot
 from app.telemetry import set_attributes, set_content, tracer
 from app.tools.base import GovernedTool, ToolResult
 from app.tools.memory import memory_prompt
@@ -188,40 +190,45 @@ def add_agent(
             messages.append(HumanMessage(FINAL_TURN_NOTE))
         llm = llm_factory(spec.model, spec.temperature, spec.reasoning_effort)
         offer_tools = bool(definitions) and not final_turn
-        started = time.perf_counter()
         requested_model = spec.model or _model_name(llm)
-        with tracer().start_as_current_span(f"chat {requested_model or ''}".strip()) as span:
-            set_attributes(span, _llm_span_attributes(spec, name, requested_model, steps))
-            set_content(span, "langfuse.observation.input", _messages_for_trace(messages))
-            if json_calls:
-                reply = llm.invoke(flatten(messages))
-                if offer_tools:
-                    reply = AIMessage(
-                        content=reply.content, tool_calls=parse_json_calls(reply.content, steps)
-                    )
-            else:
-                reply = (llm.bind_tools(definitions) if offer_tools else llm).invoke(messages)
-            model = reply.response_metadata.get("model_name") or requested_model
-            usage = reply.usage_metadata or {}
-            set_attributes(
-                span,
-                {
-                    "gen_ai.response.model": model,
-                    "gen_ai.usage.input_tokens": usage.get("input_tokens"),
-                    "gen_ai.usage.output_tokens": usage.get("output_tokens"),
-                    "agentgate.llm.tool_calls": len(reply.tool_calls),
-                },
-            )
-            set_content(
-                span,
-                "langfuse.observation.output",
-                {"content": reply.content, "tool_calls": reply.tool_calls}
-                if reply.tool_calls
-                else reply.content,
-            )
+        queue_started = time.perf_counter()
+        with llm_slot(get_settings()):
+            queue_wait_ms = round((time.perf_counter() - queue_started) * 1000)
+            started = time.perf_counter()
+            with tracer().start_as_current_span(f"chat {requested_model or ''}".strip()) as span:
+                set_attributes(span, _llm_span_attributes(spec, name, requested_model, steps))
+                set_content(span, "langfuse.observation.input", _messages_for_trace(messages))
+                if json_calls:
+                    reply = llm.invoke(flatten(messages))
+                    if offer_tools:
+                        reply = AIMessage(
+                            content=reply.content, tool_calls=parse_json_calls(reply.content, steps)
+                        )
+                else:
+                    reply = (llm.bind_tools(definitions) if offer_tools else llm).invoke(messages)
+                model = reply.response_metadata.get("model_name") or requested_model
+                usage = reply.usage_metadata or {}
+                set_attributes(
+                    span,
+                    {
+                        "gen_ai.response.model": model,
+                        "gen_ai.usage.input_tokens": usage.get("input_tokens"),
+                        "gen_ai.usage.output_tokens": usage.get("output_tokens"),
+                        "agentgate.llm.tool_calls": len(reply.tool_calls),
+                    },
+                )
+                set_content(
+                    span,
+                    "langfuse.observation.output",
+                    {"content": reply.content, "tool_calls": reply.tool_calls}
+                    if reply.tool_calls
+                    else reply.content,
+                )
+            latency_ms = round((time.perf_counter() - started) * 1000)
         llm_call = {
             "model": model,
-            "latency_ms": round((time.perf_counter() - started) * 1000),
+            "latency_ms": latency_ms,
+            "queue_wait_ms": queue_wait_ms,
         }
         run = {**run, "llm": llm_call, "deferred": 0}
         if not parallel_calls and len(reply.tool_calls) > 1 and not final_turn:

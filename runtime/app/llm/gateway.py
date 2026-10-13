@@ -5,6 +5,8 @@ only requires a different base URL. Agent code depends on the returned
 ChatModel, never on a specific LLM server.
 """
 
+import threading
+from contextlib import nullcontext
 from functools import lru_cache
 
 import httpx
@@ -47,8 +49,23 @@ def create_chat_model(
 @lru_cache
 def _limited_client(limit: int) -> httpx.Client:
     """One connection pool for every chat model: at most `limit` calls reach the model server at
-    once, the rest wait for a free connection."""
+    once, the rest wait for a free connection. This is the actual enforcement; llm_slot() below
+    is a same-sized semaphore callers can also hold, only so they can time the wait (the pool
+    itself does not expose how long a call sat queued)."""
     return httpx.Client(limits=httpx.Limits(max_connections=limit, max_keepalive_connections=limit))
+
+
+def llm_slot(settings: Settings):
+    """Context manager held for the duration of one model call, sized like the connection pool
+    above. A caller that holds this while invoking the model can time its own wait instead of
+    that time hiding inside the pool's unmeasured queue; it does not replace the pool limit."""
+    limit = settings.llm_max_concurrency
+    return _semaphore(limit) if limit else nullcontext()
+
+
+@lru_cache
+def _semaphore(limit: int) -> threading.Semaphore:
+    return threading.Semaphore(limit)
 
 
 class LlmHealth(BaseModel):
