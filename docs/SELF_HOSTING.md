@@ -45,6 +45,7 @@ cp .env.example .env
 | `OTEL_EXPORTER_OTLP_ENDPOINT` / `OTEL_EXPORTER_OTLP_HEADERS` / `OTEL_CAPTURE_CONTENT` | 선택. Agent 실행 trace를 OpenTelemetry로 내보낼 곳 ([`MONITORING.md`](MONITORING.md#agent-trace-opentelemetry)) |
 | `GRAFANA_ADMIN_PASSWORD` / `PROMETHEUS_RETENTION` | 선택. 모니터링 프로필(아래)의 Grafana 관리자 비밀번호, Prometheus 보존 기간(기본 `30d`) |
 | `AGENTGATE_APPROVAL_TTL` | 선택. 결정되지 않은 승인 요청을 만료시키는 시간 (기본 `PT24H`) |
+| `AGENTGATE_EXECUTION_RETENTION` | 선택. 끝난 실행의 기록과 Runtime checkpoint를 지우는 기간 (기본 `P90D`, `P0D`면 지우지 않음). 감사 로그와 승인 기록은 지우지 않는다 |
 | `AGENTGATE_LOGIN_*` | 선택. 로그인 실패 제한: 아이디 + IP당 연속 실패 `MAX_FAILURES`(기본 5), IP당 `MAX_FAILURES_PER_IP`(기본 20), 막는 시간 `LOCK_DURATION`(기본 `PT15M`) |
 | `AGENTGATE_NOTIFY_WEBHOOK_*` | 선택. 승인 요청 알림 웹훅 ([`API_SPEC.md`](API_SPEC.md) 승인 처리 참고) |
 

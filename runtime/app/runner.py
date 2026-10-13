@@ -39,6 +39,10 @@ class WorkflowRunner:
     def exists(self, execution_id: str) -> bool:
         return self._checkpointer.get_tuple(_config(execution_id)) is not None
 
+    def forget(self, execution_id: str) -> None:
+        """Drops every checkpoint of the execution (AgentGate purges old executions)."""
+        self._checkpointer.delete_thread(execution_id)
+
     def graph_for_execution(self, execution_id: str) -> CompiledStateGraph:
         saved = self._checkpointer.get_tuple(_config(execution_id))
         dsl = saved.checkpoint["channel_values"].get("workflow") if saved else None
