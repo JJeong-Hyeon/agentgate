@@ -4,6 +4,7 @@ import { AgentEditorPage } from "./agents/AgentEditorPage";
 import { AgentsPage } from "./agents/AgentsPage";
 import type { Role } from "./api/types";
 import { useAuth } from "./auth/AuthContext";
+import { Logo } from "./components/Logo";
 import { ToolsPage } from "./tools/ToolsPage";
 import { UsersPage } from "./users/UsersPage";
 import { BuilderPage } from "./builder/BuilderPage";
@@ -28,7 +29,10 @@ function Layout() {
   return (
     <div className="app">
       <header className="topbar">
-        <span className="brand">AgentGate</span>
+        <span className="brand">
+          <Logo />
+          AgentGate
+        </span>
         <nav>
           <NavLink to="/" end>
             대시보드
