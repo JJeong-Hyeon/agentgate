@@ -3,19 +3,31 @@ updates:
   - package-ecosystem: gradle
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
+    groups:
+      all:
+        patterns: ["*"]
   - package-ecosystem: npm
     directory: /frontend
     schedule:
-      interval: weekly
+      interval: monthly
+    groups:
+      all:
+        patterns: ["*"]
   - package-ecosystem: pip
     directory: /runtime
     schedule:
-      interval: weekly
+      interval: monthly
+    groups:
+      all:
+        patterns: ["*"]
   - package-ecosystem: docker
     directories: [/, /runtime]
     schedule:
-      interval: weekly
+      interval: monthly
+    groups:
+      all:
+        patterns: ["*"]
     # CI does not build the images, so a major base image upgrade (Python, JRE, Node) is checked by hand.
     ignore:
       - dependency-name: "*"
@@ -23,4 +35,7 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
+    groups:
+      all:
+        patterns: ["*"]
