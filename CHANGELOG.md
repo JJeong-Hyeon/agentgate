@@ -3,6 +3,12 @@
 버전별 변경 사항. 형식은 [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/), 버전은 [Semantic Versioning](https://semver.org/lang/ko/)을 따른다.
 릴리스 이미지: `ghcr.io/jjeong-hyeon/agentgate`, `ghcr.io/jjeong-hyeon/agentgate-runtime` (설치 · 업그레이드는 [`docs/SELF_HOSTING.md`](docs/SELF_HOSTING.md)).
 
+## [0.1.1] - 2026-10-13
+
+### 변경
+- 로그인 실패 횟수를 Redis에 저장(`AGENTGATE_LOGIN_STORE`, selfhost 기본 `redis`): App을 재시작해도 유지되고 여러 대가 함께 센다. Redis에 닿지 못하면 막지 않고 경고만 남긴다. 직접 실행할 때 기본값은 `memory`
+- 콘솔에서 승인 · 거절하는 흐름을 헤드리스 브라우저로 검증하는 E2E 테스트를 CI에 추가
+
 ## [0.1.0] - 2026-10-13
 
 첫 릴리스.
