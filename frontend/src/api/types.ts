@@ -106,6 +106,8 @@ export interface Approval {
   reason?: string | null;
   // agents that delegated this work, outermost first, e.g. "lead>research"
   delegatedBy?: string | null;
+  // the arguments the call will run with, secrets masked
+  payloadPreview?: string | null;
 }
 
 export type RiskLevel = "LOW" | "MEDIUM" | "HIGH" | "BLOCKED";

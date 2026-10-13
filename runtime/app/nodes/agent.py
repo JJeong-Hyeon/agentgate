@@ -294,9 +294,12 @@ def add_agent(
         update = answer(run, pending["call"], denial(rejected), rejected)
         return Command(update=update, goto=gate_node)
 
-    def execute(state: dict) -> Command:
+    def execute(state: dict, config: RunnableConfig) -> Command:
         run = run_of(state)
-        call, authorized = run["pending"]["call"], ToolResult(**run["pending"]["result"])
+        call = run["pending"]["call"]
+        execution_id = config.get("configurable", {}).get("thread_id")
+        key = f"{execution_id}:{name}:{run['steps']}:{call['id']}"
+        authorized = ToolResult(**run["pending"]["result"], idempotency_key=key)
         tool = by_name[call["name"]].tool
         tool.check_payload(call["args"], run["pending"].get("approved_hash"))
         result = tool.execute_timed(call["args"], authorized)

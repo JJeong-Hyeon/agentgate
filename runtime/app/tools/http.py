@@ -33,7 +33,14 @@ class HttpTool(GovernedTool):
 
     def execute(self, payload: dict[str, Any] | None, authorized: ToolResult) -> ToolResult:
         try:
-            response = self._client.request(self.spec.method, self.spec.url, json=payload)
+            headers = (
+                {"Idempotency-Key": authorized.idempotency_key}
+                if authorized.idempotency_key
+                else {}
+            )
+            response = self._client.request(
+                self.spec.method, self.spec.url, json=payload, headers=headers
+            )
         except httpx.HTTPError as e:
             return ToolResult(**self._base(authorized), status="FAILED", error=str(e))
         return ToolResult(

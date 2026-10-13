@@ -68,3 +68,38 @@ def test_target_error_is_failed():
 
     assert result.status == "FAILED"
     assert result.response_status == 502
+
+
+def test_idempotency_key_is_sent_when_given_and_not_saved_with_the_result():
+    from app.tools.base import ToolResult
+
+    target = FakeTarget()
+    http = tool(FakeAgentGate("ALLOWED", "LOW"), target)
+    authorized = ToolResult(tool="report", status="ALLOWED", idempotency_key="exec-1:report")
+
+    result = http.execute_timed({"msg": "hi"}, authorized)
+
+    assert target.requests[0].headers["Idempotency-Key"] == "exec-1:report"
+    assert "idempotency_key" not in result.model_dump()
+    tool(FakeAgentGate("ALLOWED", "LOW"), target).run({"msg": "hi"})
+    assert "Idempotency-Key" not in target.requests[1].headers
+
+
+def test_the_approver_gets_the_arguments_with_secrets_masked_and_the_hash_of_the_real_ones():
+    from app.governance.payload import payload_hash
+
+    gate = FakeAgentGate("APPROVAL_REQUIRED", "HIGH", 7)
+    payload = {
+        "to": "kim",
+        "auth": {"api_key": "sk-123", "note": "x"},
+        "items": [{"password": "p"}],
+    }
+
+    tool(gate).authorize("exec-1", payload=payload)
+
+    preview = gate.bodies[0]["payloadPreview"]
+    assert '"to": "kim"' in preview and "sk-123" not in preview and '"p"' not in preview
+    assert preview.count("***") == 2
+    assert gate.bodies[0]["payloadHash"] == payload_hash(
+        "SEND_REPORT", "http://hook/report", payload
+    )
