@@ -1,5 +1,7 @@
 package com.agentgate.config;
 
+import com.agentgate.user.oidc.OidcLoginSupport;
+import org.springframework.beans.factory.ObjectProvider;
 import com.agentgate.user.service.LoginAttemptService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Set;
@@ -67,7 +69,8 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, LoginAttemptService loginAttempts,
-                                                   ObjectMapper objectMapper) throws Exception {
+                                                   ObjectMapper objectMapper,
+                                                   ObjectProvider<OidcLoginSupport> oidcLogin) throws Exception {
         http
                 // The console reads the XSRF-TOKEN cookie and sends it back in X-XSRF-TOKEN.
                 .csrf(csrf -> csrf
@@ -86,6 +89,8 @@ public class SecurityConfig {
                         // Agents (API key) and the runtime (runtime token) authenticate in their controllers.
                         .requestMatchers("/api/v1/actions").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/login", "/api/v1/auth/logout").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/auth/config", "/oauth2/authorization/*", "/login/oauth2/code/*")
+                        .permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/executions/*/events").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/runtime/mcp-servers").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/runtime/memories", "/api/v1/runtime/memories/search")
@@ -116,6 +121,10 @@ public class SecurityConfig {
                                 "/agents", "/agents/**", "/tools", "/users", "/account").permitAll()
                         .anyRequest().denyAll()
                 );
+        OidcLoginSupport oidc = oidcLogin.getIfAvailable();
+        if (oidc != null) {
+            oidc.apply(http);
+        }
         return http.build();
     }
 
