@@ -3,6 +3,11 @@
 버전별 변경 사항. 형식은 [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/), 버전은 [Semantic Versioning](https://semver.org/lang/ko/)을 따른다.
 릴리스 이미지: `ghcr.io/jjeong-hyeon/agentgate`, `ghcr.io/jjeong-hyeon/agentgate-runtime` (설치 · 업그레이드는 [`docs/SELF_HOSTING.md`](docs/SELF_HOSTING.md)).
 
+## [Unreleased]
+
+### 수정
+- 실행 원장(`RUNTIME_DATABASE_URL`)을 켠 상태에서, 위임받은 Agent의 Tool 호출이 승인 대기가 되면 승인 후에도 그 Tool이 실행되지 않고 Supervisor가 "a previous attempt at this call did not finish" FAILED를 받던 문제. 승인 대기로 멈춘 위임 호출의 원장 키가 STARTED로 남아, 재개 시 같은 키가 "결과를 모르는 호출"로 replay됐다. 이제 승인 대기로 멈추면 그 STARTED 키만 해제한다 (위임 안의 실제 외부 호출은 각자 키를 따로 가지므로 중복 방지는 그대로)
+
 ## [0.3.0] - 2026-10-13
 
 ### 변경

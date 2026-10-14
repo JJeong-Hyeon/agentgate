@@ -232,3 +232,66 @@ def test_j_mcp_calls_are_covered_by_the_same_ledger(tmp_path):
     assert counter_file.read_text().count("1") == 1  # the MCP server process ran once
     assert first.status == second.status == "EXECUTED"
     assert first.response_body == second.response_body
+
+
+# K. a delegate paused on a nested approval must resume, not replay "outcome unknown" -------
+
+
+def _delegation_run(tmp_path, decision: str):
+    from langgraph.types import Command
+
+    from tests.fake_llm import ScriptedChatModel, calls
+    from tests.test_agent_node import PolicyGate
+    from tests.test_delegation import agent, build, delegate, team
+
+    counter = tmp_path / "calls.txt"
+    llm = ScriptedChatModel.of(
+        delegate("save a note"),
+        calls(("local__count", {"path": str(counter)})),
+        "worker done",
+        "lead done",
+    )
+    research = agent(
+        "research", tools=[{"server": "local", "tool": "count", "permission": "APPROVAL"}]
+    )
+    graph, state, _ = build(team(research=research), llm, PolicyGate(count="APPROVAL_REQUIRED"))
+    config = {"configurable": {"thread_id": f"exec-{uuid.uuid4()}"}}
+
+    graph.invoke(state, config)
+    assert graph.get_state(config).interrupts  # paused on the worker's approval
+    result = graph.invoke(Command(resume={"decision": decision}), config)
+    return result, llm, counter
+
+
+def test_k_an_approved_nested_call_runs_once_and_the_supervisor_gets_the_result(tmp_path):
+    result, llm, counter = _delegation_run(tmp_path, "APPROVED")
+
+    assert counter.read_text().count("1") == 1  # the worker's tool ran exactly once
+    delegated = next(r for r in result["tool_results"] if r["tool"].endswith("agent/research"))
+    assert delegated["status"] == "EXECUTED"
+    assert "did not finish" not in llm.log[3]["messages"][-1].content
+    assert result["helper"] == "lead done"
+
+
+def test_l_a_rejected_nested_call_is_reported_to_the_worker_and_the_delegation_completes(tmp_path):
+    result, llm, counter = _delegation_run(tmp_path, "REJECTED")
+
+    assert not counter.exists()  # never ran
+    assert "human approver rejected" in llm.log[2]["messages"][-1].content
+    delegated = next(r for r in result["tool_results"] if r["tool"].endswith("agent/research"))
+    assert delegated["status"] == "EXECUTED"
+    assert result["helper"] == "lead done"
+
+
+def test_m_release_removes_only_a_started_claim():
+    key = new_key()
+    assert ledger.begin(ledger_settings(), key, "t") is None
+    ledger.release(ledger_settings(), key)
+    assert ledger.begin(ledger_settings(), key, "t") is None  # claimable again
+
+    from app.tools.base import ToolResult
+
+    ledger.finish(ledger_settings(), key, ToolResult(tool="t", status="EXECUTED"))
+    ledger.release(ledger_settings(), key)  # a recorded outcome stays
+    replay = ledger.begin(ledger_settings(), key, "t")
+    assert replay is not None and replay.status == "EXECUTED"
