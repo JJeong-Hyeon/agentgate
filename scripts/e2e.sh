@@ -61,6 +61,7 @@ JSON
   AGENTGATE_BASE_URL=http://localhost:8080 \
   LLM_BASE_URL=http://localhost:18081/v1 LLM_MODEL=fake-model \
   RUNTIME_TOKEN="$TOKEN" MCP_CONFIG_PATH="$WORK/mcp.json" \
+  RUNTIME_DATABASE_URL="postgresql://myuser:secret@localhost:$PG_PORT/mydatabase" \
   "$PYTHON" -m uvicorn app.main:app --port 8000 > "$WORK/runtime.log" 2>&1) &
 PIDS+=($!)
 wait_for http://localhost:8000/health Runtime "$WORK/runtime.log"
