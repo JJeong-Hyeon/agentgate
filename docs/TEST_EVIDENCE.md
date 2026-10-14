@@ -109,6 +109,6 @@ v0.3.0 릴리스 이후 머지된 변경과 실제로 검증한 내용. 기능 �
 | 항목 | 확인 | 결과 |
 |---|---|---|
 | 역할별 접근 | `SecurityConfig`의 규칙을 읽음: 사용자 관리 ADMIN, 정의 수정 · 워크플로 · 실행 ADMIN/EDITOR, 승인 · 거절 ADMIN/APPROVER. 역할별로 호출해 보지는 않음 | 코드 확인만 |
-| 인증 없이 열린 경로 | `/api/v1/actions`, 실행 이벤트, MCP 서버 목록, 기억 API는 `permitAll`이고 컨트롤러가 API 키 · Runtime 토큰으로 인증한다고 주석에 있음. 컨트롤러 인증은 이번에 읽지 않음 | 미확인 |
+| 인증 없이 열린 경로 | `permitAll` 4곳(`/api/v1/actions`, 실행 이벤트, MCP 서버 목록, 기억 API)을 컨트롤러에서 확인: actions는 `X-API-Key` 또는 `X-Runtime-Token`이 없으면 거부, 나머지 셋은 Runtime 토큰이 틀리면 `InvalidRuntimeTokenException`. 실제 요청으로 호출해 보지는 않음 | 코드 확인 |
 | GitHub Actions 시크릿 | 워크플로에서 쓰는 시크릿은 `GITHUB_TOKEN`뿐, 출력하는 단계 없음 | 확인 |
-| 공급망 스캔 | CI `security` 잡 통과. 잔여 취약점 예외 사유는 정리하지 않음 | 부분 확인 |
+| 공급망 스캔 | CI에서 Trivy(HIGH/CRITICAL, 수정본이 있는 것만, 발견 시 실패)와 `pip-audit`을 실행하고 예외 목록(ignore)은 없음. 수정본이 없는 취약점은 스캔 대상에서 빠지므로 잔여 위험으로 남을 수 있음 | 확인 |
