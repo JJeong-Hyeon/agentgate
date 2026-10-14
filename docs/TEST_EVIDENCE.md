@@ -26,6 +26,11 @@ v0.3.0 릴리스 이후 머지된 변경과 실제로 검증한 내용. 기능 �
 | 원장 DB 연결 불가 | 보호 없이 실행하지 않고 fail-closed(FAILED) | PASS |
 | 실패한 호출 | 원장에 FAILED로 남고 재시도 안 함 | PASS |
 | HTTP/MCP 둘 다 | 동일한 보장 적용 | PASS (MCP는 실제 stdio 서브프로세스 + 파일 카운터로 호출 횟수 확인) |
+| 위임 + 중첩 승인, 원장 DB 켬 (승인) | 승인 후 하위 Agent의 Tool이 정확히 1회 실행되고 Supervisor가 EXECUTED 위임 결과를 받음 (`test_k`) | CI에서 확인 |
+| 위임 + 중첩 승인, 원장 DB 켬 (거절) | 하위 Agent가 거절 사유를 받고 Supervisor 위임 결과가 정상 반환, Tool은 실행되지 않음 (`test_l`) | CI에서 확인 |
+| 승인 대기로 멈춘 호출의 원장 키 해제 | `release()`는 STARTED만 지우고 기록된 결과는 건드리지 않음 (`test_m`) | CI에서 확인 |
+
+위임 · 중첩 승인은 원장 DB가 있을 때만 재현되는 버그(위임 호출의 키가 STARTED로 남아 재개 시 FAILED로 replay)였다. 원장 없이 도는 `test_delegation.py`로는 드러나지 않으므로, 이 회귀 테스트는 반드시 원장 DB(`LEDGER_TEST_DATABASE_URL`)를 켜고 실행한다.
 
 **한계**: 이 테스트는 애플리케이션 레벨(원장 begin/finish)의 정확성만 검증한다. "Tool 성공 후 체크포인트 저장 전 장애"(LangGraph 체크포인트와 원장 커밋 사이의 실제 프로세스 kill)처럼 더 낮은 레벨의 타이밍 장애는 시뮬레이션했을 뿐 실제로 프로세스를 죽여서 재현하지는 않았다. 외부 서비스가 네트워크 호출을 실제로 받았지만 응답이 유실된 경우(원장조차 모르는 상태)는 원천적으로 감지 불가능 — 이는 멱등키를 지원하지 않는 외부 API의 근본적 한계로, 코드가 아니라 설계 문서(`AgentGate_FINALIZATION_PLAN.md`)에 명시된 그대로다.
 

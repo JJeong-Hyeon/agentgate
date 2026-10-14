@@ -5,6 +5,7 @@ import time
 from abc import ABC, abstractmethod
 from typing import Any, Literal
 
+from langgraph.errors import GraphInterrupt
 from opentelemetry.trace import Status, StatusCode
 from pydantic import BaseModel, Field
 
@@ -167,7 +168,18 @@ class GovernedTool(ABC):
             )
             set_content(span, "langfuse.observation.input", payload)
             started = time.perf_counter()
-            result = self.execute(payload, authorized)
+            try:
+                result = self.execute(payload, authorized)
+            except GraphInterrupt:
+                # Paused, not finished (a delegate waiting for an approval): nothing external
+                # ran under this key, so free it for the node's re-run on resume. Without this
+                # the claim stays STARTED and the re-run is replayed as "outcome unknown".
+                if key:
+                    try:
+                        ledger.release(settings, key)
+                    except Exception:  # noqa: BLE001 - the interrupt must still propagate
+                        log.warning("could not release %r in the call ledger", key, exc_info=True)
+                raise
             elapsed = round((time.perf_counter() - started) * 1000)
             span.set_attribute("agentgate.tool.status", result.status)
             if result.status == "FAILED":

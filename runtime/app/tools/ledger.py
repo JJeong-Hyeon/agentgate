@@ -90,6 +90,19 @@ def begin(settings: Settings, key: str, tool: str) -> "ToolResult | None":
     )
 
 
+def release(settings: Settings, key: str) -> None:
+    """Give up a claim made by begin() for a call that paused (an interrupt) instead of running
+    to an outcome, so resuming can claim it again. Only a STARTED row is removed; a recorded
+    outcome is never touched."""
+    if not settings.runtime_database_url:
+        return
+    with _pool(settings.runtime_database_url).connection() as conn:
+        conn.execute(
+            "delete from tool_call_ledger where idempotency_key = %s and status = 'STARTED'",
+            (key,),
+        )
+
+
 def finish(settings: Settings, key: str, result: Any) -> None:
     if not settings.runtime_database_url:
         return
