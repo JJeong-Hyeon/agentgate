@@ -5,6 +5,11 @@
 
 ## [Unreleased]
 
+### 추가 (SSO)
+- **사내 계정(OIDC) 로그인**: Authorization Code + PKCE. IdP의 그룹을 ADMIN / EDITOR / APPROVER / VIEWER에 매핑하고, 매핑되는 그룹이 없으면 로그인을 거부한다(`AGENTGATE_OIDC_DEFAULT_ROLE`로 최소 권한을 줄 수도 있다). 처음 로그인하면 사용자가 만들어지고 로그인할 때마다 역할이 IdP 그룹대로 다시 정해진다. 같은 이름의 자체 계정(`admin` 등)은 SSO로 가로챌 수 없다. 기본은 꺼져 있고 `AGENTGATE_OIDC_*`로 켠다. `AGENTGATE_LOCAL_LOGIN_ENABLED=false`로 아이디 · 비밀번호 로그인을 끌 수 있다(HTTP Basic은 유지). 설정 방법은 `docs/SELF_HOSTING.md`, 한계는 `docs/SECURITY.md` · `docs/TEST_EVIDENCE.md`
+- DB 마이그레이션 V13: `users.auth_source` (기존 사용자는 `LOCAL`)
+- SAML은 지원하지 않는다
+
 ### 수정
 - 실행 원장(`RUNTIME_DATABASE_URL`)을 켠 상태에서, 위임받은 Agent의 Tool 호출이 승인 대기가 되면 승인 후에도 그 Tool이 실행되지 않고 Supervisor가 "a previous attempt at this call did not finish" FAILED를 받던 문제. 승인 대기로 멈춘 위임 호출의 원장 키가 STARTED로 남아, 재개 시 같은 키가 "결과를 모르는 호출"로 replay됐다. 이제 승인 대기로 멈추면 그 STARTED 키만 해제한다 (위임 안의 실제 외부 호출은 각자 키를 따로 가지므로 중복 방지는 그대로)
 

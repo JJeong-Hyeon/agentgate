@@ -628,7 +628,7 @@ Phase 1~9 완료, 이후 운영 · 보안 보강까지 반영(버전별 변경�
 - 인증에 실패한 요청이 세션을 만들지 않도록 요청 캐시를 끄고, 브라우저의 Basic 로그인 창이 뜨지 않도록 401에는 `WWW-Authenticate`를 싣지 않는다
 - 로그인 실패는 아이디+IP, IP 단위로 센다(Redis, Redis에 닿지 못하면 막지 않음). 한도를 넘으면 비밀번호가 맞아도 429
 - 응답에 CSP(`default-src 'self'` 등)를 싣는다
-- 스크립트 · 자동화는 같은 API를 HTTP Basic으로 호출한다. 사내 계정(OIDC · SAML) 연동은 없다
+- 스크립트 · 자동화는 같은 API를 HTTP Basic으로 호출한다. 사내 계정은 OIDC(Authorization Code + PKCE)로 연동할 수 있고(설정으로 켠다), SAML은 지원하지 않는다. IdP의 그룹을 ADMIN/EDITOR/APPROVER/VIEWER로 매핑하며, 매핑되는 그룹이 없으면 로그인을 거부한다
 
 ### 22.3 Runtime 보호
 
