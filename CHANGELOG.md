@@ -10,8 +10,8 @@
 - DB 마이그레이션 V13: `users.auth_source` (기존 사용자는 `LOCAL`)
 - SAML은 지원하지 않는다
 - ID 토큰 검증(위조 · 변조 · 만료 · 발급자 · 대상, 키 회전)을 자동 테스트로 추가
-  - `LLM:<provider>`를 APPROVAL_REQUIRED로 두면 그 Agent는 사람이 승인할 때까지 멈추고, 승인되면 이어서 실행되며 거절되면 실패한다(재개해도 승인 요청이 다시 만들어지지 않는다)
 - **외부 LLM provider 사용을 정책으로 통제**: Agent의 모델이 `provider@모델`로 기본 모델 서버가 아닌 provider를 가리키면, Runtime이 첫 모델 호출 전에 AgentGate에 `LLM:<provider>` 액션을 평가받는다. 정책 화면에서 `LLM:gemini`처럼 액션 타입별로 차단할 수 있고, 평가는 감사 로그에 남는다. 허용(ALLOWED)이 아니거나 AgentGate에 닿지 못하면 Agent 실행을 실패시킨다(fail-closed). 정책이 없으면 기존 정책의 기본 위험도를 따른다. 기본(`LLM_BASE_URL`) 모델은 검사하지 않는다
+  - `LLM:<provider>`를 APPROVAL_REQUIRED로 두면 그 Agent는 사람이 승인할 때까지 멈추고, 승인되면 이어서 실행되며 거절되면 실패한다(재개해도 승인 요청이 다시 만들어지지 않는다)
 
 ### 추가 (평가)
 - **거버넌스 평가 데이터셋과 릴리스 게이트**: `cd runtime && python -m evals.run`이 정책 허용 · 차단, 승인(대기 · 승인 · 거절), 승인 후 인자 변조, 위임(차단 · 중첩 승인), 외부 모델 차단, AgentGate 장애 시나리오 15개를 실제 그래프로 실행하고 "실행되면 안 되는데 실행된 횟수"(오실행)와 통과율을 출력한다. 오실행이 하나라도 있으면 실패하며, pytest(`test_governance_eval.py`)와 CI 요약에 연결된다
