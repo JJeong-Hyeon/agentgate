@@ -83,3 +83,32 @@ v0.3.0 릴리스 이후 머지된 변경과 실제로 검증한 내용. 기능 �
 | 세션 쿠키 | `HttpOnly`, `SameSite=Lax`, `Secure`는 `AGENTGATE_SESSION_COOKIE_SECURE`(selfhost 기본 true) | 확인 |
 | Grafana 관리자 비밀번호 | `GRAFANA_ADMIN_PASSWORD`가 비어 있으면 `admin`으로 폴백(첫 로그인 때 변경 요구). 모니터링 프로필을 켜면 `/grafana`가 외부에서 보임 | **잔여 위험**: 모니터링을 켜면 `GRAFANA_ADMIN_PASSWORD`를 반드시 채울 것 |
 | TLS/프록시 헤더, CSRF, 로그 내 민감정보, 역할별 접근, CI 시크릿, 이미지 취약점 예외 | 이 점검에서 보지 않음 | 미확인 |
+
+### 새 환경 설치 재현 (2026-10-14, 로컬 Windows PC)
+
+기존 스택과 분리해 `docker compose -p agentgate-t3`로 새 볼륨에 `deploy/selfhost/compose.yaml`을 그대로 빌드·기동했다(Caddy 포트만 18080/18443으로 변경, `AGENTGATE_DOMAIN=localhost`). 확인 후 이 스택과 볼륨은 삭제했다.
+
+| 확인 | 결과 |
+|---|---|
+| 5개 컨테이너(caddy/app/runtime/postgres/redis) 기동, app·runtime·postgres healthy | 확인 |
+| Flyway 마이그레이션 최신 버전 12까지 적용 | 확인 |
+| `/actuator/health` UP, Caddy 경유 `/actuator/prometheus`는 404 | 확인 |
+| 로그인 없이 API 401, 잘못된 비밀번호 401, 올바른 비밀번호 200 | 확인 |
+| 세션 쿠키 `Secure; HttpOnly; SameSite=Lax`, CSRF 토큰 없이 POST는 403 | 확인 |
+| 전체 컨테이너 재시작 후 사용자 데이터 유지, 로그인 정상 | 확인 |
+| app · runtime 로그에 관리자 비밀번호, Runtime 토큰 원문 없음(기동~재시작 구간) | 확인 |
+
+한계:
+- 모델 서버가 없어서 Agent 실행 → 승인 → 재개 시나리오는 이 설치에서 하지 않았다. 그 흐름은 E2E(CI)로 검증한다.
+- `tool_call_ledger` 테이블은 첫 외부 호출 때 만들어지므로 이 설치에서는 아직 없다.
+- Caddy 자체 CA 인증서는 신뢰하지 않고(`curl -k`) 확인했다. 공개 도메인의 Let's Encrypt 발급은 확인하지 않았다.
+- 승인 · 만료 · 차단 경로와 Runtime만 재시작했을 때의 원장 replay는 이 설치에서 확인하지 않았다.
+
+### 점검 항목 중 추가로 확인한 것
+
+| 항목 | 확인 | 결과 |
+|---|---|---|
+| 역할별 접근 | `SecurityConfig`의 규칙을 읽음: 사용자 관리 ADMIN, 정의 수정 · 워크플로 · 실행 ADMIN/EDITOR, 승인 · 거절 ADMIN/APPROVER. 역할별로 호출해 보지는 않음 | 코드 확인만 |
+| 인증 없이 열린 경로 | `/api/v1/actions`, 실행 이벤트, MCP 서버 목록, 기억 API는 `permitAll`이고 컨트롤러가 API 키 · Runtime 토큰으로 인증한다고 주석에 있음. 컨트롤러 인증은 이번에 읽지 않음 | 미확인 |
+| GitHub Actions 시크릿 | 워크플로에서 쓰는 시크릿은 `GITHUB_TOKEN`뿐, 출력하는 단계 없음 | 확인 |
+| 공급망 스캔 | CI `security` 잡 통과. 잔여 취약점 예외 사유는 정리하지 않음 | 부분 확인 |
