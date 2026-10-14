@@ -26,9 +26,9 @@ v0.3.0 릴리스 이후 머지된 변경과 실제로 검증한 내용. 기능 �
 | 원장 DB 연결 불가 | 보호 없이 실행하지 않고 fail-closed(FAILED) | PASS |
 | 실패한 호출 | 원장에 FAILED로 남고 재시도 안 함 | PASS |
 | HTTP/MCP 둘 다 | 동일한 보장 적용 | PASS (MCP는 실제 stdio 서브프로세스 + 파일 카운터로 호출 횟수 확인) |
-| 위임 + 중첩 승인, 원장 DB 켬 (승인) | 승인 후 하위 Agent의 Tool이 정확히 1회 실행되고 Supervisor가 EXECUTED 위임 결과를 받음 (`test_k`) | CI에서 확인 |
-| 위임 + 중첩 승인, 원장 DB 켬 (거절) | 하위 Agent가 거절 사유를 받고 Supervisor 위임 결과가 정상 반환, Tool은 실행되지 않음 (`test_l`) | CI에서 확인 |
-| 승인 대기로 멈춘 호출의 원장 키 해제 | `release()`는 STARTED만 지우고 기록된 결과는 건드리지 않음 (`test_m`) | CI에서 확인 |
+| 위임 + 중첩 승인, 원장 DB 켬 (승인) | 승인 후 하위 Agent의 Tool이 정확히 1회 실행되고 Supervisor가 EXECUTED 위임 결과를 받음 (`test_k`) | PASS (CI, PR #253) |
+| 위임 + 중첩 승인, 원장 DB 켬 (거절) | 하위 Agent가 거절 사유를 받고 Supervisor 위임 결과가 정상 반환, Tool은 실행되지 않음 (`test_l`) | PASS (CI, PR #253) |
+| 승인 대기로 멈춘 호출의 원장 키 해제 | `release()`는 STARTED만 지우고 기록된 결과는 건드리지 않음 (`test_m`) | PASS (CI, PR #253) |
 
 위임 · 중첩 승인은 원장 DB가 있을 때만 재현되는 버그(위임 호출의 키가 STARTED로 남아 재개 시 FAILED로 replay)였다. 원장 없이 도는 `test_delegation.py`로는 드러나지 않으므로, 이 회귀 테스트는 반드시 원장 DB(`LEDGER_TEST_DATABASE_URL`)를 켜고 실행한다.
 
