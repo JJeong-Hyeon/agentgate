@@ -3,6 +3,7 @@ package com.agentgate.agent.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -204,6 +205,31 @@ class AgentActionServiceTest {
         verify(riskEvaluationService, never()).evaluate(anyString(), any());
         verify(auditLogService).record(eq("mail-agent"), eq("MCP:notes:delete_note"), any(), any(),
                 eq(RiskLevel.BLOCKED), eq(ActionStatus.BLOCKED), any(), eq(DecisionBasis.TOOL_NOT_GRANTED), any(), any());
+    }
+
+    @Test
+    void modelProviderActionsAreDecidedByPolicyNotByToolGrants() {
+        // The agent has a definition (so tool grants would apply), yet its grants are never consulted.
+        Agent agent = new Agent("mail-agent", "Mail Agent", ApiKeyGenerator.hash(API_KEY));
+        agent.nextDefinitionVersion(null);
+        agent.nextDefinitionVersion(null);
+        when(agentRepository.findByAgentId("mail-agent")).thenReturn(Optional.of(agent));
+        when(riskEvaluationService.evaluate("LLM:gemini", List.of()))
+                .thenReturn(new RiskEvaluationResult(RiskLevel.BLOCKED, ActionStatus.BLOCKED));
+
+        ActionResponse blocked = service.evaluate(toolCall(agent, "LLM:gemini"), null, true);
+
+        assertThat(blocked.status()).isEqualTo(ActionStatus.BLOCKED);
+        assertThat(blocked.basis()).isEqualTo(DecisionBasis.POLICY);  // not TOOL_NOT_GRANTED
+        verify(auditLogService).record(eq("mail-agent"), eq("LLM:gemini"), any(), any(),
+                eq(RiskLevel.BLOCKED), eq(ActionStatus.BLOCKED), any(), eq(DecisionBasis.POLICY), any(), any());
+
+        when(riskEvaluationService.evaluate("LLM:openai", List.of()))
+                .thenReturn(new RiskEvaluationResult(RiskLevel.LOW, ActionStatus.ALLOWED));
+
+        assertThat(service.evaluate(toolCall(agent, "LLM:openai"), null, true).status())
+                .isEqualTo(ActionStatus.ALLOWED);
+        verify(agentDefinitionService, never()).definition(any(), anyInt());
     }
 
     @Test
