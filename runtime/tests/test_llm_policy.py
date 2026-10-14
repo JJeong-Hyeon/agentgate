@@ -5,6 +5,7 @@ import json
 import httpx
 import pytest
 from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.types import Command
 
 from app.config import Settings
 from app.dsl.schema import AgentSpec
@@ -73,3 +74,35 @@ def test_an_unreachable_agentgate_fails_closed(providers):
 
     with pytest.raises(ModelNotAllowed, match="could not check model provider 'gemini'"):
         check_model_allowed(down, spec, "exec-1")
+
+
+def test_a_provider_that_needs_approval_pauses_and_is_asked_once(providers):
+    llm = ScriptedChatModel.of(delegate("say hi"), "worker says hi", "Team: hi")
+    gate = PolicyGate(gemini="APPROVAL_REQUIRED")
+    graph, state, _ = build(external_team(), llm, gate, InMemorySaver())
+
+    graph.invoke(state, CONFIG)
+
+    assert [i.value for i in graph.get_state(CONFIG).interrupts] == [
+        {"tool": "research:llm/gemini", "approval_id": 101}
+    ]
+    assert len(llm.log) == 1  # only the supervisor has thought; the worker waits
+
+    result = graph.invoke(Command(resume={"decision": "APPROVED"}), CONFIG)
+
+    assert result["helper"] == "Team: hi"
+    # Resuming did not file a second approval request.
+    assert [b["action"] for b in gate.bodies].count("LLM:gemini") == 1
+
+
+def test_a_rejected_provider_fails_the_worker_without_a_model_call(providers):
+    llm = ScriptedChatModel.of(delegate("say hi"), "Could not delegate.")
+    gate = PolicyGate(gemini="APPROVAL_REQUIRED")
+    graph, state, _ = build(external_team(), llm, gate, InMemorySaver())
+
+    graph.invoke(state, CONFIG)
+    result = graph.invoke(Command(resume={"decision": "REJECTED"}), CONFIG)
+
+    assert len(llm.log) == 2  # the supervisor's two turns; the worker never reached a model
+    assert "was not approved for agent 'research'" in llm.log[1]["messages"][-1].content
+    assert result["helper"] == "Could not delegate."

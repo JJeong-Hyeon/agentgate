@@ -51,7 +51,7 @@ from app.config import get_settings
 from app.dsl.schema import AgentSpec, AgentToolSpec
 from app.governance.agentgate_client import AgentGateClient
 from app.llm.gateway import llm_slot
-from app.llm.policy import check_model_allowed
+from app.llm.policy import ModelNotAllowed, model_decision, refusal, uses_external_provider
 from app.telemetry import set_attributes, set_content, tracer
 from app.tools.base import GovernedTool, ToolResult
 from app.tools.memory import memory_prompt
@@ -151,6 +151,10 @@ def add_agent(
     gate_node = f"{name}.gate"
     approval_node = f"{name}.approval"
     execute_node = f"{name}.execute"
+    model_node = f"{name}.model"
+    model_approval_node = f"{name}.model_approval"
+    # Only an agent on a non-default provider has a model check (and shows it as a step).
+    checks_model = model_gate is not None and uses_external_provider(spec)
     by_name = {t.function_name: t for t in tools}
     definitions = [t.definition() for t in tools]
     json_calls = tool_calling == "JSON"
@@ -164,13 +168,6 @@ def add_agent(
         return {"agent_runs": {name: {**run, **changes}}}
 
     def start(state: dict, config: RunnableConfig) -> Command:
-        if model_gate is not None:
-            check_model_allowed(
-                model_gate,
-                spec,
-                config.get("configurable", {}).get("thread_id"),
-                delegated_by,
-            )
         prompt = build_prompt(state)
         system, update = system_prompt, {}
         recalled: list[str] = []
@@ -187,7 +184,35 @@ def add_agent(
             "delegated_by": delegated_by,
             "recalled": recalled,
         }
-        return Command(update={"agent_runs": {name: run}, **update}, goto=think_node)
+        first = model_node if checks_model else think_node
+        return Command(update={"agent_runs": {name: run}, **update}, goto=first)
+
+    def check_model(state: dict, config: RunnableConfig) -> Command:
+        """May this agent use its model provider? Asked once, before the first model call."""
+        run = run_of(state)
+        execution_id = config.get("configurable", {}).get("thread_id")
+        checked = model_decision(model_gate, spec, execution_id, delegated_by)
+        if checked is None or checked[1].status == "ALLOWED":
+            return Command(goto=think_node)
+        provider, decision = checked
+        if decision.status == "APPROVAL_REQUIRED":
+            pending = {"provider": provider, "approval_id": decision.approval_id}
+            return Command(update=save(run, model_pending=pending), goto=model_approval_node)
+        raise refusal(provider, spec, decision)
+
+    def await_model_approval(state: dict) -> Command:
+        # Its own node, so resuming asks the person's decision again, not AgentGate (which would
+        # file a second approval request).
+        run = run_of(state)
+        pending = run["model_pending"]
+        decision = interrupt(
+            {"tool": f"{name}:llm/{pending['provider']}", "approval_id": pending["approval_id"]}
+        )
+        if decision.get("decision") == "APPROVED":
+            return Command(update=save(run, model_pending=None), goto=think_node)
+        raise ModelNotAllowed(
+            f"model provider '{pending['provider']}' was not approved for agent '{spec.agent_id}'"
+        )
 
     def think(state: dict) -> Command:
         run = run_of(state)
@@ -326,7 +351,12 @@ def add_agent(
             content = f"The tool failed: {result.error}"
         return Command(update=answer(run, call, content, result), goto=gate_node)
 
-    graph.add_node(name, start, destinations=(think_node,))
+    graph.add_node(
+        name, start, destinations=(model_node, think_node) if checks_model else (think_node,)
+    )
+    if checks_model:
+        graph.add_node(model_node, check_model, destinations=(think_node, model_approval_node))
+        graph.add_node(model_approval_node, await_model_approval, destinations=(think_node,))
     graph.add_node(think_node, think, destinations=(gate_node, think_node, *next_nodes))
     graph.add_node(
         gate_node, gate, destinations=(think_node, execute_node, approval_node, gate_node)
