@@ -68,7 +68,7 @@ v0.3.0 릴리스 이후 머지된 변경과 실제로 검증한 내용. 기능 �
 
 - `tool_call_ledger`의 exactly-once는 "우리 시스템이 같은 호출을 두 번 보내지 않는다"는 보장이지, "외부 시스템이 그 호출을 정확히 한 번만 처리했다"는 보장은 아니다(외부 API가 멱등키를 지원하지 않으면 후자는 원천적으로 보장 불가)
 - SAML 미구현. OIDC는 Keycloak(로컬 컨테이너)으로 실제 로그인까지 확인했지만, Okta · Azure AD 같은 다른 IdP와 CI 자동 검증은 하지 않았다(아래 "SSO(OIDC) 검증" 참고)
-- Multi-LLM Gateway: provider별 정책 차단은 `LLM:<provider>` 액션으로 구현(`test_llm_policy.py`, `AgentActionServiceTest`). 자동 fallback, 모델 카탈로그, 비용 계측은 미구현. `LLM:` 정책을 APPROVAL_REQUIRED로 두면 승인 요청이 만들어지지만 Runtime은 대기하지 않고 실행을 실패시킨다
+- Multi-LLM Gateway: provider별 정책 차단은 `LLM:<provider>` 액션으로 구현(`test_llm_policy.py`, `AgentActionServiceTest`). 자동 fallback, 모델 카탈로그, 비용 계측은 미구현. `LLM:<provider>`를 APPROVAL_REQUIRED로 두면 Agent가 승인 때까지 멈추고 승인되면 이어서 실행, 거절되면 실패한다(`test_llm_policy.py`)
 - 실제 운영/기업 서버 배포는 하지 않음 — 지금까지는 개인 기기(iMac, Windows PC)에서만 셀프호스트 스택을 운영
 
 ## 셀프호스트 보안 설정 점검 (2026-10-14, 설정 파일 읽기)
