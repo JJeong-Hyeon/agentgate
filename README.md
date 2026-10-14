@@ -182,6 +182,7 @@ docs/          설계 · API · 설치 · 운영 문서
 ./gradlew test                       # 백엔드: 단위 + @SpringBootTest 통합 (H2, Redis는 Testcontainers)
 cd runtime && pytest                 # Runtime (Python 3.12+)
 cd frontend && npm install && npm test
+cd runtime && python -m evals.run     # 거버넌스 평가: 승인 · 차단 · 변조 · 위임 · 외부 모델 시나리오 15개, 오실행이 있으면 실패
 PYTHON=python3.12 ./scripts/e2e.sh   # 전체 흐름 + 콘솔 브라우저 E2E (Docker, Java 21, Python 3.12, Playwright)
 ```
 

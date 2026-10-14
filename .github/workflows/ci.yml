@@ -57,6 +57,9 @@ jobs:
       - run: ruff check .
       - run: ruff format --check .
       - run: pytest
+      - name: Governance evaluation summary
+        if: always()
+        run: python -m evals.run --summary >> "$GITHUB_STEP_SUMMARY"
 
   e2e:
     runs-on: ubuntu-latest
