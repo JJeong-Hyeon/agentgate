@@ -49,7 +49,9 @@ from langgraph.types import Command, interrupt
 
 from app.config import get_settings
 from app.dsl.schema import AgentSpec, AgentToolSpec
+from app.governance.agentgate_client import AgentGateClient
 from app.llm.gateway import llm_slot
+from app.llm.policy import check_model_allowed
 from app.telemetry import set_attributes, set_content, tracer
 from app.tools.base import GovernedTool, ToolResult
 from app.tools.memory import memory_prompt
@@ -140,6 +142,7 @@ def add_agent(
     delegated_by: str | None = None,
     recall: Recall | None = None,
     parallel_calls: bool = False,
+    model_gate: AgentGateClient | None = None,
 ) -> None:
     """`delegated_by` is the chain of agents that handed this one its task (outermost first),
     reported with each of its tool calls; None when it runs as a workflow node. `recall`, if
@@ -161,6 +164,13 @@ def add_agent(
         return {"agent_runs": {name: {**run, **changes}}}
 
     def start(state: dict, config: RunnableConfig) -> Command:
+        if model_gate is not None:
+            check_model_allowed(
+                model_gate,
+                spec,
+                config.get("configurable", {}).get("thread_id"),
+                delegated_by,
+            )
         prompt = build_prompt(state)
         system, update = system_prompt, {}
         recalled: list[str] = []
