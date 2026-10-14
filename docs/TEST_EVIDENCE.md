@@ -70,3 +70,16 @@ v0.3.0 릴리스 이후 머지된 변경과 실제로 검증한 내용. 기능 �
 - OIDC/SAML 미구현(의도적 보류, 회사 IdP 없음)
 - Multi-LLM Gateway는 연결 단계까지만(provider별 정책 차단, 자동 fallback은 미구현)
 - 실제 운영/기업 서버 배포는 하지 않음 — 지금까지는 개인 기기(iMac, Windows PC)에서만 셀프호스트 스택을 운영
+
+## 셀프호스트 보안 설정 점검 (2026-10-14, 설정 파일 읽기)
+
+`deploy/selfhost/compose.yaml`, `application.yaml`, `runtime/app/main.py`를 읽어서 확인했다. 스택을 새로 띄워서 확인한 것은 아니다.
+
+| 점검 항목 | 확인한 것 | 결과 |
+|---|---|---|
+| `RUNTIME_TOKEN` 누락 | compose는 `:?`로 비어 있으면 기동 거부, Runtime은 토큰 없이 시작하지 않음(`RUNTIME_ALLOW_NO_TOKEN`은 로컬 개발 전용) | 확인 |
+| 필수 시크릿 | `POSTGRES_PASSWORD`, `AGENTGATE_ADMIN_PASSWORD`, `RUNTIME_TOKEN`, `AGENTGATE_SECRET_KEY`가 모두 `:?`로 필수 | 확인 |
+| 외부 공개 포트 | Caddy(80/443)만 `ports`로 공개, Postgres/Runtime/Prometheus/Grafana는 내부 네트워크 | 확인 |
+| 세션 쿠키 | `HttpOnly`, `SameSite=Lax`, `Secure`는 `AGENTGATE_SESSION_COOKIE_SECURE`(selfhost 기본 true) | 확인 |
+| Grafana 관리자 비밀번호 | `GRAFANA_ADMIN_PASSWORD`가 비어 있으면 `admin`으로 폴백(첫 로그인 때 변경 요구). 모니터링 프로필을 켜면 `/grafana`가 외부에서 보임 | **잔여 위험**: 모니터링을 켜면 `GRAFANA_ADMIN_PASSWORD`를 반드시 채울 것 |
+| TLS/프록시 헤더, CSRF, 로그 내 민감정보, 역할별 접근, CI 시크릿, 이미지 취약점 예외 | 이 점검에서 보지 않음 | 미확인 |
