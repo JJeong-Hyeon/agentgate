@@ -155,7 +155,7 @@ pytest
 - **비밀값**: MCP 서버 인증 헤더는 AES-256-GCM으로 암호화해 저장합니다. 의존성 취약점은 CI에서 검사합니다.
 - **중복 실행 방지**: HTTP/MCP Tool 호출은 모두 실행 원장(`tool_call_ledger`)을 거칩니다. 같은 호출이 다시 들어오면(승인 재개 중복, Runtime 재시작 후) 재실행 대신 기록된 결과를 반환하고, 결과를 모르는 채 끊긴 호출은 재시도하지 않고 안전하게 실패시킵니다. 검증 내용은 [`docs/TEST_EVIDENCE.md`](docs/TEST_EVIDENCE.md), 설계상 한계는 [`docs/SECURITY.md`](docs/SECURITY.md)를 보세요.
 
-알려진 한계(사내 계정 연동 없음, 단일 인스턴스 구성 등)는 [`docs/OPERATIONS_GUIDE.md`](docs/OPERATIONS_GUIDE.md)의 "알려진 제약"에 있습니다.
+알려진 한계(SAML 미지원, 단일 인스턴스 구성 등)는 [`docs/OPERATIONS_GUIDE.md`](docs/OPERATIONS_GUIDE.md)의 "알려진 제약"에 있습니다.
 
 ## 프로젝트 구조
 

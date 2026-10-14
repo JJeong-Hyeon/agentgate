@@ -48,6 +48,10 @@ public class User {
     @Column(name = "role", nullable = false, length = 32)
     private Set<Role> roles = new HashSet<>();
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 16)
+    private AuthSource authSource = AuthSource.LOCAL;
+
     private boolean enabled;
 
     private Instant createdAt;
@@ -77,6 +81,13 @@ public class User {
         return roles.isEmpty() ? EnumSet.noneOf(Role.class) : EnumSet.copyOf(roles);
     }
 
+    /** A user created by the identity provider; the password is random and never used. */
+    public static User fromIdp(String username, String displayName, String unusablePasswordHash, Set<Role> roles) {
+        User user = new User(username, displayName, unusablePasswordHash, roles);
+        user.authSource = AuthSource.OIDC;
+        return user;
+    }
+
     public boolean isAdmin() {
         return enabled && roles.contains(Role.ADMIN);
     }
@@ -85,6 +96,12 @@ public class User {
         this.displayName = displayName;
         this.roles = new HashSet<>(roles);
         this.enabled = enabled;
+    }
+
+    /** What the identity provider says at sign-in replaces the name and roles kept here. */
+    public void syncFromIdp(String displayName, Set<Role> roles) {
+        this.displayName = displayName;
+        this.roles = new HashSet<>(roles);
     }
 
     public void changePassword(String passwordHash) {

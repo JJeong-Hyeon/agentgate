@@ -24,7 +24,8 @@ public class DatabaseUserDetailsService implements UserDetailsService {
         return User.withUsername(user.getUsername())
                 .password(user.getPasswordHash())
                 .roles(user.getRoles().stream().map(Enum::name).toArray(String[]::new))
-                .disabled(!user.isEnabled())
+                // Someone who signs in through the identity provider has no password to try here.
+                .disabled(!user.isEnabled() || user.getAuthSource() != com.agentgate.user.domain.AuthSource.LOCAL)
                 .build();
     }
 }

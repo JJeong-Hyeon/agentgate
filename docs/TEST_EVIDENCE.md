@@ -67,7 +67,7 @@ v0.3.0 릴리스 이후 머지된 변경과 실제로 검증한 내용. 기능 �
 ## 알려진 한계 (과장 방지)
 
 - `tool_call_ledger`의 exactly-once는 "우리 시스템이 같은 호출을 두 번 보내지 않는다"는 보장이지, "외부 시스템이 그 호출을 정확히 한 번만 처리했다"는 보장은 아니다(외부 API가 멱등키를 지원하지 않으면 후자는 원천적으로 보장 불가)
-- OIDC/SAML 미구현(의도적 보류, 회사 IdP 없음)
+- SAML 미구현. OIDC는 Keycloak(로컬 컨테이너)으로 실제 로그인까지 확인했지만, Okta · Azure AD 같은 다른 IdP와 CI 자동 검증은 하지 않았다(아래 "SSO(OIDC) 검증" 참고)
 - Multi-LLM Gateway: provider별 정책 차단은 `LLM:<provider>` 액션으로 구현(`test_llm_policy.py`, `AgentActionServiceTest`). 자동 fallback, 모델 카탈로그, 비용 계측은 미구현. `LLM:` 정책을 APPROVAL_REQUIRED로 두면 승인 요청이 만들어지지만 Runtime은 대기하지 않고 실행을 실패시킨다
 - 실제 운영/기업 서버 배포는 하지 않음 — 지금까지는 개인 기기(iMac, Windows PC)에서만 셀프호스트 스택을 운영
 
@@ -141,3 +141,33 @@ v0.3.0 릴리스 이후 머지된 변경과 실제로 검증한 내용. 기능 �
 - 모델 응답은 스크립트라서 "모델이 얼마나 똑똑한가"나 프롬프트 인젝션에 모델이 넘어가는지는 측정하지 않는다. 실제 모델 평가(정확도, 비용, 지연)는 하지 않았다.
 - AgentGate의 정책 판단(위험도 계산, Tool 권한 검사)은 가짜로 대체한 것이라 여기서는 검증하지 않는다. 그 부분은 Java 테스트와 E2E가 맡는다.
 - 원장(`RUNTIME_DATABASE_URL`)을 켠 시나리오는 이 평가에 없다(Postgres가 필요해서 원장 테스트와 E2E가 맡는다).
+
+## SSO(OIDC) 검증 (2026-10-14)
+
+로컬에서 Keycloak 26(컨테이너, 테스트용 realm: 그룹 `agentgate-admins` / `agentgate-viewers` / `sales`, 사용자 4명)과 AgentGate(jar)를 띄워, curl로 브라우저가 거치는 리디렉션을 그대로 따라가며 확인했다. Keycloak 쪽 변경(그룹 이동, 중지)은 관리 CLI로 했다. 확인 후 컨테이너와 DB는 삭제했다.
+
+| 시나리오 | 결과 |
+|---|---|
+| 로그인 시작 시 IdP로 보내는 주소에 PKCE(`code_challenge_method=S256`), `state`, `nonce`가 있음 | 확인 |
+| `agentgate-admins` 그룹 사용자 로그인 → 콘솔 사용자 자동 생성, 역할 ADMIN, 세션으로 API 호출 가능 | 확인 |
+| `agentgate-viewers` 그룹 사용자 → 역할 VIEWER | 확인 |
+| 매핑된 그룹이 없는 사용자(`sales`) → 로그인 거부, 세션 없음(401) | 확인 |
+| IdP에서 `admin`이라는 이름으로 로그인(AgentGate에는 자체 `admin` 계정이 있음) → 거부, 자체 계정 변경 없음 | 확인 |
+| SSO 사용자의 비밀번호로 자체 로그인 · HTTP Basic 시도 → 401 | 확인 |
+| 가짜 `code`/`state`로 콜백 호출 → 로그인 실패, 세션 없음 | 확인 |
+| 한 번 쓴 콜백 주소를 다른 브라우저(새 세션)에서 재사용 → 실패 | 확인 |
+| IdP에서 사용자를 ADMIN 그룹에서 VIEWER 그룹으로 옮기고 다시 로그인 → 역할이 ADMIN에서 VIEWER로 바뀜 | 확인 (아래 버그 수정 후) |
+| 콘솔에서 SSO 사용자를 비활성화 → 다음 SSO 로그인 거부 | 확인 |
+| IdP 중지 상태에서 AgentGate 상태 UP, 자체 계정 로그인 정상. IdP 복구 후 재시작 없이 SSO 로그인 정상 | 확인 (이 실행에서는 첫 로그인으로 IdP 정보를 이미 읽어 둔 뒤에 중지함) |
+
+**검증 중 찾은 버그**: 처음에는 IdP에서 그룹을 바꿔도 역할이 갱신되지 않았다. 사용자 생성 코드를 Spring 빈이 아니라 `new`로 만들어서 트랜잭션이 적용되지 않았다. 고친 뒤 같은 시나리오를 다시 해서 통과했고, 같은 문제를 잡는 자동 테스트(`OidcLoginIntegrationTest::aRoleChangeAtTheIdpIsSavedAtTheNextSignIn`)를 추가했다(이전 코드로 돌리면 실패하는 것을 확인).
+
+**자동 테스트(CI)**: `OidcRoleMapperTest`(그룹 → 역할, 기본 역할), `OidcUserProvisionerTest`(생성, 동기화, 자체 계정 보호, 비활성, 이름 형식), `OidcLoginIntegrationTest`(PKCE 리디렉션, 세션 없는 API는 401, 자체 로그인 끄기, Basic 유지, 빈 설정값 바인딩), 프런트엔드 로그인 화면 테스트.
+
+**하지 않은 것 · 한계**
+- 실제 IdP 로그인은 CI에서 자동으로 돌지 않는다(위 표는 수동 실행 기록). Okta, Azure AD 등 다른 IdP는 확인하지 않았다.
+- 변조된 ID 토큰(서명이 다른 토큰)을 직접 만들어 넣는 시험은 하지 않았다. 서명 · 발급자 · 대상 · 만료 · nonce 검증은 Spring Security의 기능에 맡기고 있다. 가짜 코드/상태값과 재사용한 콜백이 막히는 것까지만 확인했다.
+- JWKS 키 회전은 시험하지 않았다(Spring Security가 키를 가져오는 방식에 의존).
+- 로그아웃은 AgentGate 세션만 끝낸다. IdP에서 계정을 지워도 열려 있는 AgentGate 세션은 만료까지 유지된다.
+- 사용자는 아이디(`preferred_username` 등) 문자열로 식별한다. IdP가 사용자가 아이디를 바꾸게 허용하면 다른 사람의 아이디를 가져갈 수 있으므로, 그런 IdP에서는 아이디가 바뀌지 않는 클레임을 쓰도록 설정해야 한다.
+- SAML은 지원하지 않는다.

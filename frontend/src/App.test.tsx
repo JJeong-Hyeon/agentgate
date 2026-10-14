@@ -16,6 +16,24 @@ describe("App", () => {
   // The router keeps the browser location between tests.
   beforeEach(() => window.history.pushState({}, "", "/"));
 
+  it("offers SSO, and hides the password form when the server turns it off", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({ localLoginEnabled: false, ssoEnabled: true, ssoLabel: "Keycloak" }),
+      ),
+    );
+    try {
+      renderApp(vi.fn(async () => new Response("{}", { status: 401 })));
+
+      const link = await screen.findByRole("link", { name: "Keycloak로 로그인" });
+      expect(link).toHaveAttribute("href", "/oauth2/authorization/oidc");
+      expect(screen.queryByLabelText("비밀번호")).not.toBeInTheDocument();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("shows an error for wrong credentials", async () => {
     renderApp(vi.fn(async () => new Response("{}", { status: 401 })));
 

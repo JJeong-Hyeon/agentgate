@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { ApiError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { Logo } from "../components/Logo";
@@ -10,7 +10,29 @@ function loginError(e: unknown): string {
   return "AgentGate에 연결할 수 없습니다.";
 }
 
+type AuthConfig = { localLoginEnabled: boolean; ssoEnabled: boolean; ssoLabel: string | null };
+
+/** How this server lets people sign in; until it answers (or if it cannot), just the password form. */
+function useAuthConfig(): AuthConfig {
+  const [config, setConfig] = useState<AuthConfig>({ localLoginEnabled: true, ssoEnabled: false, ssoLabel: null });
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/v1/auth/config")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((body) => {
+        if (!cancelled && body && typeof body.localLoginEnabled === "boolean") setConfig(body);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return config;
+}
+
 export function LoginPage() {
+  const authConfig = useAuthConfig();
+  const ssoFailed = new URLSearchParams(window.location.search).has("sso_error");
   const { login } = useAuth();
   const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("");
@@ -37,27 +59,38 @@ export function LoginPage() {
           <Logo size={28} />
           AgentGate
         </h1>
-        <label>
-          아이디
-          <input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" />
-        </label>
-        <label>
-          비밀번호
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="current-password"
-          />
-        </label>
-        {error && (
+        {authConfig.localLoginEnabled && (
+          <>
+            <label>
+              아이디
+              <input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" />
+            </label>
+            <label>
+              비밀번호
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+              />
+            </label>
+          </>
+        )}
+        {(error || ssoFailed) && (
           <p className="error" role="alert">
-            {error}
+            {error ?? "SSO 로그인에 실패했습니다. 계정이 없거나 허용된 그룹에 속하지 않을 수 있습니다. 관리자에게 문의하세요."}
           </p>
         )}
-        <button type="submit" disabled={submitting || !password}>
-          {submitting ? "확인 중…" : "로그인"}
-        </button>
+        {authConfig.localLoginEnabled && (
+          <button type="submit" disabled={submitting || !password}>
+            {submitting ? "확인 중…" : "로그인"}
+          </button>
+        )}
+        {authConfig.ssoEnabled && (
+          <a className="button" href="/oauth2/authorization/oidc">
+            {authConfig.ssoLabel ?? "SSO"}로 로그인
+          </a>
+        )}
       </form>
     </main>
   );
