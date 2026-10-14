@@ -5,6 +5,9 @@
 
 ## [Unreleased]
 
+### 추가
+- **외부 LLM provider 사용을 정책으로 통제**: Agent의 모델이 `provider@모델`로 기본 모델 서버가 아닌 provider를 가리키면, Runtime이 첫 모델 호출 전에 AgentGate에 `LLM:<provider>` 액션을 평가받는다. 정책 화면에서 `LLM:gemini`처럼 액션 타입별로 차단할 수 있고, 평가는 감사 로그에 남는다. 허용(ALLOWED)이 아니거나 AgentGate에 닿지 못하면 Agent 실행을 실패시킨다(fail-closed). 정책이 없으면 기존 정책의 기본 위험도를 따른다. 기본(`LLM_BASE_URL`) 모델은 검사하지 않는다
+
 ### 수정
 - 실행 원장(`RUNTIME_DATABASE_URL`)을 켠 상태에서, 위임받은 Agent의 Tool 호출이 승인 대기가 되면 승인 후에도 그 Tool이 실행되지 않고 Supervisor가 "a previous attempt at this call did not finish" FAILED를 받던 문제. 승인 대기로 멈춘 위임 호출의 원장 키가 STARTED로 남아, 재개 시 같은 키가 "결과를 모르는 호출"로 replay됐다. 이제 승인 대기로 멈추면 그 STARTED 키만 해제한다 (위임 안의 실제 외부 호출은 각자 키를 따로 가지므로 중복 방지는 그대로)
 

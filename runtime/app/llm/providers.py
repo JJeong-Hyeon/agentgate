@@ -42,3 +42,12 @@ def resolve_model(
         if provider:
             return bare, provider
     return model, None
+
+
+def provider_name(model: str | None, providers: dict[str, LlmProviderConfig]) -> str | None:
+    """The registered provider a "<provider>@<model>" names, else None (the default provider)."""
+    if model and "@" in model:
+        name = model.partition("@")[0]
+        if name in providers:
+            return name
+    return None
