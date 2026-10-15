@@ -136,6 +136,20 @@ def test_allowed_tool_call_runs_and_its_result_goes_back_to_the_model():
     assert record["status"] == "EXECUTED"
 
 
+def test_the_approval_reason_masks_secret_arguments():
+    llm = ScriptedChatModel.of(
+        calls(("local__echo", {"text": "hi", "auth": {"api_key": "sk-123"}})), "done", "summary"
+    )
+    gate = PolicyGate(echo="APPROVAL_REQUIRED")
+    graph, state = build(agent_workflow(), llm, gate)
+
+    graph.invoke(state, CONFIG)
+
+    [body] = gate.bodies
+    assert "sk-123" not in body["reason"]
+    assert '"api_key": "***"' in body["reason"] and '"text": "hi"' in body["reason"]
+
+
 def test_approval_required_waits_then_runs_when_approved():
     llm = ScriptedChatModel.of(calls(("local__add", {"a": 2, "b": 3})), "2+3=5", "done")
     gate = PolicyGate(add="APPROVAL_REQUIRED")

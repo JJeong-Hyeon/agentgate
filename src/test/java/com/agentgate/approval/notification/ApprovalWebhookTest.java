@@ -2,6 +2,7 @@ package com.agentgate.approval.notification;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.agentgate.approval.domain.ApprovalPayload;
 import com.agentgate.approval.domain.ApprovalRequest;
 import com.agentgate.risk.RiskLevel;
 import com.sun.net.httpserver.HttpServer;
@@ -90,6 +91,22 @@ class ApprovalWebhookTest {
         mac.init(new SecretKeySpec("s3cret".getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
         String expected = HexFormat.of().formatHex(mac.doFinal(body.get().getBytes(StandardCharsets.UTF_8)));
         assertThat(signature.get()).isEqualTo("sha256=" + expected);
+    }
+
+    @Test
+    void secretArgumentsInTheReasonNeverLeaveInEitherFormat() throws Exception {
+        ApprovalRequest leaky = new ApprovalRequest("mail-agent", "SEND_EMAIL", null, List.of(), RiskLevel.HIGH,
+                "exec-1", "Agent 'mail-agent' wants to call mail/send with {\"to\": \"kim\", \"api_key\": \"sk-123\"}",
+                null, new ApprovalPayload("h", "{\"token\": \"t-456\"}"));
+        ReflectionTestUtils.setField(leaky, "id", 13L);
+
+        webhook("SLACK", "", "").send(leaky);
+        String slack = mapper.readTree(body.get()).get("text").asString();
+        webhook("JSON", "", "").send(leaky);
+        String json = body.get();
+
+        assertThat(slack).contains("\"to\": \"kim\"", "\"api_key\": \"***\"").doesNotContain("sk-123");
+        assertThat(json).contains("***").doesNotContain("sk-123").doesNotContain("t-456");
     }
 
     @Test
