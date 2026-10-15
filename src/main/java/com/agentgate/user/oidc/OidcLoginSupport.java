@@ -8,10 +8,12 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
+import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
 import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver;
@@ -20,6 +22,7 @@ import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
+import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * Plugs "sign in with the company IdP" into the security filter chain. The IdP's ID token is
@@ -59,6 +62,28 @@ public class OidcLoginSupport {
                     log.warn("SSO sign-in failed: {}", exception.getMessage());
                     response.sendRedirect("/?sso_error=1");
                 }));
+    }
+
+    /**
+     * Where to send the browser to end the person's session at the IdP too (OIDC RP-initiated logout),
+     * or null when they did not sign in through it or the IdP has no such endpoint.
+     */
+    public String endSessionUrl(Authentication authentication, String postLogoutRedirectUri) {
+        if (authentication == null || !(authentication.getPrincipal() instanceof OidcUser user)) {
+            return null;
+        }
+        ClientRegistration registration = registrations.findByRegistrationId(LazyClientRegistrationRepository.REGISTRATION_ID);
+        if (registration == null) {
+            return null;
+        }
+        Object endpoint = registration.getProviderDetails().getConfigurationMetadata().get("end_session_endpoint");
+        if (endpoint == null) {
+            return null;
+        }
+        return UriComponentsBuilder.fromUriString(endpoint.toString())
+                .queryParam("id_token_hint", user.getIdToken().getTokenValue())
+                .queryParam("post_logout_redirect_uri", postLogoutRedirectUri)
+                .build().encode().toUriString();
     }
 
     OAuth2UserService<OidcUserRequest, OidcUser> userService() {

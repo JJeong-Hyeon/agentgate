@@ -10,6 +10,7 @@
 - DB 마이그레이션 V13: `users.auth_source` (기존 사용자는 `LOCAL`)
 - SSO 사용자를 IdP의 고유 식별자(`sub`)로 식별한다(DB 마이그레이션 V14: `users.oidc_subject`). IdP가 아이디를 바꾸거나 다른 사람에게 넘겨도 계정이 넘어가지 않는다
 - SAML은 지원하지 않는다
+- SSO로 로그인한 사람이 로그아웃하면 IdP 세션도 끝난다(OIDC RP-initiated logout). IdP 클라이언트에 로그아웃 후 리디렉션 URI 등록이 필요하다
 - ID 토큰 검증(위조 · 변조 · 만료 · 발급자 · 대상, 키 회전)을 자동 테스트로 추가
 - **외부 LLM provider 사용을 정책으로 통제**: Agent의 모델이 `provider@모델`로 기본 모델 서버가 아닌 provider를 가리키면, Runtime이 첫 모델 호출 전에 AgentGate에 `LLM:<provider>` 액션을 평가받는다. 정책 화면에서 `LLM:gemini`처럼 액션 타입별로 차단할 수 있고, 평가는 감사 로그에 남는다. 허용(ALLOWED)이 아니거나 AgentGate에 닿지 못하면 Agent 실행을 실패시킨다(fail-closed). 정책이 없으면 기존 정책의 기본 위험도를 따른다. 기본(`LLM_BASE_URL`) 모델은 검사하지 않는다
   - `LLM:<provider>`를 APPROVAL_REQUIRED로 두면 그 Agent는 사람이 승인할 때까지 멈추고, 승인되면 이어서 실행되며 거절되면 실패한다(재개해도 승인 요청이 다시 만들어지지 않는다)

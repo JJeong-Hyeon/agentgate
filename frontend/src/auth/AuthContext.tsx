@@ -61,7 +61,13 @@ export function AuthProvider({
 
   const logout = useCallback(() => {
     setMe(null);
-    client.logout().catch(() => undefined);
+    client
+      .logout()
+      // An SSO sign-in also ends the identity provider session: the server says where to go for that.
+      .then((result) => {
+        if (result?.logoutUrl) window.location.assign(result.logoutUrl);
+      })
+      .catch(() => undefined);
   }, [client]);
 
   const login = useCallback(

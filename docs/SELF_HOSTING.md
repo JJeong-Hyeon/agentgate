@@ -96,7 +96,7 @@ docker compose ps        # 모두 Up이면 정상
 - SSO 사용자는 IdP의 고유 식별자(`sub`)로 구분한다. IdP에서 아이디가 바뀌어도 같은 콘솔 사용자로 로그인하고, 이미 쓰이는 아이디를 다른 사람이 받으면 로그인이 거부된다.
 - 같은 아이디의 자체 계정이 있으면(`admin` 등) SSO로는 그 계정에 로그인할 수 없다. SSO 계정은 비밀번호로 로그인할 수 없다.
 - Users 화면에서 SSO 계정을 비활성화하면 다음 SSO 로그인이 막힌다. 이미 열린 세션은 만료(`AGENTGATE_SESSION_TIMEOUT`)까지 유지된다.
-- 로그아웃은 AgentGate 세션만 끝낸다(IdP 세션은 그대로).
+- SSO로 로그인한 사람이 로그아웃하면 IdP 세션도 끝낸다(IdP의 `end_session_endpoint`로 보낸다). 이를 위해 IdP 클라이언트의 "로그아웃 후 리디렉션 URI"(Keycloak: Valid post logout redirect URIs)에 `https://<AGENTGATE_DOMAIN>/*`를 추가해 둔다. 비밀번호로 로그인한 경우와 `end_session_endpoint`가 없는 IdP는 AgentGate 세션만 끝난다.
 - 기동할 때 IdP에 접속하지 않는다. IdP가 내려가 있어도 AgentGate와 자체 계정 로그인은 정상이고, SSO 로그인만 IdP가 돌아올 때까지 실패한다.
 - 로그인에 실패하면(허용된 그룹이 없음, 비활성 계정 등) 로그인 화면에 일반적인 안내만 나오고 이유는 AgentGate 로그에 남는다.
 

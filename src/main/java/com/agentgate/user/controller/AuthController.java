@@ -1,5 +1,6 @@
 package com.agentgate.user.controller;
 
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import com.agentgate.user.oidc.OidcLoginSupport;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
@@ -108,14 +109,23 @@ public class AuthController {
         return ResponseEntity.ok(userService.me(authentication.getName()));
     }
 
+    /** For an SSO sign-in, where to send the browser next so the IdP's own session ends too. */
+    public record LogoutResponse(String logoutUrl) {
+    }
+
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(HttpServletRequest request) {
+    public ResponseEntity<?> logout(HttpServletRequest request) {
+        String idpLogoutUrl = oidc == null ? null : oidc.endSessionUrl(
+                SecurityContextHolder.getContext().getAuthentication(),
+                ServletUriComponentsBuilder.fromContextPath(request).path("/").build().toUriString());
         HttpSession session = request.getSession(false);
         if (session != null) {
             session.invalidate();
         }
         SecurityContextHolder.clearContext();
-        return ResponseEntity.noContent().build();
+        return idpLogoutUrl == null
+                ? ResponseEntity.noContent().build()
+                : ResponseEntity.ok(new LogoutResponse(idpLogoutUrl));
     }
 
     private static ResponseEntity<ErrorResponse> error(HttpStatus status, String code, String message,
