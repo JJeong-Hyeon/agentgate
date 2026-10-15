@@ -52,6 +52,10 @@ public class User {
     @Column(nullable = false, length = 16)
     private AuthSource authSource = AuthSource.LOCAL;
 
+    /** The IdP's id for this person (OIDC "sub"); null for local users. */
+    @Column(length = 255)
+    private String oidcSubject;
+
     private boolean enabled;
 
     private Instant createdAt;
@@ -82,9 +86,11 @@ public class User {
     }
 
     /** A user created by the identity provider; the password is random and never used. */
-    public static User fromIdp(String username, String displayName, String unusablePasswordHash, Set<Role> roles) {
+    public static User fromIdp(String subject, String username, String displayName, String unusablePasswordHash,
+                               Set<Role> roles) {
         User user = new User(username, displayName, unusablePasswordHash, roles);
         user.authSource = AuthSource.OIDC;
+        user.oidcSubject = subject;
         return user;
     }
 
@@ -102,6 +108,11 @@ public class User {
     public void syncFromIdp(String displayName, Set<Role> roles) {
         this.displayName = displayName;
         this.roles = new HashSet<>(roles);
+    }
+
+    /** A user created before subjects were kept is tied to the identity that signs in as them next. */
+    public void bindSubject(String subject) {
+        this.oidcSubject = subject;
     }
 
     public void changePassword(String passwordHash) {

@@ -20,12 +20,27 @@ class OidcUserProvisionerPersistenceTest {
 
     @Test
     void aLaterSignInSavesTheRolesTheIdpNowGives() {
-        provisioner.signIn("persist-hana", "Hana", Set.of(Role.ADMIN, Role.EDITOR));
-        provisioner.signIn("persist-hana", "Hana Kim", Set.of(Role.VIEWER));
+        provisioner.signIn("sub-persist", "persist-hana", "Hana", Set.of(Role.ADMIN, Role.EDITOR));
+        provisioner.signIn("sub-persist", "persist-hana", "Hana Kim", Set.of(Role.VIEWER));
 
         var stored = users.findByUsername("persist-hana").orElseThrow();
         assertThat(stored.getRoles()).containsExactly(Role.VIEWER);
         assertThat(stored.getDisplayName()).isEqualTo("Hana Kim");
         users.delete(stored);
+    }
+
+    @Test
+    void oneIdpIdentityIsOneUserEvenAfterTheIdpRenamesItOrHandsItsNameToSomeoneElse() {
+        provisioner.signIn("sub-ren", "rena", "Rena", Set.of(Role.EDITOR));
+
+        var renamed = provisioner.signIn("sub-ren", "rena.new", "Rena", Set.of(Role.EDITOR));
+        assertThat(renamed.getUsername()).isEqualTo("rena");
+        assertThat(users.findByUsername("rena.new")).isEmpty();
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> provisioner.signIn("sub-someone-else", "rena", "Newcomer", Set.of(Role.ADMIN)))
+                .isInstanceOf(OidcUserProvisioner.Refused.class);
+        assertThat(users.findByOidcSubject("sub-ren").orElseThrow().getRoles()).containsExactly(Role.EDITOR);
+        users.delete(users.findByUsername("rena").orElseThrow());
     }
 }
