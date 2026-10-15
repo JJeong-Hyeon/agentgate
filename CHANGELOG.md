@@ -19,6 +19,8 @@
 - **거버넌스 평가 데이터셋과 릴리스 게이트**: `cd runtime && python -m evals.run`이 정책 허용 · 차단, 승인(대기 · 승인 · 거절), 승인 후 인자 변조, 위임(차단 · 중첩 승인), 외부 모델 차단, AgentGate 장애 시나리오 15개를 실제 그래프로 실행하고 "실행되면 안 되는데 실행된 횟수"(오실행)와 통과율을 출력한다. 오실행이 하나라도 있으면 실패하며, pytest(`test_governance_eval.py`)와 CI 요약에 연결된다
 
 ### 수정
+- 승인 사유에 Tool 인자가 마스킹 없이 들어가, `api_key` · `token` 같은 값이 승인 화면과 승인 알림 웹훅의 "사유"에 평문으로 나가던 문제. Runtime이 사유를 만들 때 비밀 키의 값을 `***`로 바꾸고, AgentGate도 승인 요청을 저장할 때 `reason` · `payloadPreview`의 비밀 키 값을 한 번 더 가린다(Runtime을 거치지 않고 API로 들어온 요청 포함)
+- 실행 분석이 Agent 노드만 세어, LLM · Reviewer · Router · Tool 노드로 이루어진 워크플로가 LLM 호출 0회, Tool 실행 0회로 표시되던 문제
 - 실행 원장(`RUNTIME_DATABASE_URL`)을 켠 상태에서, 위임받은 Agent의 Tool 호출이 승인 대기가 되면 승인 후에도 그 Tool이 실행되지 않고 Supervisor가 "a previous attempt at this call did not finish" FAILED를 받던 문제. 승인 대기로 멈춘 위임 호출의 원장 키가 STARTED로 남아, 재개 시 같은 키가 "결과를 모르는 호출"로 replay됐다. 이제 승인 대기로 멈추면 그 STARTED 키만 해제한다 (위임 안의 실제 외부 호출은 각자 키를 따로 가지므로 중복 방지는 그대로)
 
 ## [0.3.0] - 2026-10-13
