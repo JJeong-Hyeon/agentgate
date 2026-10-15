@@ -27,6 +27,8 @@ DB에 암호화 저장된 비밀값        외부 HTTP/MCP 서버 자체
 
 `.env`/`providers.json`은 저장소에 커밋되지 않는다(`!.env.example`, `!providers.json.example`만 추적됨). `AGENTGATE_SECRET_KEY`를 잃어버리면 DB에 암호화 저장된 MCP 헤더를 다시 입력해야 한다 — 별도 백업 권장.
 
+**승인 요청에 담기는 인자**: 승인 화면, 승인 상세 API, 승인 알림 웹훅(Slack · JSON)에 보이는 사유(`reason`)와 인자 미리보기(`payloadPreview`)는 비밀값을 가린다. Runtime이 사유와 미리보기를 만들 때 키 이름에 `password` · `secret` · `token` · `api_key` · `authorization` · `credential`이 들어간 값을 `***`로 바꾸고, AgentGate도 승인 요청을 저장할 때 `"키": 값` 형태의 같은 키를 한 번 더 가린다(Runtime을 거치지 않고 API로 들어온 요청 포함). 한계: 키 이름으로만 판단하므로 키 이름이 평범한 필드(예: `note`)에 담긴 비밀값이나 문장 속에 풀어 쓴 비밀값은 가려지지 않는다. 승인 전 해시 검사는 가리기 전의 실제 인자로 한다.
+
 ## 네트워크 노출
 
 `deploy/selfhost/compose.yaml` 기준: Caddy(80/443)만 호스트 포트로 노출되고, PostgreSQL·Redis·Runtime(8000)·Grafana는 전부 내부 Docker 네트워크 전용이다(호스트 포트 매핑 없음). Runtime의 `/runtime/executions/*` API는 `RUNTIME_TOKEN` 없이는 어떤 요청도 받지 않는다(개발 모드만 예외, `RUNTIME_ALLOW_NO_TOKEN=true`일 때).
