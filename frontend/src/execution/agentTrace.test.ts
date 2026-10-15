@@ -1,5 +1,13 @@
 import type { NodeExecution } from "../api/types";
-import { agentTrace, callLabel, delegationPath, isQuietAgentStep, toolLabel, totalTokens } from "./agentTrace";
+import {
+  agentTrace,
+  callLabel,
+  delegationPath,
+  executionStats,
+  isQuietAgentStep,
+  toolLabel,
+  totalTokens,
+} from "./agentTrace";
 
 const step = (stepName: string, output: unknown, status: NodeExecution["status"] = "COMPLETED"): NodeExecution => ({
   taskId: stepName,
@@ -51,5 +59,45 @@ describe("agent traces", () => {
     expect(callLabel("notes__save_note")).toBe("notes__save_note");
     expect(delegationPath({ agent: "deep", delegated_by: "lead>research" })).toBe("lead → research → deep");
     expect(delegationPath({ agent: "lead" })).toBeNull();
+  });
+});
+
+describe("execution stats", () => {
+  const timed = (node: NodeExecution, startedAt: string, finishedAt: string): NodeExecution => ({
+    ...node,
+    startedAt,
+    finishedAt,
+  });
+
+  it("counts LLM, Reviewer and tool nodes of a workflow without agent steps", () => {
+    const nodes = [
+      timed(step("draft", { draft: "초안" }), "2026-01-01T00:00:00Z", "2026-01-01T00:00:02Z"),
+      timed(step("review", { review: "VERDICT: APPROVE", revisions: { review: 1 } }), "2026-01-01T00:00:02Z", "2026-01-01T00:00:03Z"),
+      step("route", { route: "report" }),
+      step("publish.gate", { pending_tool: null }),
+      step("publish.execute", {
+        publish: "ok",
+        tool_results: [{ tool: "publish", status: "EXECUTED", duration_ms: 120 }],
+      }),
+      step("notify.execute", { tool_results: [{ tool: "notify", status: "FAILED", duration_ms: 30 }] }),
+      step("approve", { approve: "APPROVED", tool_results: [{ tool: "approve", status: "REJECTED" }] }),
+      step("check", {}),
+    ];
+
+    expect(executionStats(nodes)).toEqual({ llmCalls: 3, llmMs: 3000, toolRuns: 2, toolMs: 150 });
+  });
+
+  it("counts a market-report run (LLM → Agent → Reviewer → HTTP tool) as more than zero model calls", () => {
+    const nodes = [
+      timed(step("plan", { plan: "1." }), "2026-01-01T00:00:00Z", "2026-01-01T00:00:01Z"),
+      step("research.think", { agent: { kind: "answer", answer: "x", llm: { model: "m", latency_ms: 400 } } }),
+      timed(step("review", { review: "VERDICT: APPROVE" }), "2026-01-01T00:00:05Z", "2026-01-01T00:00:06Z"),
+      step("send.execute", { send: "ok", tool_results: [{ tool: "send", status: "EXECUTED", duration_ms: 50 }] }),
+    ];
+
+    const stats = executionStats(nodes);
+    expect(stats.llmCalls).toBe(3);
+    expect(stats.llmMs).toBe(2400);
+    expect(stats.toolRuns).toBe(1);
   });
 });

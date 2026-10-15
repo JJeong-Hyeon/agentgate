@@ -126,19 +126,53 @@ export interface ExecutionStats {
   toolMs: number;
 }
 
-/** Model calls and tool runs the run's agents made, with the time they took. */
+function nodeOutput(node: NodeExecution): Record<string, unknown> | null {
+  if (!node.output) return null;
+  try {
+    const parsed: unknown = JSON.parse(node.output);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+function elapsedMs(node: NodeExecution): number {
+  if (!node.startedAt || !node.finishedAt) return 0;
+  return Math.max(new Date(node.finishedAt).getTime() - new Date(node.startedAt).getTime(), 0);
+}
+
+/**
+ * Model calls and tool runs of the run, with the time they took: the agents' own steps, plus the
+ * workflow nodes that ask the model (LLM, Router, Reviewer: a step named after its node whose output
+ * holds the answer under that name) and the tool results other nodes recorded.
+ */
 export function executionStats(nodes: NodeExecution[] = []): ExecutionStats {
   const stats = { llmCalls: 0, llmMs: 0, toolRuns: 0, toolMs: 0 };
   for (const node of nodes) {
     const trace = agentTrace(node);
-    if (!trace) continue;
-    if ("llm" in trace && trace.llm) {
-      stats.llmCalls += 1;
-      stats.llmMs += trace.llm.latency_ms ?? 0;
+    if (trace) {
+      if ("llm" in trace && trace.llm) {
+        stats.llmCalls += 1;
+        stats.llmMs += trace.llm.latency_ms ?? 0;
+      }
+      if (trace.kind === "result" && trace.duration_ms != null) {
+        stats.toolRuns += 1;
+        stats.toolMs += trace.duration_ms;
+      }
+      continue;
     }
-    if (trace.kind === "result" && trace.duration_ms != null) {
-      stats.toolRuns += 1;
-      stats.toolMs += trace.duration_ms;
+    const output = nodeOutput(node);
+    if (!output) continue;
+    const results = Array.isArray(output.tool_results) ? output.tool_results : [];
+    if (results.length === 0 && !node.step.includes(".") && typeof output[node.nodeId] === "string") {
+      stats.llmCalls += 1;
+      stats.llmMs += elapsedMs(node);
+    }
+    for (const result of results as { status?: string; duration_ms?: number | null }[]) {
+      if (result.status === "EXECUTED" || result.status === "FAILED") {
+        stats.toolRuns += 1;
+        stats.toolMs += result.duration_ms ?? 0;
+      }
     }
   }
   return stats;
