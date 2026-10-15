@@ -48,6 +48,7 @@ from langgraph.graph import StateGraph
 from langgraph.types import Command, interrupt
 
 from app.dsl.schema import AgentSpec, AgentToolSpec
+from app.governance.payload import _masked
 from app.telemetry import set_attributes, set_content, tracer
 from app.tools.base import GovernedTool, ToolResult
 from app.tools.memory import memory_prompt
@@ -340,8 +341,9 @@ def denial(result: ToolResult) -> str:
 def approval_reason(
     spec: AgentSpec, label: str, args: dict[str, Any], delegated_by: str | None = None
 ) -> str:
-    """Shown to the approver: who wants to call what (and on whose behalf), with which arguments."""
-    arguments = json.dumps(args, ensure_ascii=False, default=str)
+    """Shown to the approver: who wants to call what (and on whose behalf), with which arguments
+    (secrets masked: the reason ends up in approval screens and webhook notifications)."""
+    arguments = json.dumps(_masked(args), ensure_ascii=False, default=str)
     via = f", delegated by {delegated_by}" if delegated_by else ""
     reason = (
         f"Agent '{spec.agent_id}' (v{spec.version}{via}) wants to call {label} with {arguments}"

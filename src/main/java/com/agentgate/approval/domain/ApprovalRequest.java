@@ -99,14 +99,14 @@ public class ApprovalRequest {
         this.delegatedBy = delegatedBy;
         if (payload != null) {
             this.payloadHash = payload.hash();
-            this.payloadPreview = payload.preview();
+            this.payloadPreview = SecretMasker.mask(payload.preview());
         }
     }
 
     public ApprovalRequest(String agentId, String action, String target, List<String> labels, RiskLevel riskLevel,
                            String executionId, String reason) {
         this.executionId = executionId;
-        this.reason = reason;
+        this.reason = SecretMasker.mask(reason);
         this.agentId = agentId;
         this.action = action;
         this.target = target;
