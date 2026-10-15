@@ -97,7 +97,7 @@ public class OidcLoginSupport {
         List<String> groups = groupsOf(loaded);
         User user;
         try {
-            user = provisioner.signIn(username, displayName, roleMapper.rolesFor(groups));
+            user = provisioner.signIn(loaded.getSubject(), username, displayName, roleMapper.rolesFor(groups));
         } catch (OidcUserProvisioner.Refused e) {
             log.warn("SSO sign-in refused: {}", e.getMessage());
             throw new OAuth2AuthenticationException(new OAuth2Error("access_denied"), e.getMessage());
