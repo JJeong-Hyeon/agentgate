@@ -153,9 +153,9 @@ pytest
 - **로그인**: 서버 세션 쿠키(`HttpOnly`, `SameSite=Lax`) + CSRF 토큰. 비밀번호는 브라우저에 남지 않습니다. 실패가 반복되면 아이디+IP, IP 단위로 잠급니다(Redis에 저장).
 - **Runtime 보호**: Runtime API는 공유 토큰이 없으면 기동하지 않고, 모든 요청에 토큰을 요구합니다. 컨테이너는 root가 아닌 사용자로 실행됩니다.
 - **비밀값**: MCP 서버 인증 헤더는 AES-256-GCM으로 암호화해 저장합니다. 의존성 취약점은 CI에서 검사합니다.
-- **중복 실행 방지**: Runtime이 재시작되면 끊긴 실행을 이어 가되, Tool 실행 도중 끊긴 것은 이어 가지 않고 실패시킵니다. HTTP Tool에는 `Idempotency-Key`를 붙입니다.
+- **중복 실행 방지**: HTTP/MCP Tool 호출은 모두 실행 원장(`tool_call_ledger`)을 거칩니다. 같은 호출이 다시 들어오면(승인 재개 중복, Runtime 재시작 후) 재실행 대신 기록된 결과를 반환하고, 결과를 모르는 채 끊긴 호출은 재시도하지 않고 안전하게 실패시킵니다. 검증 내용은 [`docs/TEST_EVIDENCE.md`](docs/TEST_EVIDENCE.md), 설계상 한계는 [`docs/SECURITY.md`](docs/SECURITY.md)를 보세요.
 
-알려진 한계(사내 계정 연동 없음, 단일 인스턴스 구성, MCP Tool에는 멱등 키 없음 등)는 [`docs/OPERATIONS_GUIDE.md`](docs/OPERATIONS_GUIDE.md)의 "알려진 제약"에 있습니다.
+알려진 한계(SAML 미지원, 단일 인스턴스 구성 등)는 [`docs/OPERATIONS_GUIDE.md`](docs/OPERATIONS_GUIDE.md)의 "알려진 제약"에 있습니다.
 
 ## 프로젝트 구조
 
@@ -182,6 +182,7 @@ docs/          설계 · API · 설치 · 운영 문서
 ./gradlew test                       # 백엔드: 단위 + @SpringBootTest 통합 (H2, Redis는 Testcontainers)
 cd runtime && pytest                 # Runtime (Python 3.12+)
 cd frontend && npm install && npm test
+cd runtime && python -m evals.run     # 거버넌스 평가: 승인 · 차단 · 변조 · 위임 · 외부 모델 시나리오 15개, 오실행이 있으면 실패
 PYTHON=python3.12 ./scripts/e2e.sh   # 전체 흐름 + 콘솔 브라우저 E2E (Docker, Java 21, Python 3.12, Playwright)
 ```
 
@@ -192,7 +193,7 @@ PR마다 GitHub Actions가 백엔드 · Runtime · 프런트엔드 · E2E · 의
 - 설치: [`docs/SELF_HOSTING.md`](docs/SELF_HOSTING.md) (단일 서버, Docker Compose) · [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) (AWS)
 - 운영: [`docs/OPERATIONS_GUIDE.md`](docs/OPERATIONS_GUIDE.md) (첫 설정, 권장 설정, 장애 대응, 알려진 제약) · [`docs/MONITORING.md`](docs/MONITORING.md)
 - 설계: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (구조 · 보안 · 안정성 설계) · [`docs/AGENTGATE_PLAN.md`](docs/AGENTGATE_PLAN.md) (초기 기획과 Governance Core 설계)
-- 참조: [`docs/API_SPEC.md`](docs/API_SPEC.md) · [`CHANGELOG.md`](CHANGELOG.md)
+- 참조: [`docs/API_SPEC.md`](docs/API_SPEC.md) · [`docs/SECURITY.md`](docs/SECURITY.md) (신뢰 경계 · 비밀값 관리 · 잔여 위험) · [`docs/TEST_EVIDENCE.md`](docs/TEST_EVIDENCE.md) (검증 내용과 한계) · [`CHANGELOG.md`](CHANGELOG.md)
 
 ## 라이선스
 

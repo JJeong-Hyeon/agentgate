@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     runtime_allow_no_token: bool = False
     # JSON file with MCP servers ({"mcpServers": {...}}); empty → no MCP tools available.
     mcp_config_path: str = ""
+    # JSON file of alternate LLM providers ({"gemini": {"base_url": "...", "api_key": "..."}});
+    # an agent picks one with model "gemini@gemini-2.5-flash" instead of just a model name.
+    # Empty → only the default LLM_BASE_URL/LLM_MODEL above is available.
+    llm_providers_path: str = ""
     # Export prompts and answers on trace spans (OpenTelemetry, when an OTLP endpoint is set).
     otel_capture_content: bool = False
 

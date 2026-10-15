@@ -47,8 +47,12 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.graph import StateGraph
 from langgraph.types import Command, interrupt
 
+from app.config import get_settings
 from app.dsl.schema import AgentSpec, AgentToolSpec
+from app.governance.agentgate_client import AgentGateClient
 from app.governance.payload import _masked
+from app.llm.gateway import llm_slot
+from app.llm.policy import ModelNotAllowed, model_decision, refusal, uses_external_provider
 from app.telemetry import set_attributes, set_content, tracer
 from app.tools.base import GovernedTool, ToolResult
 from app.tools.memory import memory_prompt
@@ -139,6 +143,7 @@ def add_agent(
     delegated_by: str | None = None,
     recall: Recall | None = None,
     parallel_calls: bool = False,
+    model_gate: AgentGateClient | None = None,
 ) -> None:
     """`delegated_by` is the chain of agents that handed this one its task (outermost first),
     reported with each of its tool calls; None when it runs as a workflow node. `recall`, if
@@ -147,6 +152,10 @@ def add_agent(
     gate_node = f"{name}.gate"
     approval_node = f"{name}.approval"
     execute_node = f"{name}.execute"
+    model_node = f"{name}.model"
+    model_approval_node = f"{name}.model_approval"
+    # Only an agent on a non-default provider has a model check (and shows it as a step).
+    checks_model = model_gate is not None and uses_external_provider(spec)
     by_name = {t.function_name: t for t in tools}
     definitions = [t.definition() for t in tools]
     json_calls = tool_calling == "JSON"
@@ -176,7 +185,35 @@ def add_agent(
             "delegated_by": delegated_by,
             "recalled": recalled,
         }
-        return Command(update={"agent_runs": {name: run}, **update}, goto=think_node)
+        first = model_node if checks_model else think_node
+        return Command(update={"agent_runs": {name: run}, **update}, goto=first)
+
+    def check_model(state: dict, config: RunnableConfig) -> Command:
+        """May this agent use its model provider? Asked once, before the first model call."""
+        run = run_of(state)
+        execution_id = config.get("configurable", {}).get("thread_id")
+        checked = model_decision(model_gate, spec, execution_id, delegated_by)
+        if checked is None or checked[1].status == "ALLOWED":
+            return Command(goto=think_node)
+        provider, decision = checked
+        if decision.status == "APPROVAL_REQUIRED":
+            pending = {"provider": provider, "approval_id": decision.approval_id}
+            return Command(update=save(run, model_pending=pending), goto=model_approval_node)
+        raise refusal(provider, spec, decision)
+
+    def await_model_approval(state: dict) -> Command:
+        # Its own node, so resuming asks the person's decision again, not AgentGate (which would
+        # file a second approval request).
+        run = run_of(state)
+        pending = run["model_pending"]
+        decision = interrupt(
+            {"tool": f"{name}:llm/{pending['provider']}", "approval_id": pending["approval_id"]}
+        )
+        if decision.get("decision") == "APPROVED":
+            return Command(update=save(run, model_pending=None), goto=think_node)
+        raise ModelNotAllowed(
+            f"model provider '{pending['provider']}' was not approved for agent '{spec.agent_id}'"
+        )
 
     def think(state: dict) -> Command:
         run = run_of(state)
@@ -189,40 +226,45 @@ def add_agent(
             messages.append(HumanMessage(FINAL_TURN_NOTE))
         llm = llm_factory(spec.model, spec.temperature, spec.reasoning_effort)
         offer_tools = bool(definitions) and not final_turn
-        started = time.perf_counter()
         requested_model = spec.model or _model_name(llm)
-        with tracer().start_as_current_span(f"chat {requested_model or ''}".strip()) as span:
-            set_attributes(span, _llm_span_attributes(spec, name, requested_model, steps))
-            set_content(span, "langfuse.observation.input", _messages_for_trace(messages))
-            if json_calls:
-                reply = llm.invoke(flatten(messages))
-                if offer_tools:
-                    reply = AIMessage(
-                        content=reply.content, tool_calls=parse_json_calls(reply.content, steps)
-                    )
-            else:
-                reply = (llm.bind_tools(definitions) if offer_tools else llm).invoke(messages)
-            model = reply.response_metadata.get("model_name") or requested_model
-            usage = reply.usage_metadata or {}
-            set_attributes(
-                span,
-                {
-                    "gen_ai.response.model": model,
-                    "gen_ai.usage.input_tokens": usage.get("input_tokens"),
-                    "gen_ai.usage.output_tokens": usage.get("output_tokens"),
-                    "agentgate.llm.tool_calls": len(reply.tool_calls),
-                },
-            )
-            set_content(
-                span,
-                "langfuse.observation.output",
-                {"content": reply.content, "tool_calls": reply.tool_calls}
-                if reply.tool_calls
-                else reply.content,
-            )
+        queue_started = time.perf_counter()
+        with llm_slot(get_settings()):
+            queue_wait_ms = round((time.perf_counter() - queue_started) * 1000)
+            started = time.perf_counter()
+            with tracer().start_as_current_span(f"chat {requested_model or ''}".strip()) as span:
+                set_attributes(span, _llm_span_attributes(spec, name, requested_model, steps))
+                set_content(span, "langfuse.observation.input", _messages_for_trace(messages))
+                if json_calls:
+                    reply = llm.invoke(flatten(messages))
+                    if offer_tools:
+                        reply = AIMessage(
+                            content=reply.content, tool_calls=parse_json_calls(reply.content, steps)
+                        )
+                else:
+                    reply = (llm.bind_tools(definitions) if offer_tools else llm).invoke(messages)
+                model = reply.response_metadata.get("model_name") or requested_model
+                usage = reply.usage_metadata or {}
+                set_attributes(
+                    span,
+                    {
+                        "gen_ai.response.model": model,
+                        "gen_ai.usage.input_tokens": usage.get("input_tokens"),
+                        "gen_ai.usage.output_tokens": usage.get("output_tokens"),
+                        "agentgate.llm.tool_calls": len(reply.tool_calls),
+                    },
+                )
+                set_content(
+                    span,
+                    "langfuse.observation.output",
+                    {"content": reply.content, "tool_calls": reply.tool_calls}
+                    if reply.tool_calls
+                    else reply.content,
+                )
+            latency_ms = round((time.perf_counter() - started) * 1000)
         llm_call = {
             "model": model,
-            "latency_ms": round((time.perf_counter() - started) * 1000),
+            "latency_ms": latency_ms,
+            "queue_wait_ms": queue_wait_ms,
         }
         run = {**run, "llm": llm_call, "deferred": 0}
         if not parallel_calls and len(reply.tool_calls) > 1 and not final_turn:
@@ -310,7 +352,12 @@ def add_agent(
             content = f"The tool failed: {result.error}"
         return Command(update=answer(run, call, content, result), goto=gate_node)
 
-    graph.add_node(name, start, destinations=(think_node,))
+    graph.add_node(
+        name, start, destinations=(model_node, think_node) if checks_model else (think_node,)
+    )
+    if checks_model:
+        graph.add_node(model_node, check_model, destinations=(think_node, model_approval_node))
+        graph.add_node(model_approval_node, await_model_approval, destinations=(think_node,))
     graph.add_node(think_node, think, destinations=(gate_node, think_node, *next_nodes))
     graph.add_node(
         gate_node, gate, destinations=(think_node, execute_node, approval_node, gate_node)

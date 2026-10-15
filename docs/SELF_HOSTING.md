@@ -41,6 +41,7 @@ cp .env.example .env
 | `LLM_REASONING_EFFORT` | 추론 모델이 답 전에 생각하는 정도(`none` / `minimal` / `low` / `medium` / `high`). 비우면 보내지 않는다. Agent 정의에서 Agent별로 바꿀 수 있다 |
 | `LLM_MAX_CONCURRENCY` | 모델 서버로 동시에 보내는 호출 수 상한 (기본 `0` = 제한 없음). 넘는 호출은 Runtime에서 차례를 기다리고, 대기 시간은 `LLM_TIMEOUT_SECONDS`에 들어가지 않는다. Ollama는 `OLLAMA_NUM_PARALLEL`에 맞춘다 |
 | `LLM_PARALLEL_TOOL_CALLS` | 모델이 한 번에 여러 Tool을 호출했을 때 모두 실행할지. 기본 `false`: 첫 호출만 실행하고 나머지는 그 결과를 본 뒤 모델이 다시 결정한다 (로컬 모델이 앞 결과에 의존하는 인자를 추측하는 것 방지) |
+| `LLM_PROVIDERS_PATH` | 선택. `LLM_BASE_URL` 외에 다른 OpenAI 호환 provider(OpenAI, Gemini 등)를 더 쓰려면: `cp deploy/selfhost/providers.json.example deploy/selfhost/providers.json`로 채우고, `compose.yaml`의 `runtime` 서비스에 `volumes: ['./providers.json:/app/providers.json:ro']`를 추가한 뒤 이 값을 `/app/providers.json`로 설정한다. Agent 정의의 모델 칸에 `gemini@gemini-flash-latest`처럼 `provider@모델`로 쓰면 그 provider로, 그냥 모델 이름만 쓰면 기본 `LLM_BASE_URL`로 간다. 외부 provider는 프롬프트가 사내 밖으로 나가므로, 쓰기 전에 정책 화면에서 액션 `LLM:<provider>`(예: `LLM:gemini`)의 위험도를 정해 둔다(차단하려면 BLOCKED). APPROVAL_REQUIRED로 두면 그 Agent는 승인 요청이 처리될 때까지 멈추고(콘솔의 승인 화면에 나온다), 승인되면 이어서 실행하며 거절되면 Agent가 실패한다. 위임받은 Agent라면 Supervisor는 실패한 위임 결과를 받는다 |
 | `EMBEDDING_BASE_URL` / `EMBEDDING_MODEL` / `EMBEDDING_API_KEY` | 선택. Agent 기억의 의미 검색용 임베딩 서버(OpenAI 호환 `/embeddings`, 예: Ollama의 `bge-m3`). 비우면 키워드 검색 |
 | `MEMORY_MIN_SCORE` | 의미 검색 결과로 인정할 최소 코사인 유사도. 모델마다 다르며 bge-m3는 약 0.45 |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` / `OTEL_EXPORTER_OTLP_HEADERS` / `OTEL_CAPTURE_CONTENT` | 선택. Agent 실행 trace를 OpenTelemetry로 내보낼 곳 ([`MONITORING.md`](MONITORING.md#agent-trace-opentelemetry)) |
@@ -67,6 +68,37 @@ docker compose ps        # 모두 Up이면 정상
 1. **Runtime Agent 등록**: 워크플로 수준의 Tool / 승인 노드는 `runtime-agent`로 평가된다. 콘솔의 Agents 화면에서 Agent ID `runtime-agent`로 한 번 등록한다.
 2. **사용자 만들기**: Users 화면에서 역할별 계정(EDITOR / APPROVER / VIEWER)을 만들고 공용 ADMIN 계정 사용을 줄인다.
 3. **모델 연결 확인**: `docker compose exec runtime python -c "import urllib.request;print(urllib.request.urlopen('http://localhost:8000/llm/health').read())"` — `model_available: true`면 정상.
+
+## 사내 계정(SSO)으로 로그인
+
+사내 IdP(Keycloak, Okta, Azure AD 등 OpenID Connect를 지원하는 것)로 콘솔에 로그인하게 할 수 있다. 기본은 꺼져 있다. SAML은 지원하지 않는다(SAML만 되는 IdP는 Keycloak 같은 OIDC 브로커를 앞에 둔다).
+
+1. **IdP에 클라이언트 등록**: 종류는 OpenID Connect, 클라이언트 인증은 secret(confidential), 흐름은 Authorization Code(PKCE 사용). 리디렉션 URI는 `https://<AGENTGATE_DOMAIN>/login/oauth2/code/oidc`.
+2. **그룹을 토큰에 넣기**: ID 토큰에 사용자의 그룹 이름 목록이 `groups` 클레임으로 들어가게 한다(Keycloak은 클라이언트에 "Group Membership" 매퍼를 추가하고 Full group path를 끈다). 다른 이름이면 `AGENTGATE_OIDC_GROUPS_CLAIM`으로 알려 준다.
+3. **`.env`를 채운다**:
+
+| 변수 | 설명 |
+|---|---|
+| `AGENTGATE_OIDC_ENABLED` | `true`로 켠다 |
+| `AGENTGATE_OIDC_ISSUER_URI` | IdP의 issuer 주소(예: `https://sso.example.com/realms/company`). `/.well-known/openid-configuration`이 이 아래에 있어야 한다 |
+| `AGENTGATE_OIDC_CLIENT_ID` / `AGENTGATE_OIDC_CLIENT_SECRET` | 1단계에서 만든 클라이언트 |
+| `AGENTGATE_OIDC_ADMIN_GROUPS` / `_EDITOR_GROUPS` / `_APPROVER_GROUPS` / `_VIEWER_GROUPS` | 각 역할을 줄 IdP 그룹 이름(쉼표로 여러 개, 대소문자 구분). 한 사람이 여러 그룹에 있으면 역할도 여러 개 |
+| `AGENTGATE_OIDC_DEFAULT_ROLE` | 어느 그룹에도 없는 사람에게 줄 역할. **비워 두면 로그인을 거부한다**(권장). 회사 전체가 IdP를 쓰는데 이 값을 `VIEWER`로 두면 직원 누구나 감사 로그까지 읽을 수 있다 |
+| `AGENTGATE_OIDC_USERNAME_CLAIM` | 콘솔 아이디로 쓸 클레임(기본 `preferred_username`). 영문 · 숫자와 `. _ @ -`만, 3~64자 |
+| `AGENTGATE_OIDC_BUTTON_LABEL` | 로그인 화면 버튼 이름(기본 `SSO`) |
+| `AGENTGATE_LOCAL_LOGIN_ENABLED` | `false`면 콘솔의 아이디 · 비밀번호 로그인을 끈다. 스크립트용 HTTP Basic은 계속 쓸 수 있으니 SSO가 안 될 때를 위해 ADMIN 자체 계정은 남겨 둔다 |
+
+4. `docker compose up -d`로 다시 띄우고, 로그인 화면의 SSO 버튼으로 로그인해 본다.
+
+동작 규칙:
+
+- 처음 로그인하면 콘솔 사용자가 자동으로 만들어지고(Users 화면에 SSO 계정으로 보인다), **로그인할 때마다 역할이 IdP의 그룹대로 다시 정해진다.** 콘솔에서 바꾼 역할은 다음 로그인에 덮어쓰인다.
+- SSO 사용자는 IdP의 고유 식별자(`sub`)로 구분한다. IdP에서 아이디가 바뀌어도 같은 콘솔 사용자로 로그인하고, 이미 쓰이는 아이디를 다른 사람이 받으면 로그인이 거부된다.
+- 같은 아이디의 자체 계정이 있으면(`admin` 등) SSO로는 그 계정에 로그인할 수 없다. SSO 계정은 비밀번호로 로그인할 수 없다.
+- Users 화면에서 SSO 계정을 비활성화하면 다음 SSO 로그인이 막힌다. 이미 열린 세션은 만료(`AGENTGATE_SESSION_TIMEOUT`)까지 유지된다.
+- SSO로 로그인한 사람이 로그아웃하면 IdP 세션도 끝낸다(IdP의 `end_session_endpoint`로 보낸다). 이를 위해 IdP 클라이언트의 "로그아웃 후 리디렉션 URI"(Keycloak: Valid post logout redirect URIs)에 `https://<AGENTGATE_DOMAIN>/*`를 추가해 둔다. 비밀번호로 로그인한 경우와 `end_session_endpoint`가 없는 IdP는 AgentGate 세션만 끝난다.
+- 기동할 때 IdP에 접속하지 않는다. IdP가 내려가 있어도 AgentGate와 자체 계정 로그인은 정상이고, SSO 로그인만 IdP가 돌아올 때까지 실패한다.
+- 로그인에 실패하면(허용된 그룹이 없음, 비활성 계정 등) 로그인 화면에 일반적인 안내만 나오고 이유는 AgentGate 로그에 남는다.
 
 ## 모델 서버를 별도 장비로 (Ollama)
 

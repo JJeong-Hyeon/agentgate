@@ -42,3 +42,8 @@ out/
 ### Secrets ###
 .env
 !.env.example
+providers.json
+!providers.json.example
+
+# Written by `python -m evals.run`
+runtime/evals/report.json

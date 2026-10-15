@@ -1,17 +1,23 @@
 """What every tool shares: an AgentGate check before it may run, and one result format."""
 
+import logging
 import time
 from abc import ABC, abstractmethod
 from typing import Any, Literal
 
+from langgraph.errors import GraphInterrupt
 from opentelemetry.trace import Status, StatusCode
 from pydantic import BaseModel, Field
 
+from app.config import get_settings
 from app.governance.agentgate_client import AgentGateClient, AgentGateError
 from app.governance.payload import payload_hash, payload_preview
 from app.telemetry import current_step, set_attributes, set_content, tracer
+from app.tools import ledger
 
 MAX_OUTPUT_CHARS = 2000
+
+log = logging.getLogger(__name__)
 
 
 class PayloadMismatch(Exception):
@@ -127,7 +133,28 @@ class GovernedTool(ABC):
         """Run the tool; only called after authorize() allowed it (directly or via approval)."""
 
     def execute_timed(self, payload: dict[str, Any] | None, authorized: ToolResult) -> ToolResult:
-        """execute(), with how long it took recorded in the result (and traced)."""
+        """execute(), with how long it took recorded in the result (and traced). With an
+        idempotency key, a call already on record in the ledger is replayed instead of run
+        again (see app.tools.ledger)."""
+        key = authorized.idempotency_key
+        settings = get_settings() if key else None
+        if key:
+            try:
+                replay = ledger.begin(settings, key, self.name)
+            except Exception as e:  # noqa: BLE001 - a ledger we cannot reach must not be bypassed
+                return ToolResult(
+                    tool=self.name,
+                    status="FAILED",
+                    error=f"could not check the call ledger, so the call was not made: {e}",
+                )
+            if replay is not None:
+                return replay.model_copy(
+                    update={
+                        "risk_level": authorized.risk_level,
+                        "approval_id": authorized.approval_id,
+                        "basis": authorized.basis,
+                    }
+                )
         with tracer().start_as_current_span(f"tool {self.name}") as span:
             set_attributes(
                 span,
@@ -141,13 +168,32 @@ class GovernedTool(ABC):
             )
             set_content(span, "langfuse.observation.input", payload)
             started = time.perf_counter()
-            result = self.execute(payload, authorized)
+            try:
+                result = self.execute(payload, authorized)
+            except GraphInterrupt:
+                # Paused, not finished (a delegate waiting for an approval): nothing external
+                # ran under this key, so free it for the node's re-run on resume. Without this
+                # the claim stays STARTED and the re-run is replayed as "outcome unknown".
+                if key:
+                    try:
+                        ledger.release(settings, key)
+                    except Exception:  # noqa: BLE001 - the interrupt must still propagate
+                        log.warning("could not release %r in the call ledger", key, exc_info=True)
+                raise
             elapsed = round((time.perf_counter() - started) * 1000)
             span.set_attribute("agentgate.tool.status", result.status)
             if result.status == "FAILED":
                 span.set_status(Status(StatusCode.ERROR, result.error or "tool failed"))
             set_content(span, "langfuse.observation.output", result.response_body or result.error)
-        return result.model_copy(update={"duration_ms": elapsed})
+        final = result.model_copy(update={"duration_ms": elapsed})
+        if key:
+            try:
+                ledger.finish(settings, key, final)
+            except Exception:  # noqa: BLE001 - the call already ran; its result still goes back
+                log.warning(
+                    "could not record the outcome of %r in the call ledger", key, exc_info=True
+                )
+        return final
 
     def run(
         self, payload: dict[str, Any] | None = None, execution_id: str | None = None

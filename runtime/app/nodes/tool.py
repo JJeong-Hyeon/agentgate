@@ -79,9 +79,13 @@ def add_tool(
     def execute(state: dict, config: RunnableConfig) -> dict:
         pending = state["pending_tool"]
         execution_id = config.get("configurable", {}).get("thread_id")
-        authorized = ToolResult(**pending, idempotency_key=f"{execution_id}:{name}")
         payload = build_payload(state)
         tool.check_payload(payload, pending.get("approved_hash"))
+        # The payload hash is part of the key so a node called again with different arguments
+        # (the agent asking for a different order, say) gets its own ledger entry instead of
+        # replaying a stored result for a call it never actually made.
+        key = f"{execution_id}:{name}:{tool.payload_hash(payload)}"
+        authorized = ToolResult(**pending, idempotency_key=key)
         return finish(tool.execute_timed(payload, authorized))
 
     graph.add_node(name, gate, destinations=(execute_node, approval_node, *next_nodes, END))

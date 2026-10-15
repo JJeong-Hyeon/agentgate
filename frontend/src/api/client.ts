@@ -68,7 +68,7 @@ export class AgentGateClient {
     return this.request("/api/v1/auth/login", { method: "POST", body: JSON.stringify({ username, password }) });
   }
 
-  logout(): Promise<void> {
+  logout(): Promise<{ logoutUrl?: string } | undefined> {
     return this.request("/api/v1/auth/logout", { method: "POST" });
   }
 

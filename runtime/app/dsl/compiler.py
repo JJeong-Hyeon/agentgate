@@ -297,6 +297,7 @@ class WorkflowCompiler:
             spec.tool_calling or self._tool_calling,
             recall=self._recall(node.id, spec, None),
             parallel_calls=self._parallel_tool_calls,
+            model_gate=self._gate,
         )
 
     def _agent_tools(
@@ -406,6 +407,7 @@ class WorkflowCompiler:
             delegated_by=">".join(chain),
             recall=self._recall(name, spec, ">".join(chain)),
             parallel_calls=self._parallel_tool_calls,
+            model_gate=self._gate,
         )
         graph.add_edge(START, name)
         # No checkpointer: the subgraph checkpoints in the parent's, under its task.

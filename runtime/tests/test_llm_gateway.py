@@ -1,3 +1,4 @@
+import json
 import os
 
 import httpx
@@ -58,6 +59,26 @@ def test_create_chat_model_uses_placeholder_key_when_unset():
     model = create_chat_model(settings())
 
     assert model.openai_api_key.get_secret_value() == "not-needed"
+
+
+def test_create_chat_model_routes_a_registered_provider_prefix(tmp_path):
+    config = tmp_path / "providers.json"
+    config.write_text(json.dumps({"gemini": {"base_url": "https://gemini/v1", "api_key": "gk"}}))
+
+    model = create_chat_model(
+        settings(llm_providers_path=str(config)), model="gemini@gemini-2.5-flash"
+    )
+
+    assert model.openai_api_base == "https://gemini/v1"
+    assert model.model_name == "gemini-2.5-flash"
+    assert model.openai_api_key.get_secret_value() == "gk"
+
+
+def test_create_chat_model_without_a_provider_prefix_uses_the_default():
+    model = create_chat_model(settings(llm_providers_path=""), model="qwen3:14b-q4_K_M")
+
+    assert model.openai_api_base == "http://llm:11434/v1"
+    assert model.model_name == "qwen3:14b-q4_K_M"
 
 
 @pytest.mark.anyio

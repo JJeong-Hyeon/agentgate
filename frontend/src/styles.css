@@ -1,34 +1,54 @@
 :root {
-  --bg: #f6f7f9;
+  --bg: #f5f6f8;
   --surface: #ffffff;
-  --border: #dfe3e8;
-  --text: #1c2128;
+  --border: #e2e5ea;
+  --text: #15181e;
   --muted: #667085;
-  --accent: #2f6fde;
+  --accent: #3461e0;
+  --accent-hover: #2850c4;
+  --accent-soft: #eef2fe;
   --accent-text: #ffffff;
+  /* The wordmark/logo's own color -- deliberately darker and more saturated than --accent
+     (which stays the lighter interactive blue for buttons/links/focus rings). */
+  --brand: #202d6b;
   --danger: #c4372c;
-  --ok: #1f8a4c;
+  --danger-soft: #fbeae8;
+  --ok: #1a8a4c;
+  --ok-soft: #e9f7ef;
   --warn: #b7791f;
+  --warn-soft: #fcf3e3;
   --node-agent: #eaf1fd;
   --node-tool: #fdf3e6;
   --node-flow: #eef0f3;
+  --shadow-sm: 0 1px 2px rgb(16 24 40 / 6%);
+  --shadow-md: 0 4px 12px rgb(16 24 40 / 8%);
+  --radius: 10px;
+  --radius-sm: 7px;
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #12151a;
-    --surface: #1b1f26;
-    --border: #2c323c;
-    --text: #e6e9ee;
-    --muted: #98a2b3;
-    --accent: #5b8ef0;
+    --bg: #10131a;
+    --surface: #1a1e26;
+    --border: #2b313c;
+    --text: #e7eaf0;
+    --muted: #97a1b3;
+    --accent: #6490f3;
+    --accent-hover: #80a6f5;
+    --accent-soft: #1d2740;
+    --brand: #8b9af5;
     --danger: #e5584c;
-    --ok: #3fb872;
+    --danger-soft: #3a2220;
+    --ok: #46c383;
+    --ok-soft: #16302380;
     --warn: #e0a43a;
+    --warn-soft: #3a2f16;
     --node-agent: #1d2a40;
     --node-tool: #3a2c17;
     --node-flow: #262b33;
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 24%);
+    --shadow-md: 0 4px 16px rgb(0 0 0 / 32%);
     color-scheme: dark;
   }
 }
@@ -41,54 +61,114 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  font: 14px/1.55 "Segoe UI", system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic",
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
 button {
   font: inherit;
+  font-weight: 600;
+  white-space: nowrap;
   border: 1px solid transparent;
-  border-radius: 6px;
-  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  padding: 7px 14px;
   background: var(--accent);
   color: var(--accent-text);
   cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.05s ease;
+}
+button:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+/* No global anchor color existed, so a plain <Link> with no className (a couple do) fell back
+   to the browser default -- blue, or purple once visited -- instead of the app's palette.
+   :where() keeps this at zero specificity so it still loses to .item/.palette-item/etc, which
+   set their own color; without it, ":visited" alone outranks a plain class selector and was
+   turning every visited agent/tool/workflow list row's text blue. Author origin still beats the
+   browser's own default link colors regardless, so the override itself isn't lost. */
+:where(a, a:visited) {
+  color: var(--accent);
+}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 button:disabled {
   opacity: 0.5;
   cursor: default;
 }
 button.secondary {
-  background: transparent;
+  background: var(--surface);
   color: var(--text);
   border-color: var(--border);
 }
+button.secondary:hover:not(:disabled) {
+  background: var(--bg);
+  border-color: var(--muted);
+}
 button.danger {
   background: var(--danger);
+}
+button.danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 85%, black);
 }
 
 input {
   font: inherit;
   width: 100%;
-  padding: 6px 8px;
+  padding: 7px 10px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--text);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+/* The text-input styling above was leaking onto checkboxes/radios, stretching them to
+   `width: 100%` with text-field padding and a border-radius -- in a flex row that made a
+   checkbox claim the whole line's width, pushing its label text to wrap underneath it. */
+input[type="checkbox"],
+input[type="radio"] {
+  width: auto;
+  padding: 0;
+  border-radius: 0;
+  accent-color: var(--accent);
+}
+input:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 h1,
 h2 {
   margin: 0 0 12px;
+  letter-spacing: -0.01em;
+}
+h1 {
+  font-size: 22px;
+  font-weight: 700;
 }
 h2 {
   font-size: 16px;
+  font-weight: 650;
 }
 
 .muted {
   color: var(--muted);
 }
 .mono {
-  font-family: ui-monospace, monospace;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
   font-size: 12px;
 }
 .error {
@@ -98,8 +178,9 @@ h2 {
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 16px;
+  border-radius: var(--radius);
+  padding: 18px;
+  box-shadow: var(--shadow-sm);
 }
 
 .row {
@@ -107,6 +188,19 @@ h2 {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+}
+/* An <input> with the global width: 100% sets its flex-basis to the whole row, leaving a
+   sibling <button> squeezed to zero width (its label then wraps letter by letter). Let the
+   input size itself within the remaining space instead, and keep the button at its natural
+   (now nowrap) width. */
+.row input {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+}
+.row button,
+.row > a.button {
+  flex-shrink: 0;
 }
 
 /* Login */
@@ -119,11 +213,38 @@ h2 {
 .login-card {
   width: min(360px, 100%);
   display: grid;
-  gap: 12px;
+  gap: 14px;
+  padding: 28px;
+  box-shadow: var(--shadow-md);
+}
+.login-card h1 {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--brand);
 }
 .login-card label {
   display: grid;
   gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.login-card a.button {
+  display: block;
+  margin-top: 4px;
+  padding: 9px 14px;
+  text-align: center;
+  font-weight: 600;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  color: var(--accent);
+  text-decoration: none;
+}
+.login-card button {
+  margin-top: 4px;
+  padding: 9px 14px;
 }
 
 /* Layout */
@@ -131,33 +252,49 @@ h2 {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 10px 16px;
+  padding: 12px 20px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
   flex-wrap: wrap;
 }
 .brand {
-  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--brand);
+  letter-spacing: -0.02em;
 }
 .topbar nav {
   display: flex;
-  gap: 4px;
+  gap: 2px;
 }
 .topbar nav a {
   color: var(--muted);
   text-decoration: none;
-  padding: 4px 10px;
-  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
-.topbar nav a.active {
+.topbar nav a:hover {
   color: var(--text);
   background: var(--bg);
+}
+.topbar nav a.active {
+  color: var(--accent);
+  background: var(--accent-soft);
 }
 .spacer {
   flex: 1;
 }
 .content {
-  padding: 16px;
+  padding: 20px;
+  max-width: 1280px;
+  margin: 0 auto;
 }
 
 /* Workflows */
@@ -223,8 +360,21 @@ table {
 th,
 td {
   text-align: left;
-  padding: 8px;
+  padding: 9px 10px;
   border-bottom: 1px solid var(--border);
+}
+th {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+tbody tr {
+  transition: background-color 0.1s ease;
+}
+tbody tr:hover {
+  background: var(--bg);
 }
 .truncate {
   max-width: 360px;
@@ -234,10 +384,13 @@ td {
 }
 .badge {
   display: inline-block;
-  padding: 1px 8px;
+  padding: 2px 10px;
   border-radius: 999px;
-  font-size: 12px;
-  border: 1px solid currentColor;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: var(--bg);
+  color: var(--muted);
 }
 .status-completed,
 .risk-low {
@@ -253,6 +406,23 @@ td {
 .risk-blocked {
   color: var(--danger);
 }
+/* Only tint the background for the small inline badges above, never the DSL
+   canvas nodes or timeline steps that reuse these same status/risk classes. */
+.badge.status-completed,
+.badge.risk-low {
+  background: var(--ok-soft);
+}
+.badge.status-waiting_approval,
+.badge.status-running,
+.badge.risk-medium,
+.badge.risk-high {
+  background: var(--warn-soft);
+}
+.badge.status-failed,
+.badge.risk-blocked,
+.badge.status-stopped {
+  background: var(--danger-soft);
+}
 
 /* Approvals */
 .approvals {
@@ -266,9 +436,11 @@ td {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px;
+  padding: 14px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
   flex-wrap: wrap;
 }
 .actions {
@@ -614,15 +786,34 @@ fieldset.mode {
 }
 .tool-table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
 }
 .tool-table td {
-  padding: 6px 4px;
+  padding: 8px 4px;
   border-top: 1px solid var(--border);
   vertical-align: top;
 }
+/* Fixed column widths so a select with the global `width: 100%` can't claim more than its
+   share and squeeze the name column down to where Korean names wrap one syllable per line. */
+.tool-table td:first-child {
+  width: 64%;
+}
+.tool-table td:last-child {
+  width: 36%;
+}
 .tool-table tr.chosen td {
   background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+.tool-table label.inline {
+  align-items: flex-start;
+}
+.tool-table label.inline input[type="checkbox"] {
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+.tool-table td > .muted {
+  margin: 4px 0 0 22px;
 }
 .permission-fields {
   display: grid;
@@ -781,8 +972,9 @@ fieldset.mode {
   align-content: start;
 }
 .tile-value {
-  font-size: 28px;
-  font-weight: 600;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
   line-height: 1.1;
 }
 .status-line {

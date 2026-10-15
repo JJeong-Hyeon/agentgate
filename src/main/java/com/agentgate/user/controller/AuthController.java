@@ -1,5 +1,9 @@
 package com.agentgate.user.controller;
 
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+import com.agentgate.user.oidc.OidcLoginSupport;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
 import com.agentgate.common.response.ErrorResponse;
 import com.agentgate.user.dto.UserResponse;
 import com.agentgate.user.service.LoginAttemptService;
@@ -24,6 +28,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -43,8 +48,14 @@ public class AuthController {
     private final SecurityContextRepository securityContextRepository = new HttpSessionSecurityContextRepository();
     private final WebAuthenticationDetailsSource detailsSource = new WebAuthenticationDetailsSource();
 
+    private final boolean localLoginEnabled;
+    private final OidcLoginSupport oidc;
+
     public AuthController(AuthenticationManager authenticationManager, UserService userService,
-                          LoginAttemptService loginAttempts) {
+                          LoginAttemptService loginAttempts, ObjectProvider<OidcLoginSupport> oidc,
+                          @Value("${agentgate.auth.local-login-enabled:true}") boolean localLoginEnabled) {
+        this.localLoginEnabled = localLoginEnabled;
+        this.oidc = oidc.getIfAvailable();
         this.authenticationManager = authenticationManager;
         this.userService = userService;
         this.loginAttempts = loginAttempts;
@@ -53,9 +64,21 @@ public class AuthController {
     public record LoginRequest(@NotBlank String username, @NotBlank String password) {
     }
 
+    /** How the console may sign in; public, so the login page can show the right buttons. */
+    public record AuthConfig(boolean localLoginEnabled, boolean ssoEnabled, String ssoLabel) {
+    }
+
+    @GetMapping("/config")
+    public AuthConfig config() {
+        return new AuthConfig(localLoginEnabled, oidc != null, oidc == null ? null : oidc.properties().buttonLabel());
+    }
+
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest login, HttpServletRequest request,
                                    HttpServletResponse response) {
+        if (!localLoginEnabled) {
+            return error(HttpStatus.FORBIDDEN, "LOCAL_LOGIN_DISABLED", "Sign in with SSO", request, new HttpHeaders());
+        }
         Optional<Duration> blocked = loginAttempts.blockedFor(login.username(), request.getRemoteAddr());
         if (blocked.isPresent()) {
             long seconds = Math.max(1, (blocked.get().toMillis() + 999) / 1000);
@@ -86,14 +109,23 @@ public class AuthController {
         return ResponseEntity.ok(userService.me(authentication.getName()));
     }
 
+    /** For an SSO sign-in, where to send the browser next so the IdP's own session ends too. */
+    public record LogoutResponse(String logoutUrl) {
+    }
+
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(HttpServletRequest request) {
+    public ResponseEntity<?> logout(HttpServletRequest request) {
+        String idpLogoutUrl = oidc == null ? null : oidc.endSessionUrl(
+                SecurityContextHolder.getContext().getAuthentication(),
+                ServletUriComponentsBuilder.fromContextPath(request).path("/").build().toUriString());
         HttpSession session = request.getSession(false);
         if (session != null) {
             session.invalidate();
         }
         SecurityContextHolder.clearContext();
-        return ResponseEntity.noContent().build();
+        return idpLogoutUrl == null
+                ? ResponseEntity.noContent().build()
+                : ResponseEntity.ok(new LogoutResponse(idpLogoutUrl));
     }
 
     private static ResponseEntity<ErrorResponse> error(HttpStatus status, String code, String message,

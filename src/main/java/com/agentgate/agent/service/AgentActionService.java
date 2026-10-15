@@ -39,6 +39,9 @@ public class AgentActionService {
     private final ApprovalService approvalService;
     private final AuditLogService auditLogService;
 
+    /** Actions the runtime evaluates before an agent uses a non-default LLM provider: "LLM:gemini". */
+    private static final String MODEL_ACTION_PREFIX = "LLM:";
+
     /** For an agent calling with its own API key. */
     public ActionResponse evaluate(ActionRequest request, String apiKey) {
         return evaluate(request, apiKey, false);
@@ -58,10 +61,18 @@ public class AgentActionService {
         }
         Agent agent = found.orElseThrow(() -> new AgentNotFoundException(request.agentId()));
 
-        Optional<Grant> tool = (request.agentVersion() == null) ? Optional.empty()
-                : findGrant(agent, request.agentVersion(), request.action());
+        // A caller may omit the version (e.g. a direct Action API call). If the agent has never had a
+        // definition, there is nothing to enforce: it only ever used the basic policy/risk flow. If it
+        // does have one, falling back to the latest version keeps the tool grant check from being
+        // silently skipped just because the caller didn't pass a version.
+        Integer resolvedVersion = request.agentVersion() != null ? request.agentVersion()
+                : (agent.getLatestDefinitionVersion() > 0 ? agent.getLatestDefinitionVersion() : null);
+        // Using a model provider is not a tool an agent definition grants; policies decide it.
+        boolean enforceGrant = resolvedVersion != null && !request.action().startsWith(MODEL_ACTION_PREFIX);
+        Optional<Grant> tool = enforceGrant
+                ? findGrant(agent, resolvedVersion, request.action()) : Optional.empty();
         List<String> labels = tool.map(t -> merge(request.labels(), t.labels())).orElse(request.labels());
-        Decision decision = decide(agent, request, tool, labels);
+        Decision decision = decide(agent, request, tool, labels, enforceGrant);
 
         Long approvalId = null;
         if (decision.status() == ActionStatus.APPROVAL_REQUIRED) {
@@ -80,8 +91,8 @@ public class AgentActionService {
     }
 
     private Decision decide(Agent agent, ActionRequest request, Optional<Grant> tool,
-                            List<String> labels) {
-        if (request.agentVersion() != null) {
+                            List<String> labels, boolean enforceGrant) {
+        if (enforceGrant) {
             if (tool.isEmpty()) {
                 return Decision.blocked(DecisionBasis.TOOL_NOT_GRANTED);
             }

@@ -3,6 +3,7 @@ package com.agentgate.agent.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -104,8 +105,8 @@ class AgentActionServiceTest {
         ActionResponse response = service.evaluate(
                 new ActionRequest("mail-agent", "MCP:notes:save_note", null, List.of()), API_KEY);
 
-        // The agent's definition lists no such tool, yet a call that names no version is judged by policy alone:
-        // tool grants are enforced for runtime-run agents (which always name their version).
+        // The agent has never had a definition at all, so there is no grant to enforce: it is
+        // judged by policy alone, same as before any Agent Definition / Tool Catalog existed.
         assertThat(response.status()).isEqualTo(ActionStatus.ALLOWED);
     }
 
@@ -207,6 +208,31 @@ class AgentActionServiceTest {
     }
 
     @Test
+    void modelProviderActionsAreDecidedByPolicyNotByToolGrants() {
+        // The agent has a definition (so tool grants would apply), yet its grants are never consulted.
+        Agent agent = new Agent("mail-agent", "Mail Agent", ApiKeyGenerator.hash(API_KEY));
+        agent.nextDefinitionVersion(null);
+        agent.nextDefinitionVersion(null);
+        when(agentRepository.findByAgentId("mail-agent")).thenReturn(Optional.of(agent));
+        when(riskEvaluationService.evaluate("LLM:gemini", List.of()))
+                .thenReturn(new RiskEvaluationResult(RiskLevel.BLOCKED, ActionStatus.BLOCKED));
+
+        ActionResponse blocked = service.evaluate(toolCall(agent, "LLM:gemini"), null, true);
+
+        assertThat(blocked.status()).isEqualTo(ActionStatus.BLOCKED);
+        assertThat(blocked.basis()).isEqualTo(DecisionBasis.POLICY);  // not TOOL_NOT_GRANTED
+        verify(auditLogService).record(eq("mail-agent"), eq("LLM:gemini"), any(), any(),
+                eq(RiskLevel.BLOCKED), eq(ActionStatus.BLOCKED), any(), eq(DecisionBasis.POLICY), any(), any());
+
+        when(riskEvaluationService.evaluate("LLM:openai", List.of()))
+                .thenReturn(new RiskEvaluationResult(RiskLevel.LOW, ActionStatus.ALLOWED));
+
+        assertThat(service.evaluate(toolCall(agent, "LLM:openai"), null, true).status())
+                .isEqualTo(ActionStatus.ALLOWED);
+        verify(agentDefinitionService, never()).definition(any(), anyInt());
+    }
+
+    @Test
     void blocksToolsMarkedBlockedWhateverPoliciesSay() {
         Agent agent = agentWithTools(new AgentToolDefinition("notes", "delete_note", ToolPermission.BLOCKED, List.of()));
 
@@ -214,6 +240,20 @@ class AgentActionServiceTest {
 
         assertThat(response.status()).isEqualTo(ActionStatus.BLOCKED);
         assertThat(response.basis()).isEqualTo(DecisionBasis.TOOL_BLOCKED);
+    }
+
+    @Test
+    void blocksToolsNotGrantedWhenNoVersionIsNamedButTheAgentHasADefinition() {
+        // A direct Action API call (no agentVersion) for an agent that does have tool grants must
+        // not skip the grant check just because the caller omitted the version: it falls back to
+        // the latest definition instead of passing through to policy alone.
+        agentWithTools(new AgentToolDefinition("notes", "list_notes", ToolPermission.AUTO, List.of()));
+
+        ActionResponse response = service.evaluate(
+                new ActionRequest("mail-agent", "MCP:notes:delete_note", null, List.of()), API_KEY);
+
+        assertThat(response.status()).isEqualTo(ActionStatus.BLOCKED);
+        assertThat(response.basis()).isEqualTo(DecisionBasis.TOOL_NOT_GRANTED);
     }
 
     @Test
@@ -261,6 +301,8 @@ class AgentActionServiceTest {
 
     private Agent agentWithTools(AgentToolDefinition... tools) {
         Agent agent = new Agent("mail-agent", "Mail Agent", ApiKeyGenerator.hash(API_KEY));
+        agent.nextDefinitionVersion(null);
+        agent.nextDefinitionVersion(null);
         when(agentRepository.findByAgentId("mail-agent")).thenReturn(Optional.of(agent));
         when(agentDefinitionService.definition(agent, 2)).thenReturn(
                 new AgentDefinition(null, null, null, "prompt", List.of(tools), 8, null, null, null, null, null));

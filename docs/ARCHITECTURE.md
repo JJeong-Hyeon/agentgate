@@ -312,7 +312,7 @@ Risk Assessment
 Agent별 `maxRiskLevel` 상한도 그대로 적용된다. 이 부분이 일반적인 LangGraph GUI와의
 핵심 차별점이다.
 
-Agent 정의의 Tool 권한은 정책 앞 단계에서 적용된다 (요청에 `agentVersion`이 있을 때).
+Agent 정의의 Tool 권한은 정책 앞 단계에서 적용된다. 요청에 `agentVersion`이 있으면 그 버전 기준으로, 없어도(예: 버전을 모르는 직접 Action API 호출) 그 Agent가 정의를 가진 적이 있다면 최신 버전 기준으로 똑같이 적용된다 — 버전을 생략한다고 Tool 권한 검사를 건너뛰지 않는다(2026-10-13 수정, [`TEST_EVIDENCE.md`](TEST_EVIDENCE.md)). 정의가 아예 없는 Agent(기본 정책 모드)만 이 단계 없이 바로 정책으로 간다.
 
 ```text
 Tool Request (agentId, agentVersion)
@@ -628,7 +628,7 @@ Phase 1~9 완료, 이후 운영 · 보안 보강까지 반영(버전별 변경�
 - 인증에 실패한 요청이 세션을 만들지 않도록 요청 캐시를 끄고, 브라우저의 Basic 로그인 창이 뜨지 않도록 401에는 `WWW-Authenticate`를 싣지 않는다
 - 로그인 실패는 아이디+IP, IP 단위로 센다(Redis, Redis에 닿지 못하면 막지 않음). 한도를 넘으면 비밀번호가 맞아도 429
 - 응답에 CSP(`default-src 'self'` 등)를 싣는다
-- 스크립트 · 자동화는 같은 API를 HTTP Basic으로 호출한다. 사내 계정(OIDC · SAML) 연동은 없다
+- 스크립트 · 자동화는 같은 API를 HTTP Basic으로 호출한다. 사내 계정은 OIDC(Authorization Code + PKCE)로 연동할 수 있고(설정으로 켠다), SAML은 지원하지 않는다. IdP의 그룹을 ADMIN/EDITOR/APPROVER/VIEWER로 매핑하며, 매핑되는 그룹이 없으면 로그인을 거부한다
 
 ### 22.3 Runtime 보호
 
@@ -640,6 +640,6 @@ Phase 1~9 완료, 이후 운영 · 보안 보강까지 반영(버전별 변경�
 
 - **실시간 화면 동기화**: 실행 화면의 SSE는 "상태 읽기 + 구독 등록"과 "이벤트 적용 + 발행"을 실행별 락으로 서로 배타적으로 처리해, 이벤트가 누락되거나 오래된 스냅샷이 최신 상태를 덮어쓰지 않게 한다
 - **재시작 복구**: AgentGate가 1분마다 `RUNNING`인데 Runtime에서 돌고 있지 않은 실행(시작 후 2분 경과)을 찾아 `POST /runtime/executions/{id}/recover`로 마지막 체크포인트부터 이어 실행한다. Tool 실행 도중 끊긴 실행은 이미 실행됐을 수 있어 이어 가지 않고 `FAILED`로 표시한다
-- **중복 방지**: HTTP Tool 호출에 `Idempotency-Key: <실행 ID>:<단계>`를 붙인다(받는 쪽이 재시도 · 복구로 인한 반복을 걸러낼 수 있다). MCP Tool에는 붙일 자리가 없다. 승인 재개는 Runtime이 `_running` 집합으로 중복을 막고, 이미 재개된 실행에 대한 중복 알림은 409/404로 완료 처리한다
+- **중복 방지**: HTTP/MCP Tool 호출 모두 `tool_call_ledger`(Postgres, `runtime/app/tools/ledger.py`)를 거친다. 키는 `<실행 ID>:<노드>:<payload hash>` — 같은 인자로 다시 들어오면 실행하지 않고 원장에 기록된 결과를 그대로 돌려주고(`EXECUTED`/`FAILED` 모두), 결과 없이 끊긴 호출(`STARTED`만 있음)은 재시도 대신 안전하게 `FAILED`로 막는다. HTTP Tool은 추가로 `Idempotency-Key` 헤더도 보낸다(받는 쪽이 자체적으로 걸러낼 수 있도록, 원장과는 별개). `RUNTIME_DATABASE_URL`이 없으면(인메모리 체크포인터) 원장도 비활성화된다. 승인 재개는 Runtime이 `_running` 집합으로 중복을 막고, 이미 재개된 실행에 대한 중복 알림은 409/404로 완료 처리한다. 원장이 보장하지 못하는 것(응답 유실로 외부 호출이 실제로는 두 번 간 경우 등)은 [`SECURITY.md`](SECURITY.md)에 정리
 - **모델 호출 제한**: `LLM_MAX_CONCURRENCY`로 모델 서버에 동시에 보내는 호출 수를 제한하고 나머지는 Runtime에서 줄 선다(대기는 모델 타임아웃에 포함되지 않음). 한 턴에 여러 Tool을 부르면 첫 호출만 실행하고 나머지는 결과를 본 뒤 모델이 다시 정한다(`LLM_PARALLEL_TOOL_CALLS`)
 - **보존**: 끝난 실행의 기록과 Runtime 체크포인트는 `AGENTGATE_EXECUTION_RETENTION`(기본 90일)이 지나면 지운다. 감사 로그와 승인 기록은 지우지 않는다

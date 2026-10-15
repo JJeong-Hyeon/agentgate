@@ -68,11 +68,21 @@ public class AgentGateMetrics {
         if (step.hasLlmCall()) {
             String model = orUnknown(step.llmModel());
             Timer.builder("agentgate.llm.latency")
-                    .description("Model calls agents made, with how long the model took to answer")
+                    .description("Model calls agents made, with how long the model took to answer "
+                            + "(the call itself, not time spent waiting under LLM_MAX_CONCURRENCY)")
                     .tag("model", model)
                     .tag("agent", agent)
                     .register(registry)
                     .record(Duration.ofMillis(step.llmLatencyMs()));
+            if (step.llmQueueWaitMs() != null) {
+                Timer.builder("agentgate.llm.queue_wait")
+                        .description("Time model calls spent waiting for a free slot under "
+                                + "LLM_MAX_CONCURRENCY before the call itself started")
+                        .tag("model", model)
+                        .tag("agent", agent)
+                        .register(registry)
+                        .record(Duration.ofMillis(step.llmQueueWaitMs()));
+            }
             tokens(model, agent, "input", step.inputTokens());
             tokens(model, agent, "output", step.outputTokens());
         }

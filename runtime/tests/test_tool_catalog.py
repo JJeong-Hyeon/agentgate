@@ -41,7 +41,7 @@ def test_lists_a_real_stdio_server():
     assert server.error is None
     assert server.transport == "stdio"
     tools = {t.name: t for t in server.tools}
-    assert set(tools) == {"echo", "add", "fail"}
+    assert set(tools) == {"echo", "add", "fail", "count"}
     assert tools["add"].input_schema["properties"]["a"]["type"] == "integer"
     assert tools["add"].input_schema["required"] == ["a", "b"]
     assert tools["add"].annotations == {"readOnlyHint": True}
