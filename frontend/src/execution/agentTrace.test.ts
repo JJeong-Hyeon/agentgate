@@ -1,5 +1,13 @@
 import type { NodeExecution } from "../api/types";
-import { agentTrace, callLabel, delegationPath, isQuietAgentStep, toolLabel, totalTokens } from "./agentTrace";
+import {
+  agentTrace,
+  callLabel,
+  delegationPath,
+  executionStats,
+  isQuietAgentStep,
+  toolLabel,
+  totalTokens,
+} from "./agentTrace";
 
 const step = (stepName: string, output: unknown, status: NodeExecution["status"] = "COMPLETED"): NodeExecution => ({
   taskId: stepName,
@@ -51,5 +59,39 @@ describe("agent traces", () => {
     expect(callLabel("notes__save_note")).toBe("notes__save_note");
     expect(delegationPath({ agent: "deep", delegated_by: "lead>research" })).toBe("lead → research → deep");
     expect(delegationPath({ agent: "lead" })).toBeNull();
+  });
+});
+
+describe("execution stats", () => {
+  const timed = (node: NodeExecution, startedAt: string, finishedAt: string): NodeExecution => ({
+    ...node,
+    startedAt: `2026-01-01T00:00:${startedAt}Z`,
+    finishedAt: `2026-01-01T00:00:${finishedAt}Z`,
+  });
+
+  it("counts LLM, Reviewer and tool nodes, not only agents (market-report)", () => {
+    const nodes = [
+      timed(step("plan", { plan: "outline" }), "00", "02"),
+      step("research", { agent: { kind: "start", prompt: "p", agent: "researcher" } }),
+      step("research.think", { agent: { kind: "answer", answer: "a", llm: { latency_ms: 1500 } } }),
+      timed(step("review", { review: "VERDICT: APPROVE", revisions: { review: 1 } }), "05", "08"),
+      step("publish", { pending_tool: { status: "ALLOWED" } }),
+      step("publish.execute", {
+        pending_tool: null,
+        tool_results: [{ tool: "publish", status: "EXECUTED", duration_ms: 120 }],
+        publish: "ok",
+      }),
+    ];
+    expect(executionStats(nodes)).toEqual({ llmCalls: 3, llmMs: 2000 + 1500 + 3000, toolRuns: 1, toolMs: 120 });
+  });
+
+  it("counts failed tool runs but not denied ones, and ignores unfinished model nodes", () => {
+    const nodes = [
+      step("fetch.execute", { tool_results: [{ status: "FAILED", duration_ms: 40 }], fetch: "x" }),
+      step("send", { tool_results: [{ status: "BLOCKED" }], stopped: { node: "send" } }),
+      step("approve", { approve: "APPROVED", tool_results: [{ status: "APPROVED" }] }),
+      step("plan", "", "RUNNING"),
+    ];
+    expect(executionStats(nodes)).toEqual({ llmCalls: 0, llmMs: 0, toolRuns: 1, toolMs: 40 });
   });
 });
